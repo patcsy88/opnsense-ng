@@ -23,6 +23,8 @@ os.environ["CREDENTIAL_ENCRYPTION_KEY"] = TEST_FERNET_KEY
 os.environ["SESSION_TTL_MINUTES"] = "30"
 os.environ["OPNSENSE_BACKOFF_BASE_S"] = "0"
 os.environ["LOGIN_RATE_LIMIT"] = "5/minute"
+os.environ["ALLOWED_HOSTS"] = "test,localhost"
+os.environ["LOGIN_LOCKOUT_THRESHOLD"] = "50"  # per-IP limiter is what most tests exercise
 
 from app.auth.security import hash_password  # noqa: E402
 from app.core.ratelimit import limiter  # noqa: E402
@@ -30,6 +32,8 @@ from app.db.models import Role, User  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
+SESSION_COOKIE = "__Host-session"
+CSRF_COOKIE = "__Host-csrf_token"
 
 
 def pytest_collection_modifyitems(items: list[pytest.Item]) -> None:
@@ -58,7 +62,10 @@ async def db(migrated_db: None) -> AsyncIterator[None]:
     app = create_app()
     with app.state.engine.begin() as conn:
         conn.execute(
-            text("TRUNCATE audit_log, sessions, firewalls, users RESTART IDENTITY CASCADE")
+            text(
+                "TRUNCATE audit_log, sessions, firewalls, users, login_throttle "
+                "RESTART IDENTITY CASCADE"
+            )
         )
     app.state.engine.dispose()
     yield
@@ -89,4 +96,4 @@ async def login(
 
 
 def csrf_headers(client: httpx.AsyncClient) -> dict[str, str]:
-    return {"X-CSRF-Token": client.cookies.get("csrf_token") or ""}
+    return {"X-CSRF-Token": client.cookies.get("__Host-csrf_token") or ""}

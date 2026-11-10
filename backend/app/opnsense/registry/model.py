@@ -30,4 +30,6 @@ class Operation(BaseModel):
     min_version: str | None = None
     required_plugin: str | None = None
     supported: bool = True
+    # True only after the endpoint/privilege were confirmed against a real (lab) OPNsense.
+    verified: bool = False
     notes: str = ""

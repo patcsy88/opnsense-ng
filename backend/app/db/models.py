@@ -5,12 +5,15 @@ import uuid
 from datetime import UTC, datetime
 from typing import Any
 
-from sqlalchemy import Boolean, DateTime, ForeignKey, Index, String, Text
+from sqlalchemy import Boolean, DateTime, ForeignKey, Index, Integer, String, Text
 from sqlalchemy import Enum as SAEnum
 from sqlalchemy.dialects.postgresql import JSONB, UUID
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base
+
+BASE_URL_MAX_LENGTH = 500
+USER_AGENT_MAX_LENGTH = 256
 
 
 def utcnow() -> datetime:
@@ -51,10 +54,28 @@ class Session(Base):
         DateTime(timezone=True), nullable=False, default=utcnow
     )
     expires_at: Mapped[datetime] = mapped_column(DateTime(timezone=True), nullable=False)
+    # Updated (at most once a minute) on use; drives the idle timeout.
+    last_seen_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
 
     user: Mapped[User] = relationship()
 
     __table_args__ = (Index("ix_sessions_expires_at", "expires_at"),)
+
+
+class LoginThrottle(Base):
+    """Consecutive failed logins per (normalised) username, including unknown usernames, so
+    the response never reveals whether an account exists. Survives restarts."""
+
+    __tablename__ = "login_throttle"
+
+    username: Mapped[str] = mapped_column(String(64), primary_key=True)
+    failures: Mapped[int] = mapped_column(Integer, nullable=False, default=0)
+    last_failure_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    locked_until: Mapped[datetime | None] = mapped_column(DateTime(timezone=True), nullable=True)
 
 
 class Firewall(Base):
@@ -62,10 +83,12 @@ class Firewall(Base):
 
     id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
     name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
-    base_url: Mapped[str] = mapped_column(String(500), nullable=False)
+    base_url: Mapped[str] = mapped_column(String(BASE_URL_MAX_LENGTH), nullable=False)
     api_key_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     api_secret_encrypted: Mapped[str] = mapped_column(Text, nullable=False)
     verify_tls: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
+    # Optional PEM bundle (public certificates only) trusted instead of the system store.
+    ca_bundle_pem: Mapped[str | None] = mapped_column(Text, nullable=True)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
@@ -85,8 +108,11 @@ class AuditLog(Base):
     )
     outcome: Mapped[str] = mapped_column(String(20), nullable=False)
     detail: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    source_ip: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    user_agent: Mapped[str | None] = mapped_column(String(USER_AGENT_MAX_LENGTH), nullable=True)
 
     __table_args__ = (
         Index("ix_audit_log_timestamp", "timestamp"),
         Index("ix_audit_log_firewall_id", "firewall_id"),
+        Index("ix_audit_log_ip_action_ts", "source_ip", "action", "timestamp"),
     )

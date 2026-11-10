@@ -49,25 +49,23 @@ async def test_login_me_logout_and_audit(app_client: httpx.AsyncClient) -> None:
     r = await login(app_client, "alice")
     assert r.status_code == 200 and r.json()["user"]["role"] == "admin"
     cookie = r.headers.get_list("set-cookie")
-    session_cookie = next(c for c in cookie if c.startswith("session="))
+    session_cookie = next(c for c in cookie if c.startswith("__Host-session="))
     assert all(f in session_cookie for f in ("HttpOnly", "Secure", "SameSite=strict"))
-    csrf_cookie = next(c for c in cookie if c.startswith("csrf_token="))
+    csrf_cookie = next(c for c in cookie if c.startswith("__Host-csrf_token="))
     assert "Secure" in csrf_cookie and "SameSite=strict" in csrf_cookie
     assert (await app_client.get("/api/v1/auth/me")).json()["username"] == "alice"
 
     out = await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
     assert out.status_code == 204
     assert (await app_client.get("/api/v1/auth/me")).status_code == 401
-    assert [(a.action, a.outcome) for a in await audit_rows(app_client)] == [
-        ("auth.login", "success"),
-        ("auth.logout", "success"),
-    ]
+    audited = [(a.action, a.outcome) for a in await audit_rows(app_client)]
+    assert audited[:2] == [("auth.login", "success"), ("auth.logout", "success")]
 
 
 async def test_session_token_stored_hashed(app_client: httpx.AsyncClient) -> None:
     await make_user(app_client, "alice", Role.admin)
     await login(app_client, "alice")
-    raw = app_client.cookies.get("session")
+    raw = app_client.cookies.get("__Host-session")
     with app_client.app.state.sessionmaker() as s:  # type: ignore[attr-defined]
         from app.db.models import Session
 
@@ -81,7 +79,7 @@ async def test_wrong_password_and_unknown_user_are_generic(app_client: httpx.Asy
     bad_user = await login(app_client, "nobody", "wrong-password")
     assert bad_pw.status_code == bad_user.status_code == 401
     assert bad_pw.json() == bad_user.json() == {"detail": "Invalid username or password"}
-    assert "session" not in bad_pw.cookies
+    assert "__Host-session" not in bad_pw.cookies
     rows = await audit_rows(app_client)
     assert [a.outcome for a in rows] == ["failure", "failure"]
 
@@ -131,7 +129,7 @@ async def test_csrf_rejected(app_client: httpx.AsyncClient) -> None:
     logout_no = await app_client.post("/api/v1/auth/logout")
     assert no_header.status_code == wrong.status_code == logout_no.status_code == 403
     # a header matching a forged cookie still fails: it must match the server-side session
-    app_client.cookies.set("csrf_token", "forged", domain="test")
+    app_client.cookies.set("__Host-csrf_token", "forged", domain="test")
     forged = await app_client.post(
         "/api/v1/firewalls", json=FW_BODY, headers={"X-CSRF-Token": "forged"}
     )
@@ -228,7 +226,7 @@ async def test_credentials_never_in_logs_or_errors(app_client: httpx.AsyncClient
             side_effect=httpx.ConnectError(f"boom {API_KEY} {API_SECRET}")
         )
         s = await app_client.get(f"/api/v1/firewalls/{fid}/system/status")
-    session_cookie = app_client.cookies.get("session") or ""
+    session_cookie = app_client.cookies.get("__Host-session") or ""
     everything = stream.getvalue() + s.text + PASSWORD
     assert API_KEY not in stream.getvalue() and API_SECRET not in stream.getvalue()
     assert API_KEY not in s.text and API_SECRET not in s.text

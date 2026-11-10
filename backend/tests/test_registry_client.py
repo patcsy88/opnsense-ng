@@ -115,7 +115,7 @@ async def test_http_errors_map_to_status_without_retry() -> None:
     cases = {
         401: ConnectionStatus.auth_failed,
         403: ConnectionStatus.forbidden,
-        404: ConnectionStatus.not_found,
+        404: ConnectionStatus.endpoint_not_found,
     }
     for code, expected in cases.items():
         with respx.mock() as router:

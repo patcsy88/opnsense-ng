@@ -16,6 +16,7 @@ _ENTRIES = (
         endpoint="/api/diagnostics/system/system_information",
         required_privilege="Diagnostics: System Information",
         read_only=True,
+        verified=False,
     ),
     Operation(
         operation_id=CONNECTIVITY_CHECK,
@@ -23,6 +24,7 @@ _ENTRIES = (
         endpoint="/api/diagnostics/system/system_time",
         required_privilege="Diagnostics: System Information",
         read_only=True,
+        verified=False,
         notes="Cheap authenticated call used to verify reachability, TLS and credentials.",
     ),
 )

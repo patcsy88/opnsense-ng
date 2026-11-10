@@ -9,6 +9,8 @@ class ConnectionStatus(enum.StrEnum):
     auth_failed = "auth_failed"
     forbidden = "forbidden"
     not_found = "not_found"
+    endpoint_not_found = "endpoint_not_found"
+    blocked_target = "blocked_target"
     server_error = "server_error"
     bad_response = "bad_response"
 
@@ -21,3 +23,8 @@ class FirewallError(Exception):
         self.status = status
         self.retry_ok = False
         self.message = message
+
+
+# Statuses shown to non-admin roles: everything collapses to reachable / unreachable.
+def public_status(status: ConnectionStatus) -> str:
+    return "reachable" if status is ConnectionStatus.ok else "unreachable"

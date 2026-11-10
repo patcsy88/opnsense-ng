@@ -8,7 +8,14 @@ import httpx
 
 from app.core.logging import get_logger
 from app.opnsense.errors import ConnectionStatus, FirewallError
+from app.opnsense.netpolicy import (
+    PinnedTransport,
+    TargetNotAllowedError,
+    TargetPolicy,
+    split_host,
+)
 from app.opnsense.registry import HttpMethod, Operation, get_operation
+from app.opnsense.tls import build_ssl_context
 
 log = get_logger("opnsense.client")
 
@@ -23,6 +30,8 @@ class OPNsenseClient:
         api_key: str,
         api_secret: str,
         verify_tls: bool = True,
+        ca_bundle_pem: str | None = None,
+        policy: TargetPolicy | None = None,
         connect_timeout_s: float = 5.0,
         read_timeout_s: float = 15.0,
         max_retries: int = 2,
@@ -31,10 +40,19 @@ class OPNsenseClient:
     ) -> None:
         self._max_retries = max_retries
         self._backoff = backoff_base_s
+        self.policy = policy or TargetPolicy()
+        self._host = split_host(base_url)[0]
+        if transport is None:
+            # Resolve -> validate -> connect to the validated IP (DNS-rebinding defence); TLS
+            # keeps using the configured hostname for SNI and certificate verification.
+            transport = PinnedTransport(
+                ssl_context=build_ssl_context(verify_tls=verify_tls, ca_bundle_pem=ca_bundle_pem),
+                policy=self.policy,
+            )
         self._http = httpx.AsyncClient(
             base_url=base_url.rstrip("/"),
             auth=httpx.BasicAuth(api_key, api_secret),
-            verify=verify_tls,
+            trust_env=False,
             timeout=httpx.Timeout(read_timeout_s, connect=connect_timeout_s),
             follow_redirects=False,
             transport=transport,
@@ -48,6 +66,8 @@ class OPNsenseClient:
         """Run a registry operation by id. Raises UnknownOperationError/UnsupportedOperationError
         for ids that are not executable, and FirewallError for connectivity/API failures."""
         op = get_operation(operation_id)
+        if not self.policy.host_allowed(self._host):
+            raise FirewallError(ConnectionStatus.blocked_target, "Firewall address is not allowed")
         return await self._send(op, payload)
 
     async def _send(self, op: Operation, payload: dict[str, Any] | None) -> Any:
@@ -81,6 +101,10 @@ class OPNsenseClient:
         except httpx.TimeoutException:
             raise FirewallError(ConnectionStatus.timeout, "Firewall request timed out") from None
         except httpx.ConnectError as exc:
+            if _has_cause(exc, TargetNotAllowedError):
+                raise FirewallError(
+                    ConnectionStatus.blocked_target, "Firewall address is not allowed"
+                ) from None
             if _is_tls_error(exc):
                 raise FirewallError(
                     ConnectionStatus.tls_error, "TLS certificate verification failed"
@@ -101,9 +125,15 @@ class OPNsenseClient:
                 ConnectionStatus.forbidden, "API key lacks the privilege for this operation"
             )
         if code == 404:
-            raise FirewallError(
-                ConnectionStatus.not_found, "Operation not available on this firewall"
+            # Not "operation unavailable": our registry path or the firewall version differs.
+            log.error(
+                "registry_endpoint_not_found", endpoint=op.endpoint, operation=op.operation_id
             )
+            err = FirewallError(
+                ConnectionStatus.endpoint_not_found,
+                "Registry endpoint not found on this firewall (registry or version problem)",
+            )
+            raise err
         if code >= 500 or code in _RETRY_STATUS:
             err = FirewallError(ConnectionStatus.server_error, f"Firewall returned HTTP {code}")
             err.retry_ok = code in _RETRY_STATUS
@@ -118,10 +148,16 @@ class OPNsenseClient:
             ) from None
 
 
-def _is_tls_error(exc: BaseException) -> bool:
+def _has_cause(exc: BaseException, kind: type[BaseException]) -> bool:
     cause: BaseException | None = exc
-    while cause is not None:
-        if isinstance(cause, ssl.SSLError):
+    seen = 0
+    while cause is not None and seen < 10:
+        if isinstance(cause, kind):
             return True
         cause = cause.__cause__ or cause.__context__
+        seen += 1
     return False
+
+
+def _is_tls_error(exc: BaseException) -> bool:
+    return _has_cause(exc, ssl.SSLError)

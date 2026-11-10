@@ -1,15 +1,22 @@
 import uuid
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
+from app.auth.security import PASSWORD_MAX_LENGTH, USERNAME_MAX_LENGTH, normalise_username
 from app.db.models import Role
 
 
 class LoginRequest(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
-    username: str = Field(min_length=1, max_length=64)
-    password: str = Field(min_length=1, max_length=256)
+    username: str = Field(min_length=1, max_length=USERNAME_MAX_LENGTH)
+    # Login accepts anything up to the policy maximum (older passwords may predate the policy).
+    password: str = Field(min_length=1, max_length=PASSWORD_MAX_LENGTH)
+
+    @field_validator("username")
+    @classmethod
+    def _normalise(cls, value: str) -> str:
+        return normalise_username(value)
 
 
 class UserOut(BaseModel):
@@ -21,3 +28,7 @@ class UserOut(BaseModel):
 class LoginResponse(BaseModel):
     user: UserOut
     csrf_token: str
+
+
+class LogoutAllResponse(BaseModel):
+    revoked: int
