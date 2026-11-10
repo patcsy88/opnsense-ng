@@ -1,6 +1,6 @@
 # ADR-0001: Backend-mediated access and API capability registry
 
-- Status: proposed (awaiting owner approval)
+- Status: accepted (approved by project owner on 2026-11-10)
 - Date: 2026-11-10
 - Deciders: project owner
 
