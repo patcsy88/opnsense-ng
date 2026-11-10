@@ -1,0 +1,20 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>Offline - OPNsense Firewall Manager</title>
+    <style>
+      body{font-family:system-ui,sans-serif;background:#0f172a;color:#e2e8f0;display:grid;place-items:center;min-height:100vh;margin:0;text-align:center}
+      main{max-width:26rem;padding:1.5rem}
+      button{margin-top:1rem;padding:.5rem 1rem;border-radius:.375rem;border:0;background:#38bdf8;color:#0f172a;font-weight:600;cursor:pointer}
+    </style>
+  </head>
+  <body>
+    <main>
+      <h1>You are offline</h1>
+      <p>The firewall manager needs a network connection. No firewall data is stored on this device.</p>
+      <button onclick="location.reload()">Retry</button>
+    </main>
+  </body>
+</html>
