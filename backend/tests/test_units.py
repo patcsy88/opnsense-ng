@@ -110,14 +110,31 @@ def test_policy_always_denies(ip: str) -> None:
     )
 
 
-def test_policy_private_allowed_by_default_and_configurable() -> None:
-    assert TargetPolicy().ip_allowed(ipaddress.ip_address("192.168.1.1"))
-    assert TargetPolicy().ip_allowed(ipaddress.ip_address("203.0.113.5"))
+@pytest.mark.parametrize(
+    "ip", ["10.1.1.1", "172.16.0.1", "172.31.255.254", "192.168.1.1", "fd12:3456::1", "fc00::1"]
+)
+def test_policy_private_allowed_by_default(ip: str) -> None:
+    assert TargetPolicy().ip_allowed(ipaddress.ip_address(ip))
+
+
+@pytest.mark.parametrize(
+    "ip", ["203.0.113.5", "8.8.8.8", "93.184.216.34", "172.32.0.1", "11.0.0.1", "2001:db8::1"]
+)
+def test_policy_public_rejected_by_default(ip: str) -> None:
+    assert not TargetPolicy().ip_allowed(ipaddress.ip_address(ip))
+
+
+def test_policy_is_configurable() -> None:
+    public = ipaddress.ip_address("203.0.113.5")
+    assert TargetPolicy(allowed_networks=[ipaddress.ip_network("203.0.113.0/24")]).ip_allowed(
+        public
+    )
     deny = TargetPolicy(denied_networks=[ipaddress.ip_network("10.0.0.0/8")])
     assert not deny.ip_allowed(ipaddress.ip_address("10.1.1.1"))
     allow = TargetPolicy(allowed_networks=[ipaddress.ip_network("192.168.0.0/16")])
     assert allow.ip_allowed(ipaddress.ip_address("192.168.9.9"))
     assert not allow.ip_allowed(ipaddress.ip_address("10.1.1.1"))
+    assert not TargetPolicy(allowed_networks=[]).ip_allowed(ipaddress.ip_address("10.1.1.1"))
 
 
 def test_policy_own_hostnames_and_literals() -> None:
@@ -126,7 +143,9 @@ def test_policy_own_hostnames_and_literals() -> None:
     assert not p.host_allowed("Manager.Example.com.")
     assert not p.host_allowed("127.0.0.1")
     assert not p.host_allowed("[::1]")
-    assert p.host_allowed("fw.example.net")
+    assert p.host_allowed("fw.example.net")  # names are judged on their resolved addresses
+    assert p.host_allowed("10.0.0.1")
+    assert not p.host_allowed("203.0.113.5")
 
 
 def test_filter_resolved_rejects_mixed_answers() -> None:
@@ -181,7 +200,10 @@ async def test_pinned_backend_rebinding(monkeypatch: pytest.MonkeyPatch) -> None
     answers["fw.example.test"] = ["127.0.0.1"]  # rebinding
     with pytest.raises(TargetNotAllowedError):
         await backend.connect_tcp("fw.example.test", 443)
-    answers["fw.example.test"] = ["93.184.216.34", "169.254.169.254"]
+    answers["fw.example.test"] = ["93.184.216.34"]  # public: not in the default allow-list
+    with pytest.raises(TargetNotAllowedError):
+        await backend.connect_tcp("fw.example.test", 443)
+    answers["fw.example.test"] = ["192.168.1.10", "169.254.169.254"]
     with pytest.raises(TargetNotAllowedError):
         await backend.connect_tcp("fw.example.test", 443)
     with pytest.raises(TargetNotAllowedError):
@@ -318,6 +340,19 @@ def test_defaults_are_safe(monkeypatch: pytest.MonkeyPatch) -> None:
     s = Settings(_env_file=None)
     assert s.trusted_proxies == [] and s.allow_insecure_tls is False
     assert s.session_idle_timeout_minutes == 30 and s.max_sessions_per_user == 5
+    assert s.allowed_firewall_networks == [
+        "10.0.0.0/8", "172.16.0.0/12", "192.168.0.0/16", "fc00::/7"
+    ]  # fmt: skip
+
+
+def test_allowed_firewall_networks_override(monkeypatch: pytest.MonkeyPatch) -> None:
+    _env(monkeypatch, ALLOWED_FIREWALL_NETWORKS="203.0.113.0/24, 10.0.0.0/8")
+    assert Settings(_env_file=None).allowed_firewall_networks == ["203.0.113.0/24", "10.0.0.0/8"]
+    _env(monkeypatch, ALLOWED_FIREWALL_NETWORKS="")  # empty never widens or empties the policy
+    assert "192.168.0.0/16" in Settings(_env_file=None).allowed_firewall_networks
+    _env(monkeypatch, ALLOWED_FIREWALL_NETWORKS="bogus")
+    with pytest.raises(ValueError):
+        Settings(_env_file=None)
 
 
 # ---- L6 crypto binding, L5 logging --------------------------------------------------------
@@ -352,3 +387,19 @@ def test_known_secrets_bounded_and_stdlib_redacted() -> None:
         lg.removeHandler(handler)
     out = stream.getvalue()
     assert "stdlib-leak-value" not in out and "abcdef123456" not in out
+
+
+def test_uvicorn_access_records_survive_redaction() -> None:
+    """The filter must leave uvicorn.access args as a tuple (its formatter unpacks them)."""
+    import logging
+
+    from uvicorn.logging import AccessFormatter
+
+    from app.core.logging import RedactingFilter
+
+    record = logging.LogRecord(
+        "uvicorn.access", logging.INFO, "", 0, '%s - "%s %s HTTP/%s" %d',
+        ("127.0.0.1:1", "GET", "/health", "1.1", 200), None,
+    )  # fmt: skip
+    assert RedactingFilter().filter(record)
+    assert '"GET /health HTTP/1.1" 200' in AccessFormatter("%(message)s").format(record)

@@ -3,9 +3,10 @@
 * ``parse_base_url`` is purely syntactic: https, host, optional port; nothing else.
 * ``TargetPolicy`` decides whether an IP or hostname may be contacted. Loopback, link-local
   (incl. 169.254.169.254), unspecified, multicast, reserved and well-known cloud metadata
-  addresses are ALWAYS denied. RFC1918 is allowed by default because firewalls live there;
-  ``denied_networks`` removes ranges, and a non-empty ``allowed_networks`` turns the policy
-  into an allow-list.
+  addresses are ALWAYS denied. Beyond that the policy is an allow-list: by default only private
+  ranges (RFC1918 + IPv6 ULA) are permitted, so public targets need an explicit
+  ``allowed_networks`` entry. ``denied_networks`` removes ranges from the allow-list. An empty
+  allow-list permits nothing (fail closed).
 * ``PinnedNetworkBackend`` resolves the hostname at connection time, validates every resolved
   address, and connects to a validated IP. TLS still happens against the original hostname
   (SNI and certificate verification are unchanged) because only the TCP target is replaced.
@@ -43,6 +44,14 @@ _ALWAYS_DENIED = tuple(
         "fd00:ec2::254/128",  # AWS IPv6 metadata
         "ff00::/8",
     )
+)
+
+
+DEFAULT_ALLOWED_NETWORKS: tuple[str, ...] = (
+    "10.0.0.0/8",
+    "172.16.0.0/12",
+    "192.168.0.0/16",
+    "fc00::/7",
 )
 
 
@@ -105,7 +114,9 @@ def _unmap(ip: IPAddress) -> IPAddress:
 
 @dataclass(frozen=True)
 class TargetPolicy:
-    allowed_networks: Sequence[IPNetwork] = ()
+    allowed_networks: Sequence[IPNetwork] = tuple(
+        ipaddress.ip_network(n) for n in DEFAULT_ALLOWED_NETWORKS
+    )
     denied_networks: Sequence[IPNetwork] = ()
     own_hostnames: frozenset[str] = field(default_factory=frozenset)
 
@@ -126,9 +137,7 @@ class TargetPolicy:
             return False
         if any(ip.version == n.version and ip in n for n in self.denied_networks):
             return False
-        if self.allowed_networks:
-            return any(ip.version == n.version and ip in n for n in self.allowed_networks)
-        return True
+        return any(ip.version == n.version and ip in n for n in self.allowed_networks)
 
     def host_allowed(self, host: str) -> bool:
         """Syntactic check on the configured host (literal IP or name)."""

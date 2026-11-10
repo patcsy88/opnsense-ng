@@ -71,6 +71,10 @@ class RedactingFilter(logging.Filter):
     """Scrub stdlib log records (uvicorn, sqlalchemy, httpx, ...) with the same rules."""
 
     def filter(self, record: logging.LogRecord) -> bool:
+        if record.name == "uvicorn.access" and isinstance(record.args, tuple):
+            # uvicorn's AccessFormatter unpacks record.args, so keep the tuple and scrub in place.
+            record.args = tuple(_scrub_string(a) if isinstance(a, str) else a for a in record.args)
+            return True
         try:
             message = record.getMessage()
         except Exception:

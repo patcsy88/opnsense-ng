@@ -25,7 +25,8 @@ List values are comma separated (`A,B`) or a JSON list.
 | `COOKIE_SECURE` | default true. `false` is refused unless `DEV_MODE=true` (cookies then lose the `__Host-` prefix) |
 | `DEV_MODE` | default false; only for local plain-HTTP development |
 | `ALLOW_INSECURE_TLS` | default false; must be true before any firewall may use `verify_tls=false`. Prefer a per-firewall `ca_bundle_pem` |
-| `ALLOWED_FIREWALL_NETWORKS` / `DENIED_FIREWALL_NETWORKS` | CIDR lists. Default: RFC1918 and public addresses allowed. A non-empty allow list restricts targets to those networks; the deny list removes ranges. Loopback, link-local (incl. 169.254.169.254), unspecified, multicast and known cloud-metadata addresses are always denied |
+| `ALLOWED_FIREWALL_NETWORKS` | CIDR list of networks firewalls may live in. **Default: private ranges only** (`10.0.0.0/8,172.16.0.0/12,192.168.0.0/16,fc00::/7`); public addresses are rejected (422 on create/update, `blocked_target` on connect). Setting it *replaces* the default, so list the private ranges too if still needed. An empty value falls back to the default |
+| `DENIED_FIREWALL_NETWORKS` | CIDR list removed from the allowed networks. Loopback, link-local (incl. 169.254.169.254), unspecified, multicast and known cloud-metadata addresses are always denied, regardless of the allow list |
 | `LOGIN_LOCKOUT_THRESHOLD` / `_BASE_SECONDS` / `_MAX_SECONDS` | per-username backoff, defaults 5 / 30 / 900 |
 | optional | `LOGIN_RATE_LIMIT` (`5/minute`), `DEFAULT_RATE_LIMIT` (`120/minute`), `ENABLE_DOCS` (false), `OPNSENSE_*` timeouts/retries |
 
@@ -52,7 +53,7 @@ in-memory (single process).
 ### Firewall targets and TLS
 `base_url` must be `https://host[:port]` (no userinfo, path, query or fragment). The host policy is
 checked when saving **and again on every connection**: the name is resolved, every address is
-validated, and the connection goes to the validated IP while SNI/certificate verification keep using
+validated against the target policy (private ranges by default), and the connection goes to the validated IP while SNI/certificate verification keep using
 the configured hostname (limits DNS rebinding). A per-firewall `ca_bundle_pem` (public CERTIFICATE
 blocks only) is trusted instead of the system store. The HTTP client ignores proxy/`SSL_CERT_*`
 environment variables. Non-admin roles only see `reachable`/`unreachable`.
@@ -63,6 +64,21 @@ environment variables. Non-admin roles only see `reachable`/`unreachable`.
 .venv/bin/python -m app.auth.cli create <username> admin # bootstrap a user (prompts for password)
 .venv/bin/uvicorn --factory app.main:create_app --host 127.0.0.1 --port 8000
 ```
+
+## Docker
+```sh
+docker build -t opnsense-ng-backend backend/
+```
+Multi-stage image (`python:3.15-slim`), runtime dependencies only (pinned in `pyproject.toml`), runs as
+non-root uid 10001 and listens on 8000. `docker-entrypoint.sh` runs `alembic upgrade head` and then
+`exec`s uvicorn. Set `SKIP_MIGRATIONS=1` to skip the migration step. To run migrations as a one-shot
+(e.g. a compose service) override the entrypoint:
+`docker run --rm --entrypoint alembic <image> upgrade head`. Create the first user with
+`docker exec -it <container> python -m app.auth.cli create <username> admin`.
+uvicorn runs **without** `--proxy-headers`: the app resolves `X-Forwarded-For` itself via
+`TRUSTED_PROXIES`. `HEALTHCHECK` runs `healthcheck.py` (stdlib only), which requests `/health` with the
+first `ALLOWED_HOSTS` entry as `Host`. The image contains no `.env` file; pass configuration through the
+environment.
 
 ## Test / lint
 Tests need a **disposable** PostgreSQL (the schema is dropped/recreated). DB tests are skipped without `TEST_DATABASE_URL`.

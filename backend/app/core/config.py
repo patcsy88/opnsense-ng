@@ -10,6 +10,7 @@ from pydantic import Field, SecretStr, field_validator, model_validator
 from pydantic_settings import BaseSettings, NoDecode, SettingsConfigDict
 
 from app.core.crypto import CredentialCipher
+from app.opnsense.netpolicy import DEFAULT_ALLOWED_NETWORKS
 
 # Comma separated in the environment (``A,B``); a JSON list is accepted too.
 CsvList = Annotated[list[str], NoDecode]
@@ -68,9 +69,10 @@ class Settings(BaseSettings):
     allowed_origins: CsvList = []
 
     # Firewall target policy. Loopback, link-local, unspecified, multicast and cloud
-    # metadata addresses are always denied. RFC1918 is allowed unless excluded below.
-    # If ALLOWED_FIREWALL_NETWORKS is non-empty, targets must be inside one of them.
-    allowed_firewall_networks: CsvList = []
+    # metadata addresses are always denied. Targets must be inside ALLOWED_FIREWALL_NETWORKS,
+    # which defaults to private ranges only (RFC1918 + IPv6 ULA). Setting it REPLACES the
+    # default (list the private ranges too if they are still needed); empty = default.
+    allowed_firewall_networks: CsvList = list(DEFAULT_ALLOWED_NETWORKS)
     denied_firewall_networks: CsvList = []
     allow_insecure_tls: bool = False
 
@@ -99,6 +101,8 @@ class Settings(BaseSettings):
     @field_validator("allowed_firewall_networks")
     @classmethod
     def _valid_allowed_nets(cls, value: list[str]) -> list[str]:
+        if not value:  # an empty variable must never widen the policy
+            return list(DEFAULT_ALLOWED_NETWORKS)
         return _networks(value, "ALLOWED_FIREWALL_NETWORKS")
 
     @field_validator("denied_firewall_networks")

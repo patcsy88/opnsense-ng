@@ -106,6 +106,20 @@ async def test_bad_base_urls_are_422_never_500(app_client: httpx.AsyncClient, ur
     assert API_KEY not in r.text  # validation errors never echo the submitted body
 
 
+async def test_public_address_rejected_unless_explicitly_allowed(
+    app_client: httpx.AsyncClient,
+) -> None:
+    await login_as(app_client, Role.admin)
+    body = {**FW_BODY, "base_url": "https://203.0.113.7"}
+    r = await app_client.post("/api/v1/firewalls", json=body, headers=csrf_headers(app_client))
+    assert r.status_code == 422
+    assert any(a.detail and a.detail.get("reason") == "target_not_allowed"
+               for a in await audit_rows(app_client))  # fmt: skip
+    override(app_client, allowed_firewall_networks=["203.0.113.0/24"])
+    ok = await app_client.post("/api/v1/firewalls", json=body, headers=csrf_headers(app_client))
+    assert ok.status_code == 201
+
+
 async def test_private_range_allowed_by_default_and_configurable(
     app_client: httpx.AsyncClient,
 ) -> None:
@@ -139,6 +153,20 @@ async def test_connectivity_blocks_target_resolving_to_loopback(
         return ["127.0.0.1"]
 
     monkeypatch.setattr("app.opnsense.netpolicy.resolve", rebind)
+    r = await app_client.get(f"/api/v1/firewalls/{fid}/connectivity")
+    assert r.json()["ok"] is False and r.json()["status"] == "blocked_target"
+
+
+async def test_connectivity_blocks_target_resolving_to_public(
+    app_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+
+    async def public(host: str, port: int) -> list[str]:
+        return ["93.184.216.34"]
+
+    monkeypatch.setattr("app.opnsense.netpolicy.resolve", public)
     r = await app_client.get(f"/api/v1/firewalls/{fid}/connectivity")
     assert r.json()["ok"] is False and r.json()["status"] == "blocked_target"
 
