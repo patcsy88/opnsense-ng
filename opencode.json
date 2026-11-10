@@ -1,0 +1,119 @@
+{
+  "$schema": "https://opencode.ai/config.json",
+  "instructions": ["AGENTS.md"],
+  "permission": {
+    "read": {
+      "*": "allow",
+      "*.env": "deny",
+      "*.env.*": "deny",
+      "*.env.example": "allow",
+      "secrets/**": "deny"
+    },
+    "edit": "ask",
+    "bash": {
+      "*": "ask",
+      "git status*": "allow",
+      "git diff*": "allow",
+      "git log*": "allow",
+      "ls*": "allow",
+      "cd backend && pytest*": "allow",
+      "cd backend && ruff*": "allow",
+      "cd frontend && npm test*": "allow",
+      "cd frontend && npm run lint*": "allow",
+      "cd frontend && npm run typecheck*": "allow",
+      "rm -rf*": "deny",
+      "git push*": "deny",
+      "git reset --hard*": "deny",
+      "docker system prune*": "deny",
+      "sudo*": "deny"
+    }
+  },
+  "agent": {
+    "orchestrator": {
+      "description": "Coordinates development tasks, delegates to specialist agents and reviews deliverables",
+      "mode": "primary",
+      "prompt": "{file:./.opencode/agents/orchestrator.md}",
+      "permission": {
+        "edit": "deny",
+        "task": {
+          "*": "allow"
+        }
+      }
+    },
+    "architect": {
+      "description": "Maintains architecture, ADRs and design consistency",
+      "mode": "subagent",
+      "prompt": "{file:./.opencode/agents/architect.md}",
+      "permission": {
+        "edit": {
+          "docs/**": "allow",
+          "AGENTS.md": "ask",
+          "*": "deny"
+        }
+      }
+    },
+    "frontend": {
+      "description": "Develops React, TypeScript, PWA and UI components",
+      "mode": "subagent",
+      "prompt": "{file:./.opencode/agents/frontend.md}",
+      "permission": {
+        "edit": {
+          "frontend/**": "allow",
+          "*": "deny"
+        }
+      }
+    },
+    "backend": {
+      "description": "Develops FastAPI services and OPNsense API integrations",
+      "mode": "subagent",
+      "prompt": "{file:./.opencode/agents/backend.md}",
+      "permission": {
+        "edit": {
+          "backend/**": "allow",
+          "*": "deny"
+        }
+      }
+    },
+    "security": {
+      "description": "Reviews authentication, authorisation, secrets handling and vulnerabilities (read-only)",
+      "mode": "subagent",
+      "prompt": "{file:./.opencode/agents/security.md}",
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "qa": {
+      "description": "Writes automated tests and validates functional requirements",
+      "mode": "subagent",
+      "prompt": "{file:./.opencode/agents/qa.md}",
+      "permission": {
+        "edit": {
+          "backend/tests/**": "allow",
+          "frontend/src/**/*.test.*": "allow",
+          "frontend/tests/**": "allow",
+          "*": "deny"
+        }
+      }
+    },
+    "reviewer": {
+      "description": "Reviews code quality, maintainability and adherence to conventions (read-only)",
+      "mode": "subagent",
+      "prompt": "{file:./.opencode/agents/reviewer.md}",
+      "permission": {
+        "edit": "deny"
+      }
+    },
+    "docs": {
+      "description": "Maintains technical documentation, API references and deployment guides",
+      "mode": "subagent",
+      "prompt": "{file:./.opencode/agents/docs.md}",
+      "permission": {
+        "edit": {
+          "docs/**": "allow",
+          "README.md": "allow",
+          "*": "deny"
+        }
+      }
+    }
+  }
+}
