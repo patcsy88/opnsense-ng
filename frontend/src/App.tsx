@@ -3,6 +3,8 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { NAV_ITEMS } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/protected-route";
 import { AdministrationPage } from "@/pages/administration";
+import { ChangeDetailPage } from "@/pages/change-detail";
+import { ChangesPage } from "@/pages/changes";
 import { DashboardPage } from "@/pages/dashboard";
 import { FirewallConnectionsPage } from "@/pages/firewall-connections";
 import { LoginPage } from "@/pages/login";
@@ -21,6 +23,8 @@ export function App() {
             <Route key={n.to} path={n.to} element={<PlannedPage title={n.label} />} />
           ))}
           <Route path="/firewall" element={<FirewallPage />} />
+          <Route path="/changes" element={<ChangesPage />} />
+          <Route path="/changes/:id" element={<ChangeDetailPage />} />
           <Route path="/network" element={<NetworkPage />} />
           <Route path="/administration" element={<AdministrationPage />} />
           <Route element={<ProtectedRoute roles={["admin"]} />}>

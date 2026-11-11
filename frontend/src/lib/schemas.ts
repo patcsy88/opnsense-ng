@@ -21,6 +21,7 @@ export const firewallSchema = z.object({
   base_url: z.string(),
   verify_tls: z.boolean(),
   has_ca_bundle: z.boolean(),
+  allow_writes: z.boolean(),
   created_at: z.string(),
 });
 export type Firewall = z.infer<typeof firewallSchema>;
@@ -138,7 +139,7 @@ export interface FirewallCreateInput {
   ca_bundle_pem?: string;
 }
 // Omitted fields are unchanged; ca_bundle_pem "" removes the bundle.
-export type FirewallUpdateInput = Partial<FirewallCreateInput>;
+export type FirewallUpdateInput = Partial<FirewallCreateInput> & { allow_writes?: boolean };
 
 export const firewallCreateFormSchema = z.object({
   name: z.string().trim().min(1, "Name is required").max(100, "Max 100 characters"),
@@ -156,3 +157,55 @@ export const loginFormSchema = z.object({
   username: z.string().trim().min(1, "Username is required").max(64),
   password: z.string().min(1, "Password is required").max(128),
 });
+
+export const CHANGE_STATUSES = [
+  "draft",
+  "validated",
+  "in_review",
+  "approved",
+  "applying",
+  "applied",
+  "rejected",
+  "cancelled",
+  "failed",
+  "stale",
+] as const;
+export type ChangeStatus = (typeof CHANGE_STATUSES)[number];
+
+export const changeEventSchema = z.object({
+  timestamp: z.string(),
+  actor_username: z.string(),
+  from_status: z.string().nullable(),
+  to_status: z.string(),
+  note: z.string().nullable(),
+});
+
+export const changeSchema = z.object({
+  id: z.uuid(),
+  firewall_id: z.uuid(),
+  kind: z.string(),
+  action: z.string(),
+  target_uuid: z.string().nullable(),
+  proposed: z.record(z.string(), z.unknown()).nullable(),
+  status: z.string(),
+  high_risk: z.boolean(),
+  self_approved: z.boolean(),
+  requester_username: z.string(),
+  reviewer_username: z.string().nullable(),
+  applier_username: z.string().nullable(),
+  failure_message: z.string().nullable(),
+  created_at: z.string(),
+  updated_at: z.string(),
+});
+export type ChangeRequest = z.infer<typeof changeSchema>;
+export const changeListSchema = z.array(changeSchema);
+export const changeDetailSchema = changeSchema.extend({ events: z.array(changeEventSchema) });
+export type ChangeDetail = z.infer<typeof changeDetailSchema>;
+
+export const ALIAS_TYPES = ["host", "network", "port"] as const;
+export interface AliasProposalInput {
+  name: string;
+  type: (typeof ALIAS_TYPES)[number];
+  content: string[];
+  description: string;
+}

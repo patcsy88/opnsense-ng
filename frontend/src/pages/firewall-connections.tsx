@@ -22,6 +22,7 @@ export function FirewallConnectionsPage() {
   const [formError, setFormError] = useState<string | null>(null);
   const [tlsConfirm, setTlsConfirm] = useState<Firewall | null>(null);
   const [deleteConfirm, setDeleteConfirm] = useState<Firewall | null>(null);
+  const [writesConfirm, setWritesConfirm] = useState<Firewall | null>(null);
 
   // Deliberately not useMutation: its cache would retain the submitted variables (API key/secret).
   const [saving, setSaving] = useState(false);
@@ -32,6 +33,14 @@ export function FirewallConnectionsPage() {
     onSuccess: () => {
       setTlsConfirm(null);
       return qc.invalidateQueries({ queryKey: ["firewalls"] });
+    },
+  });
+
+  const setWrites = useMutation({
+    mutationFn: (v: { id: string; allow: boolean }) => api.updateFirewall(v.id, { allow_writes: v.allow }),
+    onSuccess: async () => {
+      setWritesConfirm(null);
+      await qc.invalidateQueries({ queryKey: ["firewalls"] });
     },
   });
 
@@ -91,6 +100,7 @@ export function FirewallConnectionsPage() {
                   <TableHead>Base URL</TableHead>
                   <TableHead>TLS</TableHead>
                   <TableHead>CA bundle</TableHead>
+                  <TableHead>Changes</TableHead>
                   <TableHead className="text-right">Actions</TableHead>
                 </TableRow>
               </TableHeader>
@@ -109,9 +119,25 @@ export function FirewallConnectionsPage() {
                       )}
                     </TableCell>
                     <TableCell>{fw.has_ca_bundle ? "Yes" : "No"}</TableCell>
+                    <TableCell>
+                      {fw.allow_writes ? (
+                        <Badge variant="warning">Writes enabled</Badge>
+                      ) : (
+                        <Badge>Read-only</Badge>
+                      )}
+                    </TableCell>
                     <TableCell className="space-x-1 text-right">
                       <Button size="sm" variant="outline" onClick={() => setEditing({ mode: "edit", firewall: fw })}>
                         <Pencil className="h-3 w-3" /> Edit
+                      </Button>
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() =>
+                          fw.allow_writes ? setWrites.mutate({ id: fw.id, allow: false }) : setWritesConfirm(fw)
+                        }
+                      >
+                        {fw.allow_writes ? "Disable writes" : "Enable writes"}
                       </Button>
                       {fw.verify_tls && (
                         <Button size="sm" variant="ghost" onClick={() => setTlsConfirm(fw)}>
@@ -173,6 +199,35 @@ export function FirewallConnectionsPage() {
           </>
         }
         onConfirm={() => tlsConfirm && disableTls.mutate(tlsConfirm.id)}
+      />
+
+      {setWrites.isError && !writesConfirm && (
+        <p role="alert" className="text-sm text-destructive">
+          {describeError(setWrites.error).message}
+        </p>
+      )}
+
+      <ConfirmDialog
+        open={writesConfirm !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setWritesConfirm(null);
+            setWrites.reset();
+          }
+        }}
+        title="Allow changes to this firewall?"
+        destructive
+        confirmLabel="Enable writes"
+        requireText={writesConfirm?.name}
+        pending={setWrites.isPending}
+        error={setWrites.isError ? describeError(setWrites.error).message : null}
+        description={
+          <>
+            Administrators will be able to apply approved change requests to{" "}
+            <strong>{writesConfirm?.name}</strong>. Changes are not rolled back automatically.
+          </>
+        }
+        onConfirm={() => writesConfirm && setWrites.mutate({ id: writesConfirm.id, allow: true })}
       />
 
       <ConfirmDialog

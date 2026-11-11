@@ -9,9 +9,12 @@ import {
   logoutAllResponseSchema,
   interfacesResponseSchema,
   aliasesResponseSchema,
+  changeDetailSchema,
+  changeListSchema,
   rulesResponseSchema,
   systemStatusResponseSchema,
   userSchema,
+  type AliasProposalInput,
   type FirewallCreateInput,
   type FirewallUpdateInput,
 } from "./schemas";
@@ -214,6 +217,30 @@ export const api = {
   interfaces: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/interfaces`, {
       schema: interfacesResponseSchema,
+    }),
+  listChanges: (params: { status?: string; firewallId?: string } = {}) => {
+    const q = new URLSearchParams();
+    if (params.status) q.set("status", params.status);
+    if (params.firewallId) q.set("firewall_id", params.firewallId);
+    const qs = q.toString();
+    return request("GET", `${base}/changes${qs ? `?${qs}` : ""}`, { schema: changeListSchema });
+  },
+  getChange: (id: string) =>
+    request("GET", `${base}/changes/${encodeURIComponent(id)}`, { schema: changeDetailSchema }),
+  stageAlias: (firewallId: string, alias: AliasProposalInput) =>
+    request("POST", `${base}/changes/aliases`, {
+      body: { firewall_id: firewallId, alias },
+      schema: changeDetailSchema,
+    }),
+  moveChange: (id: string, verb: "submit" | "approve" | "reject" | "cancel", note?: string) =>
+    request("POST", `${base}/changes/${encodeURIComponent(id)}/${verb}`, {
+      body: note ? { note } : {},
+      schema: changeDetailSchema,
+    }),
+  applyChange: (id: string, confirmName?: string) =>
+    request("POST", `${base}/changes/${encodeURIComponent(id)}/apply`, {
+      body: confirmName ? { confirm_name: confirmName } : {},
+      schema: changeDetailSchema,
     }),
   systemStatus: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/system/status`, {

@@ -7,6 +7,7 @@ const FW = {
   base_url: "https://192.0.2.1",
   verify_tls: true,
   has_ca_bundle: false,
+  allow_writes: false,
   created_at: "2026-11-10T00:00:00Z",
 };
 
