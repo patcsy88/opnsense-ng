@@ -183,7 +183,7 @@ async def test_status_detail_only_for_admins(app_client: httpx.AsyncClient) -> N
         await login_as(app_client, Role.read_only)
         other = (await app_client.get(f"/api/v1/firewalls/{fid}/connectivity")).json()
         sys_status = await app_client.get(f"/api/v1/firewalls/{fid}/system/status")
-    assert admin["status"] == "auth_failed" and admin["registry_verified"] is False
+    assert admin["status"] == "auth_failed" and admin["registry_verified"] is True
     assert other["status"] == "unreachable" and "credential" not in other["message"].lower()
     assert sys_status.status_code == 502 and sys_status.json()["detail"]["status"] in {
         "unreachable"
@@ -204,14 +204,36 @@ async def test_reachable_collapsed_and_registry_flag(app_client: httpx.AsyncClie
         )
         c = (await app_client.get(f"/api/v1/firewalls/{fid}/connectivity")).json()
         s = (await app_client.get(f"/api/v1/firewalls/{fid}/system/status")).json()
-    assert c["status"] == "reachable" and c["registry_verified"] is False
-    assert s["registry_verified"] is False
+    assert c["status"] == "reachable" and c["registry_verified"] is True
+    assert s["registry_verified"] is True
 
 
-async def test_registry_entries_marked_unverified() -> None:
+async def test_unverified_registry_entry_is_flagged(
+    app_client: httpx.AsyncClient, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    from app.opnsense.registry.entries import CONNECTIVITY_CHECK, REGISTRY
+
+    monkeypatch.setitem(
+        REGISTRY,
+        CONNECTIVITY_CHECK,
+        REGISTRY[CONNECTIVITY_CHECK].model_copy(update={"verified": False}),
+    )
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    with respx.mock() as router:
+        router.get("https://fw.example.test/api/diagnostics/system/system_time").respond(
+            200, json={}
+        )
+        c = (await app_client.get(f"/api/v1/firewalls/{fid}/connectivity")).json()
+    assert c["registry_verified"] is False
+
+
+async def test_verified_entries_record_tested_version() -> None:
     from app.opnsense.registry import list_operations
 
-    assert list_operations() and all(op.verified is False for op in list_operations())
+    for op in list_operations():
+        if op.verified:
+            assert op.min_version, f"{op.operation_id} is verified without a tested version"
 
 
 async def test_404_is_endpoint_not_found_and_audited_as_registry_problem(
@@ -227,7 +249,7 @@ async def test_404_is_endpoint_not_found_and_audited_as_registry_problem(
     assert row.detail is not None
     assert row.detail["status"] == "endpoint_not_found"
     assert (
-        row.detail["problem"] == "registry_or_version" and row.detail["registry_verified"] is False
+        row.detail["problem"] == "registry_or_version" and row.detail["registry_verified"] is True
     )
 
 

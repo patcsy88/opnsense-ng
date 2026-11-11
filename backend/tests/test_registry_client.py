@@ -86,6 +86,21 @@ async def test_client_success_and_normalise() -> None:
     assert status.hostname == "fw1" and status.versions == ["OPNsense 26.1"]
 
 
+def test_normalise_maps_time_fields() -> None:
+    info = {"name": "fw1.internal", "versions": ["OPNsense 26.7"], "updates": "ok"}
+    time_info = {
+        "uptime": "2 days, 03:04:05",
+        "datetime": "Wed Nov 11 10:00:00 UTC 2026",
+        "boottime": "Mon Nov 9 07:00:00 UTC 2026",
+        "config": "Tue Nov 10 12:00:00 UTC 2026",
+        "loadavg": "0.10, 0.20, 0.30",
+    }
+    status = normalise_system_status(info, time_info)
+    assert status.uptime == "2 days, 03:04:05"
+    assert status.server_time == "Wed Nov 11 10:00:00 UTC 2026"
+    assert normalise_system_status(info, None).uptime is None
+
+
 def test_normalise_tolerates_garbage() -> None:
     assert normalise_system_status(["x"]).hostname is None
 

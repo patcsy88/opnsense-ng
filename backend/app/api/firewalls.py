@@ -26,7 +26,7 @@ from app.opnsense.errors import ConnectionStatus, FirewallError, public_status
 from app.opnsense.netpolicy import TargetPolicy, split_host
 from app.opnsense.normalise import normalise_system_status
 from app.opnsense.registry import get_operation
-from app.opnsense.registry.entries import CONNECTIVITY_CHECK, SYSTEM_STATUS
+from app.opnsense.registry.entries import CONNECTIVITY_CHECK, SYSTEM_STATUS, SYSTEM_TIME
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["firewalls"])
 log = get_logger("api.firewalls")
@@ -416,8 +416,22 @@ def system_status(
             _HTTP_FOR_STATUS.get(exc.status, status.HTTP_502_BAD_GATEWAY),
             {"status": exc.status.value, "message": exc.message},
         ) from None
+    # Time data is best-effort: a failure here is audited by _run_operation and
+    # leaves uptime/time empty rather than failing the whole status call.
+    time_raw = None
+    try:
+        time_raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=SYSTEM_TIME,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError:
+        pass
     return SystemStatusOut(
         firewall_id=firewall_id,
-        status=normalise_system_status(raw),
+        status=normalise_system_status(raw, time_raw),
         registry_verified=get_operation(SYSTEM_STATUS).verified,
     )

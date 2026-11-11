@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 secrets/
+docker-compose.override.yml
 node_modules/
 dist/
 __pycache__/
