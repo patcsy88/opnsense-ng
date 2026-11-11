@@ -11,7 +11,9 @@ import type { InterfaceInfo } from "@/lib/schemas";
 function statusBadge(i: InterfaceInfo) {
   if (i.status === "up") return <StatusBadge level="healthy" label="Up" />;
   if (!i.status) return <Badge>Unknown</Badge>;
-  return <StatusBadge level={i.enabled === false ? "warning" : "critical"} label={i.status} />;
+  // Only an enabled, assigned interface that is not up is a problem; unassigned ones (enc0, pflog0) are normally down.
+  if (i.enabled === true) return <StatusBadge level="critical" label={i.status} />;
+  return <Badge>{i.status}</Badge>;
 }
 
 export function NetworkPage() {

@@ -1,6 +1,6 @@
 # OPNsense API Integration
 
-Status: six read-only operations verified; `interfaces.overview` awaits lab verification. New endpoints must be verified against a lab OPNsense before `verified=True`.
+Status: seven read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`. New endpoints must be verified against a lab OPNsense before `verified=True`.
 
 ## Rules
 
@@ -24,7 +24,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `system.resources` | GET | `/api/diagnostics/system/system_resources` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `cpu.usage` (SSE) | GET | `/api/diagnostics/cpu_usage/stream` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `system.disk` | GET | `/api/diagnostics/system/system_disk` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
-| `interfaces.overview` | GET | `/api/interfaces/overview/interfacesInfo` | Status: Interfaces | yes | no | - | no |
+| `interfaces.overview` | GET | `/api/interfaces/overview/interfacesInfo` | Status: Interfaces | yes | no | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -44,4 +44,4 @@ Observed `system_disk` response: `devices` list; the dashboard uses the entry wi
 
 ## Interfaces
 
-`interfaces.overview` needs the **Status: Interfaces** privilege in addition to Lobby: Dashboard. It returns a search-style result (`rows`). The backend keeps identifier, description, device, status, enabled, link type, IPv4/IPv6 addresses, gateways and VLAN tag, and drops MAC addresses, counters and other fields. Verify the row field names on the lab before `verified=True`.
+`interfaces.overview` needs the **Status: Interfaces** privilege in addition to Lobby: Dashboard. It returns a search-style result (`rows`). The backend keeps identifier, description, device, status, enabled, link type, IPv4/IPv6 addresses, gateways and VLAN tag, and drops MAC addresses, counters and other fields. Verified on 26.7.8_2: LAN, WAN and loopback rows returned identifier-derived descriptions, devices, status, IPv4/IPv6 addresses and gateways; unassigned system interfaces (enc0, pflog0) come back with description `Unassigned Interface` and no `enabled` flag.

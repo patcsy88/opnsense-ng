@@ -162,6 +162,7 @@ describe("role-based rendering", () => {
           interfaces: [
             { identifier: "wan", description: "WAN", device: "vtnet0", status: "up", enabled: true, link_type: "dhcp", ipv4: ["10.0.0.2/24"], ipv6: [], gateways: ["WAN_GW"], vlan_tag: null },
             { identifier: "opt1", description: "Guest", device: "vtnet2", status: "no carrier", enabled: true, link_type: "static", ipv4: [], ipv6: [], gateways: [], vlan_tag: 20 },
+            { identifier: null, description: "Unassigned Interface", device: "enc0", status: "down", enabled: null, link_type: null, ipv4: [], ipv6: [], gateways: [], vlan_tag: null },
           ],
         }),
       ),
@@ -171,6 +172,9 @@ describe("role-based rendering", () => {
     expect(screen.getByText("10.0.0.2/24")).toBeInTheDocument();
     expect(screen.getByText("Up")).toBeInTheDocument();
     expect(screen.getByText("no carrier")).toBeInTheDocument();
+    // An enabled interface without carrier is an alarm; an unassigned one that is down is not.
+    expect(screen.getByText("no carrier").closest("[class*=text-destructive]")).not.toBeNull();
+    expect(screen.getByText("down").closest("[class*=text-destructive]")).toBeNull();
     expect(screen.getByText("Unverified API mapping")).toBeInTheDocument();
   });
 });

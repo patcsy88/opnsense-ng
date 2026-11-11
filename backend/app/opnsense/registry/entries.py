@@ -63,8 +63,9 @@ _ENTRIES = (
         endpoint="/api/interfaces/overview/interfacesInfo",
         required_privilege="Status: Interfaces",
         read_only=True,
-        verified=False,
-        notes="Interface list with status and addresses. Shape from the OPNsense source.",
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Interface list with status and addresses; needs Status: Interfaces as well.",
     ),
     Operation(
         operation_id=CPU_USAGE,
