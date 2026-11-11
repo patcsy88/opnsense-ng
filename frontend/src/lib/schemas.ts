@@ -26,6 +26,11 @@ export const firewallSchema = z.object({
 export type Firewall = z.infer<typeof firewallSchema>;
 export const firewallListSchema = z.array(firewallSchema);
 
+// Selector entries available to every role (no URL or TLS details).
+export const firewallOptionSchema = z.object({ id: z.uuid(), name: z.string() });
+export const firewallOptionListSchema = z.array(firewallOptionSchema);
+export type FirewallOption = z.infer<typeof firewallOptionSchema>;
+
 // `status` is a detailed ConnectionStatus for admins, "reachable"/"unreachable" for others.
 export const connectivitySchema = z.object({
   firewall_id: z.uuid(),

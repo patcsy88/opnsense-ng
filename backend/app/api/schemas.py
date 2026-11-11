@@ -84,6 +84,13 @@ class FirewallOut(BaseModel):
     created_at: datetime
 
 
+class FirewallOption(BaseModel):
+    """Selector entry for any signed-in role: no URL, TLS settings or certificate details."""
+
+    id: uuid.UUID
+    name: str
+
+
 class ConnectivityOut(BaseModel):
     firewall_id: uuid.UUID
     ok: bool

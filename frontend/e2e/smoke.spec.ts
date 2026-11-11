@@ -21,6 +21,8 @@ test("login with a mocked API and see the dashboard", async ({ page }) => {
       case "/api/v1/auth/login":
         loggedIn = true;
         return json({ user: USER, csrf_token: "t" });
+      case "/api/v1/firewalls/options":
+        return json([{ id: FW.id, name: FW.name }]);
       case "/api/v1/firewalls":
         return json([FW]);
       case `/api/v1/firewalls/${FW.id}/connectivity`:

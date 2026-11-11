@@ -40,7 +40,7 @@ describe("auth flow", () => {
     mockSession(null);
     server.use(
       http.post("/api/v1/auth/login", () => HttpResponse.json({ user: ADMIN, csrf_token: "t" })),
-      http.get("/api/v1/firewalls", () => HttpResponse.json([])),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([])),
     );
     renderApp(<App />, "/");
     fireEvent.change(await screen.findByLabelText("Username"), { target: { value: "alice" } });
@@ -83,14 +83,14 @@ describe("auth flow", () => {
     renderApp(<App />, "/");
     expect(await screen.findByText("Server unreachable")).toBeInTheDocument();
     mockSession(ADMIN);
-    server.use(http.get("/api/v1/firewalls", () => HttpResponse.json([])));
+    server.use(http.get("/api/v1/firewalls/options", () => HttpResponse.json([])));
     fireEvent.click(screen.getByRole("button", { name: "Retry" }));
     expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
   });
 
   it("returns to login when a later request gets 401", async () => {
     mockSession(ADMIN);
-    server.use(http.get("/api/v1/firewalls", () => new HttpResponse(null, { status: 401 })));
+    server.use(http.get("/api/v1/firewalls/options", () => new HttpResponse(null, { status: 401 })));
     renderApp(<App />, "/");
     expect(await screen.findByRole("heading", { name: "Sign in" })).toBeInTheDocument();
   });
@@ -100,7 +100,7 @@ describe("role-based rendering", () => {
   it("admin sees the connections link and detailed connectivity", async () => {
     mockSession(ADMIN);
     server.use(
-      http.get("/api/v1/firewalls", () => HttpResponse.json([FW])),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
       http.get("/api/v1/firewalls/:id/connectivity", () =>
         HttpResponse.json({ firewall_id: FW.id, ok: false, status: "tls_error", message: "bad cert", registry_verified: true }),
       ),
@@ -116,23 +116,25 @@ describe("role-based rendering", () => {
     expect(await screen.findByText("5.0 GB of 20.0 GB (25%)")).toBeInTheDocument();
   });
 
-  it("read-only user gets the collapsed status and no firewall list call", async () => {
+  it("read-only user picks a firewall from the options list and never calls the detailed list", async () => {
     mockSession(READER);
-    let listed = false;
+    let detailedListCalled = false;
     server.use(
       http.get("/api/v1/firewalls", () => {
-        listed = true;
+        detailedListCalled = true;
         return HttpResponse.json([]);
       }),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: "edge-1" }])),
       http.get("/api/v1/firewalls/:id/connectivity", () =>
         HttpResponse.json({ firewall_id: FW.id, ok: false, status: "unreachable", message: "Firewall is unreachable", registry_verified: true }),
       ),
       http.get("/api/v1/firewalls/:id/system/status", () => HttpResponse.json(okStatus)),
     );
-    renderApp(<App />, `/?fw=${FW.id}`);
+    renderApp(<App />, "/");
     expect(await screen.findByText("Firewall is unreachable")).toBeInTheDocument();
+    expect(await screen.findByRole("option", { name: "edge-1" })).toBeInTheDocument();
     expect(screen.queryByText("tls_error")).not.toBeInTheDocument();
-    expect(listed).toBe(false);
+    expect(detailedListCalled).toBe(false);
   });
 
   it("read-only user is blocked from the connections page", async () => {

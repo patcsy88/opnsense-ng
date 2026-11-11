@@ -3,6 +3,7 @@ import type { z } from "zod";
 import {
   connectivitySchema,
   firewallListSchema,
+  firewallOptionListSchema,
   firewallSchema,
   loginResponseSchema,
   logoutAllResponseSchema,
@@ -184,6 +185,8 @@ export const api = {
   me: () =>
     request("GET", `${base}/auth/me`, { schema: userSchema, skipUnauthorizedHandler: true }),
   listFirewalls: () => request("GET", `${base}/firewalls`, { schema: firewallListSchema }),
+  listFirewallOptions: () =>
+    request("GET", `${base}/firewalls/options`, { schema: firewallOptionListSchema }),
   createFirewall: (input: FirewallCreateInput) =>
     request("POST", `${base}/firewalls`, { body: input, schema: firewallSchema }),
   updateFirewall: (id: string, input: FirewallUpdateInput) =>

@@ -12,6 +12,7 @@ from app import audit
 from app.api.schemas import (
     ConnectivityOut,
     FirewallCreate,
+    FirewallOption,
     FirewallOut,
     FirewallUpdate,
     SystemStatusOut,
@@ -258,6 +259,15 @@ def delete_firewall(
     db.delete(fw)
     db.commit()
     cpu_sampler.forget(firewall_id)
+
+
+@router.get("/options", response_model=list[FirewallOption])
+def firewall_options(
+    _user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    db: Session = Depends(get_db),
+) -> list[FirewallOption]:
+    rows = db.execute(select(Firewall).order_by(Firewall.name)).scalars().all()
+    return [FirewallOption(id=fw.id, name=fw.name) for fw in rows]
 
 
 @router.get("", response_model=list[FirewallOut])

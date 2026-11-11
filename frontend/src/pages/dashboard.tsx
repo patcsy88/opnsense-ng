@@ -22,11 +22,10 @@ export function DashboardPage() {
   const [pollMs, setPollMs] = useState<number>(30_000); // in memory only
   const fwParam = params.get("fw");
 
-  // Only admins may list firewalls (backend GET /firewalls is admin-only).
+  // Any role may list the selector options (id and name only); details stay admin-only.
   const list = useQuery({
-    queryKey: ["firewalls"],
-    queryFn: api.listFirewalls,
-    enabled: admin,
+    queryKey: ["firewalls", "options"],
+    queryFn: api.listFirewallOptions,
   });
 
   const firewalls = useMemo(() => list.data ?? [], [list.data]);
@@ -43,7 +42,7 @@ export function DashboardPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Dashboard</h1>
         <div className="flex flex-wrap items-center gap-3 text-sm">
-          {admin && firewalls.length > 0 && (
+          {firewalls.length > 0 && (
             <label className="flex items-center gap-2">
               Firewall
               <select
@@ -76,25 +75,22 @@ export function DashboardPage() {
         </div>
       </div>
 
-      {admin && list.isError && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
+      {list.isError && <ErrorState error={list.error} onRetry={() => void list.refetch()} />}
 
-      {admin && list.isSuccess && firewalls.length === 0 && (
+      {list.isSuccess && firewalls.length === 0 && (
         <Card>
           <CardContent className="pt-4 text-sm">
             No firewalls configured.{" "}
-            <Link className="text-primary underline" to="/administration/firewalls">
-              Add a firewall connection
-            </Link>
-            .
-          </CardContent>
-        </Card>
-      )}
-
-      {!admin && !selected && (
-        <Card>
-          <CardContent className="pt-4 text-sm text-muted-foreground">
-            The firewall list is only available to administrators. Open a dashboard link that includes a
-            firewall (<code>?fw=…</code>) provided by your administrator.
+            {admin ? (
+              <>
+                <Link className="text-primary underline" to="/administration/firewalls">
+                  Add a firewall connection
+                </Link>
+                .
+              </>
+            ) : (
+              "Ask an administrator to add one."
+            )}
           </CardContent>
         </Card>
       )}

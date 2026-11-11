@@ -83,5 +83,5 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 - Rate-limit counters (per IP) are in memory, so a single backend process is assumed. Per-username lockout is stored in the database.
 - Tested against one lab OPNsense (26.7.8_2) only. Six read-only dashboard operations are verified; see `docs/api-integration.md`.
 - The dashboard shows hostname, versions, updates, uptime, load average, CPU, memory and the root filesystem's disk usage.
-- Non-admin users cannot list firewalls yet, so they cannot choose a firewall on the dashboard.
+- Every role can list firewall names (`GET /api/v1/firewalls/options`, id and name only) to pick one on the dashboard. URLs, TLS settings and certificates stay admin-only.
 - Deleting a connection (Administration > Firewall Connections) removes its stored credentials. Audit records are kept.

@@ -287,3 +287,31 @@ async def test_delete_firewall_requires_admin_and_csrf(app_client: httpx.AsyncCl
         await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
     assert (await login(app_client, Role.admin.value)).status_code == 200
     assert len((await app_client.get("/api/v1/firewalls")).json()) == 1
+
+
+async def test_firewall_options_for_every_role_expose_only_id_and_name(
+    app_client: httpx.AsyncClient,
+) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+    for role in (Role.read_only, Role.network_admin, Role.security_admin, Role.admin):
+        if role is Role.admin:
+            assert (await login(app_client, role.value)).status_code == 200
+        else:
+            await login_as(app_client, role)
+        r = await app_client.get("/api/v1/firewalls/options")
+        assert r.status_code == 200
+        assert r.json() == [{"id": fid, "name": FW_BODY["name"]}]
+        for leaked in (FW_BODY["base_url"], "verify_tls", "ca_bundle", "api_key", API_KEY):
+            assert str(leaked) not in r.text
+        await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+
+
+async def test_firewall_options_requires_login_and_detailed_list_stays_admin_only(
+    app_client: httpx.AsyncClient,
+) -> None:
+    assert (await app_client.get("/api/v1/firewalls/options")).status_code == 401
+    await login_as(app_client, Role.read_only)
+    assert (await app_client.get("/api/v1/firewalls/options")).status_code == 200
+    assert (await app_client.get("/api/v1/firewalls")).status_code == 403
