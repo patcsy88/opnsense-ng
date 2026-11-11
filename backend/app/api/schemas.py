@@ -6,7 +6,14 @@ from pydantic import BaseModel, ConfigDict, Field, SecretStr, field_validator
 from app.db.models import BASE_URL_MAX_LENGTH
 from app.opnsense.errors import ConnectionStatus
 from app.opnsense.netpolicy import InvalidBaseUrlError, parse_base_url
-from app.opnsense.normalise import AliasInfo, InterfaceInfo, LogEntry, RuleInfo, SystemStatus
+from app.opnsense.normalise import (
+    AliasInfo,
+    InterfaceInfo,
+    LogEntry,
+    LogSummary,
+    RuleInfo,
+    SystemStatus,
+)
 from app.opnsense.tls import CA_BUNDLE_MAX_BYTES, InvalidCaBundleError, normalise_ca_bundle
 
 
@@ -116,6 +123,7 @@ class RulesOut(BaseModel):
 class LogsOut(BaseModel):
     firewall_id: uuid.UUID
     entries: list[LogEntry]
+    summary: LogSummary
     truncated: bool
     registry_verified: bool
 

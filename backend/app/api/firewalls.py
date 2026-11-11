@@ -38,6 +38,7 @@ from app.opnsense.normalise import (
     normalise_log,
     normalise_rules,
     normalise_system_status,
+    summarise_log,
 )
 from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
@@ -701,6 +702,7 @@ def firewall_logs(
     return LogsOut(
         firewall_id=firewall_id,
         entries=result.entries,
+        summary=summarise_log(raw),
         truncated=result.truncated,
         registry_verified=get_operation(FIREWALL_LOG).verified,
     )

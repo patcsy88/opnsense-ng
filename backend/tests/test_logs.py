@@ -1,11 +1,13 @@
 """Firewall log viewing. OPNsense is mocked."""
 
+from typing import Any
+
 import httpx
 import respx
 from sqlalchemy import select
 
 from app.db.models import AuditLog, Role
-from app.opnsense.normalise import normalise_log
+from app.opnsense.normalise import normalise_log, summarise_log
 from tests.test_api import create_fw, login_as
 from tests.test_changes_api import switch
 
@@ -43,6 +45,29 @@ def test_normalise_log_keeps_only_display_fields_and_caps() -> None:
     assert normalise_log(None).entries == []
 
 
+def test_summary_counts_blocked_traffic_over_all_records() -> None:
+    rows: list[Any] = [record()] * 3 + [record(src="198.51.100.7", dstport="22", label="")]
+    rows += [record(action="pass", src="10.0.0.9")] * 2 + ["junk"]
+    s = summarise_log(rows)
+    assert (s.records, s.blocked, s.passed) == (6, 4, 2)
+    assert s.top_blocked_sources[0].model_dump() == {"label": "203.0.113.9", "count": 3}
+    assert {t.label for t in s.top_blocked_ports} == {"23/tcp", "22/tcp"}
+    assert (
+        s.blocked_by_rule[0].label == "Default deny"
+        and s.blocked_by_rule[1].label == "no rule label"
+    )
+    assert all(t.label != "10.0.0.9" for t in s.top_blocked_sources)  # passed traffic is excluded
+    assert s.newest == "2026-11-12T10:00:00"
+    assert summarise_log(None).records == 0 and summarise_log({"x": 1}).blocked == 0
+
+
+def test_summary_reads_beyond_the_displayed_entries() -> None:
+    s = summarise_log([record()] * 600)
+    assert s.records == 600 and s.blocked == 600
+    assert len(normalise_log([record()] * 600).entries) == 200
+    assert summarise_log([record()] * 1500).records == 1000
+
+
 async def test_log_is_read_only_audited_and_hides_internals(app_client: httpx.AsyncClient) -> None:
     await login_as(app_client, Role.admin)
     fid = await create_fw(app_client)
@@ -54,6 +79,7 @@ async def test_log_is_read_only_audited_and_hides_internals(app_client: httpx.As
     body = r.json()
     assert [e["action"] for e in body["entries"]] == ["block", "pass"]
     assert body["registry_verified"] is True
+    assert body["summary"]["blocked"] == 1 and body["summary"]["passed"] == 1
     assert "secretdigest" not in r.text and "hidden" not in r.text
     with app_client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
         actions = {a.action for a in db.scalars(select(AuditLog))}
