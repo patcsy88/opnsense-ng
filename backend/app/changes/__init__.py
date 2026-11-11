@@ -1,4 +1,4 @@
-"""Staged change management (stub - not implemented in Phase 1).
+"""Staged change management (ADR-0005). Status machine and service; no OPNsense calls yet.
 
 Planned workflow for every state-changing firewall configuration operation:
 

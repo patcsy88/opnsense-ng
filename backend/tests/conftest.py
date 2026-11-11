@@ -63,7 +63,8 @@ async def db(migrated_db: None) -> AsyncIterator[None]:
     with app.state.engine.begin() as conn:
         conn.execute(
             text(
-                "TRUNCATE audit_log, sessions, firewalls, users, login_throttle "
+                "TRUNCATE audit_log, change_request_events, change_requests, sessions, "
+                "firewalls, users, login_throttle "
                 "RESTART IDENTITY CASCADE"
             )
         )

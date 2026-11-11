@@ -1,8 +1,8 @@
 # ADR-0005: Staged change flow for firewall rules and aliases
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-11
-- Deciders: project owner (approval required before any implementation)
+- Deciders: project owner (accepted 2026-11-11 with the decisions in "Owner decisions")
 
 ## Context
 
@@ -71,14 +71,18 @@ database advisory lock.
 | Action | read_only | security_admin | network_admin | admin |
 |---|---|---|---|---|
 | View requests | yes | yes | yes | yes |
-| Create / edit own draft, submit | no | rules | aliases | yes |
-| Approve / reject | no | rules | aliases | yes |
-| Apply | no | no | no | yes (first release) |
+| Create / edit own draft, submit | no | no | rules and aliases | yes |
+| Approve / reject | no | no | rules and aliases | yes |
+| Apply | no | no | no | yes |
 
-Rules: the **approver must not be the requester** (four-eyes), enforced in the backend. In the
-first release only `admin` may apply, so a single-admin lab can still run the flow by
-requesting as one user and approving as another. `high_risk` requests need an `admin` approver.
-The role split is a proposal and is the first thing to decide.
+Rules:
+- `network_admin` handles both rules and aliases; only `admin` may apply. `security_admin` is
+  view-only for now.
+- A `network_admin` may not approve their own request (four-eyes, enforced in the backend).
+- An `admin` **may** approve their own request. The audit record and the request history then
+  carry `self_approved: true`.
+- `high_risk` requests need an `admin` approver.
+- Apply also requires the firewall's `allow_writes` flag.
 
 ### 5. Apply procedure (one request at a time, per firewall)
 
@@ -140,16 +144,18 @@ buttons. The Apply button states what will run and that it cannot be rolled back
 5. Alias update, toggle, delete.
 6. The same for rules, starting with create and toggle, then update and delete.
 
-## Open questions for the project owner
+## Owner decisions (2026-11-11)
 
-1. Is the role table in section 4 right, or should `network_admin` also manage rules?
-2. Four-eyes required always, or can an admin approve their own request in a single-user lab (with
-   an audit flag)?
-3. Alias first, then rules, as proposed?
-4. May the lab API user get **Firewall: Alias: Edit** (and later write access to rules) once the
-   build reaches the lab test step? Only a throwaway alias would be touched at first.
-5. Whether the lab OPNsense has a savepoint/rollback endpoint is unknown. I will check it on the lab
-   (read-only first) before step 3 and report back.
+1. `network_admin` handles rules and aliases; `admin` applies.
+2. An `admin` may approve their own requests (audited as self-approved); others may not.
+3. Aliases first, then rules.
+4. The lab API user may get **Firewall: Alias: Edit** when the build reaches the lab test, for a
+   throwaway alias only.
+
+## Open question
+
+- Whether the lab OPNsense has a savepoint/rollback endpoint is unknown. It will be checked on the
+  lab (read-only first) before build step 3, and the result recorded here.
 
 ## Alternatives considered
 

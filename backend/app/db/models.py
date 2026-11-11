@@ -89,9 +89,70 @@ class Firewall(Base):
     verify_tls: Mapped[bool] = mapped_column(Boolean, nullable=False, default=True)
     # Optional PEM bundle (public certificates only) trusted instead of the system store.
     ca_bundle_pem: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # Writes (applying staged changes) are refused unless this is switched on explicitly.
+    allow_writes: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, default=utcnow
     )
+
+
+class ChangeRequest(Base):
+    """A proposed firewall change. Lives only in our database until an admin applies it."""
+
+    __tablename__ = "change_requests"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    firewall_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("firewalls.id", ondelete="CASCADE"), nullable=False
+    )
+    kind: Mapped[str] = mapped_column(String(20), nullable=False)
+    action: Mapped[str] = mapped_column(String(20), nullable=False)
+    target_uuid: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    proposed: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    base_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    base_fingerprint: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    status: Mapped[str] = mapped_column(String(20), nullable=False, default="draft")
+    high_risk: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    self_approved: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
+    requester_id: Mapped[uuid.UUID | None] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("users.id", ondelete="SET NULL"), nullable=True
+    )
+    requester_username: Mapped[str] = mapped_column(String(64), nullable=False)
+    reviewer_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    applier_username: Mapped[str | None] = mapped_column(String(64), nullable=True)
+    result_snapshot: Mapped[dict[str, Any] | None] = mapped_column(JSONB, nullable=True)
+    failure_message: Mapped[str | None] = mapped_column(Text, nullable=True)
+    created_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    updated_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow, onupdate=utcnow
+    )
+
+    __table_args__ = (
+        Index("ix_change_requests_firewall_status", "firewall_id", "status"),
+        Index("ix_change_requests_created_at", "created_at"),
+    )
+
+
+class ChangeRequestEvent(Base):
+    """Append-only history of a change request."""
+
+    __tablename__ = "change_request_events"
+
+    id: Mapped[uuid.UUID] = mapped_column(UUID(as_uuid=True), primary_key=True, default=uuid.uuid4)
+    change_request_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("change_requests.id", ondelete="CASCADE"), nullable=False
+    )
+    timestamp: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, default=utcnow
+    )
+    actor_username: Mapped[str] = mapped_column(String(64), nullable=False)
+    from_status: Mapped[str | None] = mapped_column(String(20), nullable=True)
+    to_status: Mapped[str] = mapped_column(String(20), nullable=False)
+    note: Mapped[str | None] = mapped_column(String(500), nullable=True)
+
+    __table_args__ = (Index("ix_change_events_request_ts", "change_request_id", "timestamp"),)
 
 
 class AuditLog(Base):
