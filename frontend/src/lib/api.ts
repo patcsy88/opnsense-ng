@@ -191,6 +191,8 @@ export const api = {
       body: input,
       schema: firewallSchema,
     }),
+  deleteFirewall: (id: string) =>
+    request("DELETE", `${base}/firewalls/${encodeURIComponent(id)}`),
   connectivity: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/connectivity`, {
       schema: connectivitySchema,

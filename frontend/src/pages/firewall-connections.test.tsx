@@ -99,4 +99,27 @@ describe("Firewall Connections page", () => {
     fireEvent.click(confirm);
     await waitFor(() => expect(patches).toContainEqual({ verify_tls: false }));
   });
+
+  it("deletes a firewall only after typing its name", async () => {
+    const deleted: string[] = [];
+    document.cookie = "csrf_token=tok; path=/";
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(ADMIN)),
+      http.get("/api/v1/firewalls", () => HttpResponse.json([FW])),
+      http.delete("/api/v1/firewalls/:id", ({ request, params }) => {
+        expect(request.headers.get("x-csrf-token")).toBe("tok");
+        deleted.push(String(params.id));
+        return new HttpResponse(null, { status: 204 });
+      }),
+    );
+    renderApp(<App />, "/administration/firewalls");
+    fireEvent.click(await screen.findByRole("button", { name: /^delete$/i }));
+    const confirm = await screen.findByRole("button", { name: "Delete connection" });
+    expect(confirm).toBeDisabled();
+    fireEvent.click(confirm);
+    expect(deleted).toEqual([]);
+    fireEvent.change(screen.getByLabelText(/type/i), { target: { value: "edge-1" } });
+    fireEvent.click(confirm);
+    await waitFor(() => expect(deleted).toEqual([FW.id]));
+  });
 });

@@ -34,6 +34,11 @@ def sample_cpu(firewall_id: uuid.UUID, fetch: Callable[[], float | None]) -> flo
     return value
 
 
+def forget(firewall_id: uuid.UUID) -> None:
+    with _lock:
+        _cache.pop(firewall_id, None)
+
+
 def clear() -> None:
     with _lock:
         _cache.clear()

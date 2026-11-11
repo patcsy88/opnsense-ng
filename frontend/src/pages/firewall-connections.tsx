@@ -1,5 +1,5 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Pencil, Plus, ShieldAlert } from "lucide-react";
+import { Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useState } from "react";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -21,6 +21,7 @@ export function FirewallConnectionsPage() {
   const [editing, setEditing] = useState<Editing>(null);
   const [formError, setFormError] = useState<string | null>(null);
   const [tlsConfirm, setTlsConfirm] = useState<Firewall | null>(null);
+  const [deleteConfirm, setDeleteConfirm] = useState<Firewall | null>(null);
 
   // Deliberately not useMutation: its cache would retain the submitted variables (API key/secret).
   const [saving, setSaving] = useState(false);
@@ -31,6 +32,14 @@ export function FirewallConnectionsPage() {
     onSuccess: () => {
       setTlsConfirm(null);
       return qc.invalidateQueries({ queryKey: ["firewalls"] });
+    },
+  });
+
+  const remove = useMutation({
+    mutationFn: (id: string) => api.deleteFirewall(id),
+    onSuccess: async () => {
+      setDeleteConfirm(null);
+      await qc.invalidateQueries({ queryKey: ["firewalls"] });
     },
   });
 
@@ -109,6 +118,9 @@ export function FirewallConnectionsPage() {
                           Disable TLS check
                         </Button>
                       )}
+                      <Button size="sm" variant="ghost" onClick={() => setDeleteConfirm(fw)}>
+                        <Trash2 className="h-3 w-3" /> Delete
+                      </Button>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -116,7 +128,7 @@ export function FirewallConnectionsPage() {
             </Table>
           )}
           <p className="mt-3 text-xs text-muted-foreground">
-            The API does not support deleting a connection yet. Credentials are write-only and never shown.
+            Credentials are write-only and never shown.
           </p>
         </CardContent>
       </Card>
@@ -161,6 +173,29 @@ export function FirewallConnectionsPage() {
           </>
         }
         onConfirm={() => tlsConfirm && disableTls.mutate(tlsConfirm.id)}
+      />
+
+      <ConfirmDialog
+        open={deleteConfirm !== null}
+        onOpenChange={(o) => {
+          if (!o) {
+            setDeleteConfirm(null);
+            remove.reset();
+          }
+        }}
+        title="Delete firewall connection?"
+        destructive
+        confirmLabel="Delete connection"
+        requireText={deleteConfirm?.name}
+        pending={remove.isPending}
+        error={remove.isError ? describeError(remove.error).message : null}
+        description={
+          <>
+            The connection to <strong>{deleteConfirm?.name}</strong> and its stored credentials will be
+            removed. The firewall itself is not changed. Audit history is kept.
+          </>
+        }
+        onConfirm={() => deleteConfirm && remove.mutate(deleteConfirm.id)}
       />
     </div>
   );

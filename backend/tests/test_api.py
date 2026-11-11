@@ -252,3 +252,38 @@ async def test_credentials_never_in_logs_or_errors(app_client: httpx.AsyncClient
     assert API_KEY not in s.text and API_SECRET not in s.text
     assert session_cookie not in stream.getvalue()
     assert everything
+
+
+async def test_delete_firewall_removes_it_and_keeps_audit(app_client: httpx.AsyncClient) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    r = await app_client.delete(f"/api/v1/firewalls/{fid}", headers=csrf_headers(app_client))
+    assert r.status_code == 204
+    assert (await app_client.get("/api/v1/firewalls")).json() == []
+    again = await app_client.delete(f"/api/v1/firewalls/{fid}", headers=csrf_headers(app_client))
+    assert again.status_code == 404
+    rows = [(a.action, a.outcome, a.detail) for a in await audit_rows(app_client)]
+    assert (
+        "firewall.delete",
+        "success",
+        {"name": FW_BODY["name"], "base_url": FW_BODY["base_url"]},
+    ) in rows
+    assert ("firewall.delete", "failure", {"reason": "firewall_not_found"}) in rows
+    assert API_KEY not in json.dumps([r[2] for r in rows])
+
+
+async def test_delete_firewall_requires_admin_and_csrf(app_client: httpx.AsyncClient) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    no_csrf = await app_client.delete(f"/api/v1/firewalls/{fid}")
+    assert no_csrf.status_code == 403
+    await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+    for role in (Role.read_only, Role.network_admin, Role.security_admin):
+        await login_as(app_client, role)
+        denied = await app_client.delete(
+            f"/api/v1/firewalls/{fid}", headers=csrf_headers(app_client)
+        )
+        assert denied.status_code == 403
+        await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+    assert (await login(app_client, Role.admin.value)).status_code == 200
+    assert len((await app_client.get("/api/v1/firewalls")).json()) == 1

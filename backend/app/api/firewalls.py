@@ -21,6 +21,7 @@ from app.core.config import Settings, get_settings
 from app.core.crypto import CredentialCipher, CredentialDecryptionError
 from app.core.logging import get_logger, register_secret
 from app.db.models import Firewall, Role
+from app.opnsense import cpu_sampler
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.cpu_sampler import sample_cpu
 from app.opnsense.errors import ConnectionStatus, FirewallError, public_status
@@ -233,6 +234,30 @@ def update_firewall(
         )
         raise HTTPException(status.HTTP_409_CONFLICT, "A firewall with this name exists") from None
     return _out(fw)
+
+
+@router.delete("/{firewall_id}", status_code=status.HTTP_204_NO_CONTENT)
+def delete_firewall(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(Role.admin)),
+    db: Session = Depends(get_db),
+) -> None:
+    fw = _get_firewall(db, firewall_id, "firewall.delete", user, request)
+    # Name and URL are kept in the audit record, which outlives the firewall; no credentials.
+    audit.add(
+        db,
+        action="firewall.delete",
+        outcome=audit.OUTCOME_SUCCESS,
+        user_id=user.id,
+        username=user.username,
+        firewall_id=fw.id,
+        detail={"name": fw.name, "base_url": fw.base_url},
+        request=request,
+    )
+    db.delete(fw)
+    db.commit()
+    cpu_sampler.forget(firewall_id)
 
 
 @router.get("", response_model=list[FirewallOut])
