@@ -27,6 +27,8 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `interfaces.overview` | GET | `/api/interfaces/overview/interfacesInfo` | Status: Interfaces | yes | no | 26.7.8_2 | yes |
 | `firewall.rules.list` | GET | `/api/firewall/filter/searchRule` | Firewall: Rules [new] | yes | no | 26.7.8_2 | yes |
 | `firewall.aliases.list` | GET | `/api/firewall/alias/searchItem` | Firewall: Aliases | yes | no | 26.7.8_2 | yes |
+| `firewall.aliases.add` | POST | `/api/firewall/alias/addItem` | Firewall: Alias: Edit | no | yes | - | no |
+| `firewall.aliases.reconfigure` | POST | `/api/firewall/alias/reconfigure` | Firewall: Alias: Edit | no | no | - | no |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -55,3 +57,13 @@ Observed `system_disk` response: `devices` list; the dashboard uses the entry wi
 ## Firewall aliases
 
 `firewall.aliases.list` needs **Firewall: Aliases**, which in the OPNsense source covers `api/firewall/alias/search*`, `list*`, `get*` and `export`; the Edit privilege (add, set, delete) is separate. The result is search-style (`rows`) with `content` as one string. On 26.7.8_2 the entries are newline-separated; the normaliser also accepts commas. The backend keeps uuid, name, type, enabled, description and content (split into a list, at most 200 items per alias, 1000 aliases), and drops categories. Verified on 26.7.8_2: system aliases (bogons, sshlockout, virusprot, `__lan_network`, ...) have empty content, and a test host alias returned both entries.
+
+## Alias writes (staged flow, ADR-0005)
+
+`firewall.aliases.add` and `firewall.aliases.reconfigure` are only called from the reviewed apply
+procedure (`backend/app/changes/apply.py`), never directly by an endpoint, and only for firewalls
+with `allow_writes` on. They need **Firewall: Alias: Edit**. `addItem` saves the alias on the
+firewall without activating it; `reconfigure` activates it. Both are never retried. Neither is
+verified yet: the request body (`{alias: {enabled, name, type, content, description}}` with content
+newline-separated) and the replies (`result: saved`, `status: ok`) come from the OPNsense source on
+master and are confirmed only against mocks until the first lab test.

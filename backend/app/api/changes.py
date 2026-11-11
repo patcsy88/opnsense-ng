@@ -11,9 +11,11 @@ from sqlalchemy.orm import Session
 
 from app import audit
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
+from app.changes import apply as apply_changes
 from app.changes import service
 from app.changes.schemas import AliasProposal
 from app.changes.states import Status
+from app.core.config import Settings, get_settings
 from app.db.models import ChangeRequest, Role
 
 router = APIRouter(prefix="/api/v1/changes", tags=["changes"])
@@ -279,3 +281,48 @@ def cancel_change(
     return _move(
         change_id=change_id, to=Status.cancelled, body=body, user=user, db=db, request=request
     )
+
+
+class ApplyBody(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    confirm_name: str | None = Field(default=None, max_length=64)
+
+
+@router.post("/{change_id}/apply", response_model=ChangeDetailOut)
+def apply_change(
+    request: Request,
+    change_id: uuid.UUID,
+    body: ApplyBody | None = None,
+    user: CurrentUser = Depends(require_roles(Role.admin)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Send an approved change to the firewall. Admin only, and only where allow_writes is on.
+    A failed apply is reported in the body with status failed or stale (HTTP 200); there is no
+    automatic rollback."""
+    cr = _get(db, change_id)
+    firewall_id = cr.firewall_id
+    try:
+        cr = apply_changes.apply_alias_create(
+            db,
+            change_id=change_id,
+            user=user,
+            settings=settings,
+            request=request,
+            confirm_name=body.confirm_name if body else None,
+        )
+    except (service.ChangeError, apply_changes.ApplyRefused) as exc:
+        error = (
+            service.ChangeError(str(exc)) if isinstance(exc, apply_changes.ApplyRefused) else exc
+        )
+        raise _refuse(
+            db,
+            error,
+            action="change.apply",
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        ) from None
+    return _detail(db, cr)

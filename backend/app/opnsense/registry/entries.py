@@ -15,6 +15,8 @@ SYSTEM_DISK = "system.disk"
 INTERFACES_OVERVIEW = "interfaces.overview"
 FIREWALL_RULES_LIST = "firewall.rules.list"
 FIREWALL_ALIASES_LIST = "firewall.aliases.list"
+FIREWALL_ALIASES_ADD = "firewall.aliases.add"
+FIREWALL_ALIASES_RECONFIGURE = "firewall.aliases.reconfigure"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -88,6 +90,26 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Lists aliases with their content (newline-separated string).",
+    ),
+    Operation(
+        operation_id=FIREWALL_ALIASES_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/alias/addItem",
+        required_privilege="Firewall: Alias: Edit",
+        read_only=False,
+        apply_required=True,
+        verified=False,
+        notes="Saves a new alias on the firewall without activating it. Only called from the "
+        "reviewed apply procedure (ADR-0005). Body: {alias: {...}}; reply: result and uuid.",
+    ),
+    Operation(
+        operation_id=FIREWALL_ALIASES_RECONFIGURE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/alias/reconfigure",
+        required_privilege="Firewall: Alias: Edit",
+        read_only=False,
+        verified=False,
+        notes="Activates saved alias changes. Only called from the reviewed apply procedure.",
     ),
     Operation(
         operation_id=CPU_USAGE,

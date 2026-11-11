@@ -59,6 +59,7 @@ class FirewallUpdate(BaseModel):
     api_secret: SecretStr | None = Field(default=None, min_length=1, max_length=512)
     verify_tls: bool | None = None
     ca_bundle_pem: str | None = Field(default=None, max_length=CA_BUNDLE_MAX_BYTES)
+    allow_writes: bool | None = None
 
     @field_validator("base_url")
     @classmethod
@@ -81,6 +82,7 @@ class FirewallOut(BaseModel):
     base_url: str
     verify_tls: bool
     has_ca_bundle: bool
+    allow_writes: bool
     created_at: datetime
 
 

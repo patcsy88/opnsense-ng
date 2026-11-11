@@ -66,6 +66,7 @@ def _out(fw: Firewall) -> FirewallOut:
         base_url=fw.base_url,
         verify_tls=fw.verify_tls,
         has_ca_bundle=bool(fw.ca_bundle_pem),
+        allow_writes=fw.allow_writes,
         created_at=fw.created_at,
     )
 
@@ -210,6 +211,9 @@ def update_firewall(
     if body.verify_tls is not None:
         detail["verify_tls"] = {"old": fw.verify_tls, "new": body.verify_tls}
         fw.verify_tls = body.verify_tls
+    if body.allow_writes is not None:
+        detail["allow_writes"] = {"old": fw.allow_writes, "new": body.allow_writes}
+        fw.allow_writes = body.allow_writes
     if "ca_bundle_pem" in changes:
         fw.ca_bundle_pem = body.ca_bundle_pem or None
         detail["has_ca_bundle"] = bool(fw.ca_bundle_pem)
@@ -310,6 +314,38 @@ def _get_firewall(
     return fw
 
 
+def decrypt_credentials(fw: Firewall, settings: Settings) -> tuple[str, str]:
+    """Raises CredentialDecryptionError. Registers both values so logs redact them."""
+    cipher = CredentialCipher(settings.credential_encryption_key.get_secret_value())
+    api_key = cipher.decrypt(fw.api_key_encrypted, f"{fw.id}:api_key")
+    api_secret = cipher.decrypt(fw.api_secret_encrypted, f"{fw.id}:api_secret")
+    register_secret(api_key)
+    register_secret(api_secret)
+    return api_key, api_secret
+
+
+def make_client(fw: Firewall, api_key: str, api_secret: str, settings: Settings) -> OPNsenseClient:
+    return OPNsenseClient(
+        base_url=fw.base_url,
+        api_key=api_key,
+        api_secret=api_secret,
+        # fail closed if insecure TLS was switched off server-wide after the row was saved
+        verify_tls=fw.verify_tls or not settings.allow_insecure_tls,
+        ca_bundle_pem=fw.ca_bundle_pem,
+        policy=build_policy(settings),
+        connect_timeout_s=settings.opnsense_connect_timeout_s,
+        read_timeout_s=settings.opnsense_read_timeout_s,
+        max_retries=settings.opnsense_max_retries,
+        backoff_base_s=settings.opnsense_backoff_base_s,
+    )
+
+
+def open_client(fw: Firewall, settings: Settings) -> OPNsenseClient:
+    """Raises CredentialDecryptionError. The caller must close the client."""
+    api_key, api_secret = decrypt_credentials(fw, settings)
+    return make_client(fw, api_key, api_secret, settings)
+
+
 def _run_operation(
     *,
     firewall_id: uuid.UUID,
@@ -325,9 +361,7 @@ def _run_operation(
     action = f"firewall.{operation_id}"
     fw = _get_firewall(db, firewall_id, action, user, request)
     try:
-        cipher = CredentialCipher(settings.credential_encryption_key.get_secret_value())
-        api_key = cipher.decrypt(fw.api_key_encrypted, f"{fw.id}:api_key")
-        api_secret = cipher.decrypt(fw.api_secret_encrypted, f"{fw.id}:api_secret")
+        api_key, api_secret = decrypt_credentials(fw, settings)
     except CredentialDecryptionError:
         log.error("credential_decrypt_failed", firewall_id=str(fw.id))
         audit.record(
@@ -341,25 +375,10 @@ def _run_operation(
             request=request,
         )
         raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error") from None
-    register_secret(api_key)
-    register_secret(api_secret)
-
     verified = get_operation(operation_id).verified
     client: OPNsenseClient | None = None
     try:
-        client = OPNsenseClient(
-            base_url=fw.base_url,
-            api_key=api_key,
-            api_secret=api_secret,
-            # fail closed if insecure TLS was switched off server-wide after the row was saved
-            verify_tls=fw.verify_tls or not settings.allow_insecure_tls,
-            ca_bundle_pem=fw.ca_bundle_pem,
-            policy=build_policy(settings),
-            connect_timeout_s=settings.opnsense_connect_timeout_s,
-            read_timeout_s=settings.opnsense_read_timeout_s,
-            max_retries=settings.opnsense_max_retries,
-            backoff_base_s=settings.opnsense_backoff_base_s,
-        )
+        client = make_client(fw, api_key, api_secret, settings)
         if get_operation(operation_id).response_kind is ResponseKind.sse:
             result = anyio.from_thread.run(lambda: client.sample_stream(operation_id, max_events=2))
         else:

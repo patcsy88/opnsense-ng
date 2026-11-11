@@ -152,10 +152,15 @@ buttons. The Apply button states what will run and that it cannot be rolled back
 4. The lab API user may get **Firewall: Alias: Edit** when the build reaches the lab test, for a
    throwaway alias only.
 
-## Open question
+## Savepoint and rollback (checked against the OPNsense source, 2026-11-11)
 
-- Whether the lab OPNsense has a savepoint/rollback endpoint is unknown. It will be checked on the
-  lab (read-only first) before build step 3, and the result recorded here.
+- **Aliases:** the alias controller has no savepoint or revert endpoint on master, 26.1 or 25.7.
+  Undo for an alias is a new reviewed change request (delete the alias we created).
+- **Rules:** the 25.7 and 26.1 branches of the filter controller have `savepoint` and
+  `revert/{revision}` actions (revert reloads the filter). They are **not** on master, so they may be
+  gone on the lab's 26.7.8_2. They are not used in this release. Whether to use them for rules is
+  decided in build step 6, after checking the lab.
+- Apply therefore stays without automatic rollback, as decided above.
 
 ## Alternatives considered
 
