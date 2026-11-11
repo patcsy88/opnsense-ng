@@ -36,7 +36,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.rules.delete` | POST | `/api/firewall/filter/delRule/{uuid}` | Firewall: Rules [new] | no | yes | 26.7.8_2 | yes |
 | `firewall.rules.toggle` | POST | `/api/firewall/filter/toggleRule/{uuid}` | Firewall: Rules [new] | no | yes | 26.7.8_2 | yes |
 | `firewall.rules.apply` | POST | `/api/firewall/filter/apply` | Firewall: Rules [new] | no | no | 26.7.8_2 | yes |
-| `firewall.log` | GET | `/api/diagnostics/firewall/log` | Diagnostics: Logs: Firewall: Live View | yes | no | - | **no** |
+| `firewall.log` | GET | `/api/diagnostics/firewall/log` | Diagnostics: Logs: Firewall: Live View | yes | no | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -90,4 +90,4 @@ because the alias is in use is still unverified on the wire.
 
 `firewall.rules.update` (`setRule/{uuid}`) and `firewall.rules.delete` (`delRule/{uuid}`) are called only from the reviewed apply. Update keeps the rule's interface, description and sequence; delete is always high risk. Both were verified on the lab (26.7.8_2) on 2026-11-12 through the full staged flow.
 
-`firewall.log` is read-only. It returns the newest packet-filter records (default 1000 from the firewall; the backend keeps the newest 200 and only the fields the Logs page shows: time, action, interface, direction, protocol, addresses, ports, rule label, reason). Digests, TCP internals and raw lines are dropped. Viewing is limited to admin, network_admin and security_admin because logs expose internal traffic. Unverified until tested on the lab; the privilege name comes from the OPNsense ACL source.
+`firewall.log` is read-only. It returns the newest packet-filter records (default 1000 from the firewall; the backend keeps the newest 200 and only the fields the Logs page shows: time, action, interface, direction, protocol, addresses, ports, rule label, reason). Digests, TCP internals and raw lines are dropped. Viewing is limited to admin, network_admin and security_admin because logs expose internal traffic. Verified on the lab (26.7.8_2) on 2026-11-12 with the privilege Diagnostics: Logs: Firewall: Live View.

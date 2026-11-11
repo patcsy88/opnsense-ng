@@ -214,8 +214,10 @@ _ENTRIES = (
         endpoint="/api/diagnostics/firewall/log",
         required_privilege="Diagnostics: Logs: Firewall: Live View",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Recent packet-filter log records, newest first (default 1000, capped when "
-        "normalised). Unverified.",
+        "normalised). Verified on the lab.",
     ),
     Operation(
         operation_id=CPU_USAGE,

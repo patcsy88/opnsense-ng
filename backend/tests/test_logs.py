@@ -53,7 +53,7 @@ async def test_log_is_read_only_audited_and_hides_internals(app_client: httpx.As
     assert r.status_code == 200 and route.calls.last.request.method == "GET"
     body = r.json()
     assert [e["action"] for e in body["entries"]] == ["block", "pass"]
-    assert body["registry_verified"] is False
+    assert body["registry_verified"] is True
     assert "secretdigest" not in r.text and "hidden" not in r.text
     with app_client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
         actions = {a.action for a in db.scalars(select(AuditLog))}
