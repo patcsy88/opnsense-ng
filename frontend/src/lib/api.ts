@@ -8,6 +8,7 @@ import {
   loginResponseSchema,
   logoutAllResponseSchema,
   interfacesResponseSchema,
+  rulesResponseSchema,
   systemStatusResponseSchema,
   userSchema,
   type FirewallCreateInput,
@@ -200,6 +201,10 @@ export const api = {
   connectivity: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/connectivity`, {
       schema: connectivitySchema,
+    }),
+  firewallRules: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/firewall/rules`, {
+      schema: rulesResponseSchema,
     }),
   interfaces: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/interfaces`, {

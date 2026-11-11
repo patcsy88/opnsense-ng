@@ -6,6 +6,7 @@ import { AdministrationPage } from "@/pages/administration";
 import { DashboardPage } from "@/pages/dashboard";
 import { FirewallConnectionsPage } from "@/pages/firewall-connections";
 import { LoginPage } from "@/pages/login";
+import { FirewallPage } from "@/pages/firewall";
 import { NetworkPage } from "@/pages/network";
 import { PlannedPage } from "@/pages/planned";
 
@@ -19,6 +20,7 @@ export function App() {
           {NAV_ITEMS.filter((n) => !n.implemented).map((n) => (
             <Route key={n.to} path={n.to} element={<PlannedPage title={n.label} />} />
           ))}
+          <Route path="/firewall" element={<FirewallPage />} />
           <Route path="/network" element={<NetworkPage />} />
           <Route path="/administration" element={<AdministrationPage />} />
           <Route element={<ProtectedRoute roles={["admin"]} />}>

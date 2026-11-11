@@ -364,3 +364,56 @@ async def test_interfaces_errors_are_collapsed_for_non_admins(
     assert admin.status_code == 502 and admin.json()["detail"]["status"] == "forbidden"
     assert other.status_code == 502 and other.json()["detail"]["status"] != "forbidden"
     assert (await app_client.get(f"/api/v1/firewalls/{uuid.uuid4()}/interfaces")).status_code == 404
+
+
+async def test_firewall_rules_any_role_normalised_and_audited(
+    app_client: httpx.AsyncClient,
+) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+    await login_as(app_client, Role.read_only)
+    url = "https://fw.example.test/api/firewall/filter/searchRule"
+    with respx.mock() as router:
+        route = router.get(url).respond(
+            200,
+            json={
+                "rows": [
+                    {
+                        "uuid": "u1",
+                        "enabled": "1",
+                        "action": "block",
+                        "interface": "wan",
+                        "source_net": "any",
+                        "destination_net": "any",
+                        "description": "Block all",
+                        "categories": "hidden",
+                    }
+                ]
+            },
+        )
+        r = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/rules")
+    assert r.status_code == 200 and route.calls.last.request.method == "GET"
+    rule = r.json()["rules"][0]
+    assert rule["action"] == "block" and rule["enabled"] is True
+    assert "hidden" not in r.text
+    actions = [(a.action, a.outcome) for a in await audit_rows(app_client)]
+    assert ("firewall.firewall.rules.list", "success") in actions
+
+
+async def test_firewall_rules_errors_collapsed_and_unauthenticated_blocked(
+    app_client: httpx.AsyncClient,
+) -> None:
+    assert (
+        await app_client.get(f"/api/v1/firewalls/{uuid.uuid4()}/firewall/rules")
+    ).status_code == 401
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    with respx.mock() as router:
+        router.get("https://fw.example.test/api/firewall/filter/searchRule").respond(403)
+        admin = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/rules")
+        await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+        await login_as(app_client, Role.read_only)
+        other = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/rules")
+    assert admin.status_code == 502 and admin.json()["detail"]["status"] == "forbidden"
+    assert other.status_code == 502 and other.json()["detail"]["status"] != "forbidden"

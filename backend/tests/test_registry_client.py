@@ -7,6 +7,7 @@ from app.opnsense.errors import ConnectionStatus, FirewallError
 from app.opnsense.normalise import (
     normalise_cpu_events,
     normalise_interfaces,
+    normalise_rules,
     normalise_system_status,
 )
 from app.opnsense.registry import (
@@ -368,3 +369,45 @@ def test_normalise_interfaces_maps_rows_and_drops_extras() -> None:
 @pytest.mark.parametrize("raw", [None, [], {}, {"rows": "x"}, {"rows": None}])
 def test_normalise_interfaces_rejects_bad_shapes(raw: object) -> None:
     assert normalise_interfaces(raw) == []
+
+
+def test_normalise_rules_maps_flags_and_drops_extras() -> None:
+    raw = {
+        "rows": [
+            {
+                "uuid": "abc-1",
+                "enabled": "1",
+                "action": "pass",
+                "interface": "lan",
+                "direction": "in",
+                "ipprotocol": "inet",
+                "protocol": "TCP",
+                "source_net": "any",
+                "destination_net": "10.0.0.0/8",
+                "destination_port": "443",
+                "description": "Allow HTTPS",
+                "log": "0",
+                "sequence": "5",
+                "categories": "secret-cat",
+                "category_colors": ["ff0000"],
+            },
+            "junk",
+            {"enabled": "maybe", "sequence": True, "description": "x" * 2000},
+        ]
+    }
+    result = normalise_rules(raw)
+    first, odd = result.rules
+    assert first.enabled is True and first.log is False and first.sequence == 5
+    assert first.ip_protocol == "inet" and first.destination == "10.0.0.0/8"
+    assert "secret-cat" not in first.model_dump_json()
+    assert odd.enabled is None and odd.sequence is None and len(odd.description or "") == 500
+    assert result.truncated is False
+
+
+def test_normalise_rules_truncates_and_rejects_bad_shapes() -> None:
+    many = {"rows": [{"uuid": str(n)} for n in range(2500)]}
+    result = normalise_rules(many)
+    assert len(result.rules) == 2000 and result.truncated is True
+    bad_shapes: list[object] = [None, [], {}, {"rows": "x"}]
+    for bad in bad_shapes:
+        assert normalise_rules(bad).rules == []

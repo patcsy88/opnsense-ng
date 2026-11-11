@@ -177,4 +177,27 @@ describe("role-based rendering", () => {
     expect(screen.getByText("down").closest("[class*=text-destructive]")).toBeNull();
     expect(screen.getByText("Unverified API mapping")).toBeInTheDocument();
   });
+
+  it("firewall page lists rules read-only", async () => {
+    mockSession(READER);
+    server.use(
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: "edge-1" }])),
+      http.get("/api/v1/firewalls/:id/firewall/rules", () =>
+        HttpResponse.json({
+          firewall_id: FW.id,
+          truncated: false,
+          registry_verified: false,
+          rules: [
+            { uuid: "u1", enabled: true, action: "pass", interface: "lan", direction: "in", ip_protocol: "inet", protocol: "TCP", source: "any", source_port: null, destination: "10.0.0.0/8", destination_port: "443", description: "Allow HTTPS", log: false, sequence: 5 },
+          ],
+        }),
+      ),
+    );
+    renderApp(<App />, "/firewall");
+    expect(await screen.findByText("Allow HTTPS")).toBeInTheDocument();
+    expect(screen.getByText("10.0.0.0/8:443")).toBeInTheDocument();
+    expect(screen.getByText("pass")).toBeInTheDocument();
+    expect(screen.getByText("Unverified API mapping")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete|add|edit/i })).toBeNull();
+  });
 });

@@ -16,6 +16,7 @@ from app.api.schemas import (
     FirewallOut,
     FirewallUpdate,
     InterfacesOut,
+    RulesOut,
     SystemStatusOut,
 )
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
@@ -31,12 +32,14 @@ from app.opnsense.netpolicy import TargetPolicy, split_host
 from app.opnsense.normalise import (
     normalise_cpu_events,
     normalise_interfaces,
+    normalise_rules,
     normalise_system_status,
 )
 from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
+    FIREWALL_RULES_LIST,
     INTERFACES_OVERVIEW,
     SYSTEM_DISK,
     SYSTEM_RESOURCES,
@@ -563,4 +566,40 @@ def interfaces(
         firewall_id=firewall_id,
         interfaces=normalise_interfaces(raw),
         registry_verified=get_operation(INTERFACES_OVERVIEW).verified,
+    )
+
+
+@router.get("/{firewall_id}/firewall/rules", response_model=RulesOut)
+def firewall_rules(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> RulesOut:
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=FIREWALL_RULES_LIST,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        if user.role is not Role.admin:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                {"status": public_status(exc.status), "message": "Firewall is unreachable"},
+            ) from None
+        raise HTTPException(
+            _HTTP_FOR_STATUS.get(exc.status, status.HTTP_502_BAD_GATEWAY),
+            {"status": exc.status.value, "message": exc.message},
+        ) from None
+    result = normalise_rules(raw)
+    return RulesOut(
+        firewall_id=firewall_id,
+        rules=result.rules,
+        truncated=result.truncated,
+        registry_verified=get_operation(FIREWALL_RULES_LIST).verified,
     )

@@ -83,6 +83,31 @@ export const interfacesResponseSchema = z.object({
   registry_verified: z.boolean(),
 });
 
+export const ruleSchema = z.object({
+  uuid: z.string().nullable(),
+  enabled: z.boolean().nullable(),
+  action: z.string().nullable(),
+  interface: z.string().nullable(),
+  direction: z.string().nullable(),
+  ip_protocol: z.string().nullable(),
+  protocol: z.string().nullable(),
+  source: z.string().nullable(),
+  source_port: z.string().nullable(),
+  destination: z.string().nullable(),
+  destination_port: z.string().nullable(),
+  description: z.string().nullable(),
+  log: z.boolean().nullable(),
+  sequence: z.number().nullable(),
+});
+export type RuleInfo = z.infer<typeof ruleSchema>;
+
+export const rulesResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  rules: z.array(ruleSchema),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export type SystemStatusResponse = z.infer<typeof systemStatusResponseSchema>;
 
 // Request payloads (write-only secrets live only in these).
