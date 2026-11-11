@@ -12,9 +12,10 @@ import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth";
 import { AliasForm } from "@/features/changes/alias-form";
+import { RuleForm, toProposal } from "@/features/changes/rule-form";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import type { AliasInfo, AliasProposalInput, RuleInfo } from "@/lib/schemas";
+import type { AliasInfo, AliasProposalInput, RuleInfo, RuleProposalInput } from "@/lib/schemas";
 
 const EDITABLE_TYPES = ["host", "network", "port"];
 
@@ -185,6 +186,29 @@ export function FirewallPage() {
     setToggling(null);
     setToggleError(null);
   };
+  const [editingRule, setEditingRule] = useState<RuleInfo | null>(null);
+  const [deletingRule, setDeletingRule] = useState<RuleInfo | null>(null);
+  const [rulePending, setRulePending] = useState(false);
+  const [ruleError, setRuleError] = useState<string | null>(null);
+  const closeRule = () => {
+    setEditingRule(null);
+    setDeletingRule(null);
+    setRuleError(null);
+  };
+  const stageEdit = (rule: RuleProposalInput) => {
+    if (!editingRule?.uuid || !selected) return;
+    setRuleError(null);
+    setRulePending(true);
+    api
+      .stageRuleUpdate(selected, editingRule.uuid, rule)
+      .then(async (made) => {
+        await qc.invalidateQueries({ queryKey: ["changes"] });
+        closeRule();
+        navigate(`/changes/${made.id}`);
+      })
+      .catch((e: unknown) => setRuleError(describeError(e).message))
+      .finally(() => setRulePending(false));
+  };
   const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
   const [chosen, setChosen] = useState<string | null>(null);
   const firewalls = options.data ?? [];
@@ -277,9 +301,21 @@ export function FirewallPage() {
                         {canManage && (
                           <TableCell className="text-right">
                             {r.uuid && r.enabled !== null ? (
-                              <Button size="sm" variant="outline" onClick={() => setToggling(r)}>
-                                {r.enabled ? "Disable" : "Enable"}
-                              </Button>
+                              <div className="flex justify-end gap-1">
+                                <Button size="sm" variant="outline" onClick={() => setToggling(r)}>
+                                  {r.enabled ? "Disable" : "Enable"}
+                                </Button>
+                                {toProposal(r) && (
+                                  <Button size="sm" variant="outline" onClick={() => setEditingRule(r)}>
+                                    <Pencil className="h-3 w-3" /> Edit
+                                  </Button>
+                                )}
+                                {r.sequence !== null && r.description && (
+                                  <Button size="sm" variant="outline" onClick={() => setDeletingRule(r)}>
+                                    <Trash2 className="h-3 w-3" /> Delete
+                                  </Button>
+                                )}
+                              </div>
                             ) : (
                               <span className="text-xs text-muted-foreground">Not editable here</span>
                             )}
@@ -295,6 +331,56 @@ export function FirewallPage() {
         </Card>
       )}
       {selected && <AliasesCard firewallId={selected} />}
+      <Dialog open={editingRule !== null} onOpenChange={(o) => !o && closeRule()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change rule {editingRule?.description}</DialogTitle>
+            <DialogDescription>
+              Creates a change request. Nothing is sent to the firewall until it is reviewed, approved and
+              applied.
+            </DialogDescription>
+          </DialogHeader>
+          {editingRule && toProposal(editingRule) && (
+            <RuleForm
+              initial={toProposal(editingRule) as RuleProposalInput}
+              pending={rulePending}
+              error={ruleError}
+              onSubmit={stageEdit}
+              onCancel={closeRule}
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={deletingRule !== null}
+        onOpenChange={(o) => !o && closeRule()}
+        title="Request deleting this rule?"
+        confirmLabel="Create change request"
+        destructive
+        pending={rulePending}
+        error={ruleError}
+        description={
+          <>
+            This creates a high-risk change request to delete the rule{" "}
+            <strong>{deletingRule?.description}</strong>. Nothing is sent to the firewall until an admin
+            approves it and applies it by typing the rule description.
+          </>
+        }
+        onConfirm={() => {
+          if (!deletingRule?.uuid || !selected) return;
+          setRuleError(null);
+          setRulePending(true);
+          api
+            .stageRuleDelete(selected, deletingRule.uuid)
+            .then(async (made) => {
+              await qc.invalidateQueries({ queryKey: ["changes"] });
+              closeRule();
+              navigate(`/changes/${made.id}`);
+            })
+            .catch((e: unknown) => setRuleError(describeError(e).message))
+            .finally(() => setRulePending(false));
+        }}
+      />
       <ConfirmDialog
         open={toggling !== null}
         onOpenChange={(o) => !o && closeToggle()}

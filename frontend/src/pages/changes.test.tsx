@@ -416,6 +416,87 @@ describe("Rule enable/disable", () => {
     expect(await screen.findByText(/disables the rule "Web out"/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
   });
+
+  it("edits a rule with the interface and description fixed", async () => {
+    const calls: { uuid: string; body: Record<string, unknown> }[] = [];
+    document.cookie = "csrf_token=tok; path=/";
+    rulesPage(NETADMIN);
+    server.use(
+      http.post("/api/v1/changes/rules/:uuid/update", async ({ request, params }) => {
+        calls.push({ uuid: String(params.uuid), body: (await request.json()) as Record<string, unknown> });
+        return HttpResponse.json(ruleChange({ action: "update" }), { status: 201 });
+      }),
+      http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(ruleChange({ action: "update" }))),
+    );
+    renderApp(<App />, "/firewall");
+    fireEvent.click(await screen.findByRole("button", { name: /^Edit/ }));
+    expect(await screen.findByLabelText("Description")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Interface")).toHaveAttribute("readonly");
+    fireEvent.change(screen.getByLabelText("Destination port"), { target: { value: "8443" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create change request" }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]?.uuid).toBe(RULE_UUID);
+    expect(calls[0]?.body).toEqual({
+      firewall_id: FW.id,
+      rule: {
+        action: "pass",
+        interface: "lan",
+        direction: "in",
+        ip_protocol: "inet",
+        protocol: "TCP",
+        source: "10.0.0.0/24",
+        source_port: "",
+        destination: "10.0.1.5",
+        destination_port: "8443",
+        log: false,
+        enabled: true,
+        description: "Web out",
+      },
+    });
+  });
+
+  it("stages a delete only after confirmation", async () => {
+    const calls: unknown[] = [];
+    document.cookie = "csrf_token=tok; path=/";
+    rulesPage(NETADMIN);
+    server.use(
+      http.post("/api/v1/changes/rules/:uuid/delete", async ({ request }) => {
+        calls.push(await request.json());
+        return HttpResponse.json(ruleChange({ action: "delete", high_risk: true }), { status: 201 });
+      }),
+      http.get(`/api/v1/changes/${CID}`, () =>
+        HttpResponse.json(ruleChange({ action: "delete", high_risk: true })),
+      ),
+    );
+    renderApp(<App />, "/firewall");
+    fireEvent.click(await screen.findByRole("button", { name: /^Delete/ }));
+    expect(calls).toEqual([]);
+    fireEvent.click(await screen.findByRole("button", { name: "Create change request" }));
+    await waitFor(() => expect(calls).toEqual([{ firewall_id: FW.id }]));
+    expect(await screen.findByText("Rule to delete")).toBeInTheDocument();
+  });
+
+  it("offers neither Edit nor Delete to view-only roles", async () => {
+    rulesPage(READER);
+    renderApp(<App />, "/firewall");
+    await screen.findByText("Web out");
+    expect(screen.queryByRole("button", { name: /^Edit/ })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^Delete/ })).not.toBeInTheDocument();
+  });
+
+  it("describes a delete in the apply dialog and needs the typed description", async () => {
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(ADMIN)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get(`/api/v1/changes/${CID}`, () =>
+        HttpResponse.json(ruleChange({ action: "delete", status: "approved", high_risk: true })),
+      ),
+    );
+    renderApp(<App />, `/changes/${CID}`);
+    fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
+    expect(await screen.findByText(/permanently deletes the rule "Web out"/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
+  });
 });
 
 describe("New rule", () => {

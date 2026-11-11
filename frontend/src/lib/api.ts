@@ -248,6 +248,16 @@ export const api = {
       body: { firewall_id: firewallId, rule },
       schema: changeDetailSchema,
     }),
+  stageRuleUpdate: (firewallId: string, uuid: string, rule: RuleProposalInput) =>
+    request("POST", `${base}/changes/rules/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, rule },
+      schema: changeDetailSchema,
+    }),
+  stageRuleDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/rules/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
+    }),
   stageRuleToggle: (firewallId: string, uuid: string, enabled: boolean) =>
     request("POST", `${base}/changes/rules/${encodeURIComponent(uuid)}/toggle`, {
       body: { firewall_id: firewallId, enabled },

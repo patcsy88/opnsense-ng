@@ -50,6 +50,12 @@ function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [
       ...(Array.isArray(p.risk) && p.risk.length > 0 ? ([["High risk because", p.risk.join("; ")]] as [string, string][]) : []),
     ];
   }
+  if (kind === "rule" && p.action === undefined && p.enabled === undefined) {
+    return [
+      ["Rule", String(p.label ?? "—")],
+      ...(Array.isArray(p.risk) && p.risk.length > 0 ? ([["High risk because", p.risk.join("; ")]] as [string, string][]) : []),
+    ];
+  }
   if (kind === "rule") {
     return [
       ["Rule", String(p.label ?? "—")],
@@ -134,7 +140,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? "Alias to delete" : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -152,7 +158,9 @@ export function ChangeDetailPage() {
           </dl>
           {c.action === "delete" && (
             <p className="mt-3 text-sm font-medium text-destructive">
-              This alias will be deleted. The values above are what it holds now.
+              {c.kind === "rule"
+                ? "This rule will be deleted. See the current rule below."
+                : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
         </CardContent>
