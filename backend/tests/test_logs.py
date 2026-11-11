@@ -50,7 +50,11 @@ def test_summary_counts_blocked_traffic_over_all_records() -> None:
     rows += [record(action="pass", src="10.0.0.9")] * 2 + ["junk"]
     s = summarise_log(rows)
     assert (s.records, s.blocked, s.passed) == (6, 4, 2)
-    assert s.top_blocked_sources[0].model_dump() == {"label": "203.0.113.9", "count": 3}
+    assert s.top_blocked_sources[0].model_dump() == {
+        "label": "203.0.113.9",
+        "count": 3,
+        "country": None,
+    }
     assert {t.label for t in s.top_blocked_ports} == {"23/tcp", "22/tcp"}
     assert (
         s.blocked_by_rule[0].label == "Default deny"

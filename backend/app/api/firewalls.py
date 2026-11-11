@@ -27,6 +27,7 @@ from app.core.config import Settings, get_settings
 from app.core.crypto import CredentialCipher, CredentialDecryptionError
 from app.core.logging import get_logger, register_secret
 from app.db.models import Firewall, Role
+from app.geoip import GeoIP, geoip_for
 from app.opnsense import cpu_sampler
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.cpu_sampler import sample_cpu
@@ -673,6 +674,10 @@ def firewall_aliases(
 LOG_ROLES = (Role.admin, Role.network_admin, Role.security_admin)
 
 
+def get_geoip(settings: Settings = Depends(get_settings)) -> GeoIP:
+    return geoip_for(settings.geoip_db_path)
+
+
 def _log_error(exc: FirewallError, user: CurrentUser) -> HTTPException:
     if user.role is not Role.admin:
         return HTTPException(
@@ -692,6 +697,7 @@ def firewall_logs(
     user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    geoip: GeoIP = Depends(get_geoip),
 ) -> LogsOut:
     """Recent packet-filter log. Not for read_only: it exposes internal addresses and traffic."""
     try:
@@ -705,11 +711,13 @@ def firewall_logs(
         )
     except FirewallError as exc:
         raise _log_error(exc, user) from None
-    result = normalise_log(raw)
+    country = geoip.resolver()
+    result = normalise_log(raw, country=country)
     return LogsOut(
         firewall_id=firewall_id,
         entries=result.entries,
-        summary=summarise_log(raw),
+        summary=summarise_log(raw, country=country),
+        geoip_enabled=country is not None,
         cursor=log_cursor(raw),
         truncated=result.truncated,
         registry_verified=get_operation(FIREWALL_LOG).verified,
@@ -724,6 +732,7 @@ def firewall_logs_new(
     user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
+    geoip: GeoIP = Depends(get_geoip),
 ) -> LogsNewOut:
     """Log records newer than the cursor from a previous response (used by the live view)."""
     try:
@@ -738,7 +747,7 @@ def firewall_logs_new(
         )
     except FirewallError as exc:
         raise _log_error(exc, user) from None
-    result = normalise_log(raw, after=since)
+    result = normalise_log(raw, after=since, country=geoip.resolver())
     return LogsNewOut(
         firewall_id=firewall_id,
         entries=result.entries,

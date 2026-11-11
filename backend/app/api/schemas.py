@@ -124,6 +124,7 @@ class LogsOut(BaseModel):
     firewall_id: uuid.UUID
     entries: list[LogEntry]
     summary: LogSummary
+    geoip_enabled: bool
     cursor: str | None
     truncated: bool
     registry_verified: bool

@@ -6,6 +6,7 @@ from typing import Any
 
 from pydantic import BaseModel
 
+from app.geoip import CountryLookup
 from app.opnsense.normalise.rules import _int, _text
 
 MAX_LOG_ROWS = 200
@@ -21,6 +22,7 @@ class LogEntry(BaseModel):
     ip_version: int | None = None
     protocol: str | None = None
     source: str | None = None
+    source_country: str | None = None
     source_port: int | None = None
     destination: str | None = None
     destination_port: int | None = None
@@ -46,7 +48,9 @@ def log_cursor(raw: Any) -> str | None:
     return None
 
 
-def normalise_log(raw: Any, after: str | None = None) -> LogResult:
+def normalise_log(
+    raw: Any, after: str | None = None, country: CountryLookup | None = None
+) -> LogResult:
     """Tolerant mapping of the record list (newest first). Only the fields shown in the UI are
     passed on; TCP internals, digests and raw lines are dropped. Output is capped. `after` is a
     digest: records from that one onwards (older) are cut off."""
@@ -73,7 +77,8 @@ def normalise_log(raw: Any, after: str | None = None) -> LogResult:
                 direction=_text(row.get("dir"), 8),
                 ip_version=_int(row.get("ipversion")),
                 protocol=_text(row.get("protoname"), 32),
-                source=_text(row.get("src"), 64),
+                source=(src := _text(row.get("src"), 64)),
+                source_country=country(src) if country and src else None,
                 source_port=_int(row.get("srcport")),
                 destination=_text(row.get("dst"), 64),
                 destination_port=_int(row.get("dstport")),
@@ -87,6 +92,7 @@ def normalise_log(raw: Any, after: str | None = None) -> LogResult:
 class TopItem(BaseModel):
     label: str
     count: int
+    country: str | None = None
 
 
 class LogSummary(BaseModel):
@@ -102,13 +108,14 @@ class LogSummary(BaseModel):
     top_blocked_ports: list[TopItem] = []
     blocked_by_interface: list[TopItem] = []
     blocked_by_rule: list[TopItem] = []
+    blocked_by_country: list[TopItem] = []
 
 
 def _top(counter: Counter[str]) -> list[TopItem]:
     return [TopItem(label=k, count=v) for k, v in counter.most_common(TOP_N)]
 
 
-def summarise_log(raw: Any) -> LogSummary:
+def summarise_log(raw: Any, country: CountryLookup | None = None) -> LogSummary:
     rows = raw.get("rows") if isinstance(raw, dict) else raw
     if not isinstance(rows, list):
         return LogSummary()
@@ -117,6 +124,7 @@ def summarise_log(raw: Any) -> LogSummary:
     ports: Counter[str] = Counter()
     interfaces: Counter[str] = Counter()
     rules: Counter[str] = Counter()
+    countries: Counter[str] = Counter()
     blocked = passed = records = 0
     times: list[str] = []
     for row in rows[:MAX_SUMMARY_ROWS]:
@@ -134,6 +142,8 @@ def summarise_log(raw: Any) -> LogSummary:
         blocked += 1
         if src := _text(row.get("src"), 64):
             sources[src] += 1
+            if country and (code := country(src)):
+                countries[code] += 1
         if dst := _text(row.get("dst"), 64):
             destinations[dst] += 1
         port = _int(row.get("dstport"))
@@ -148,9 +158,13 @@ def summarise_log(raw: Any) -> LogSummary:
         passed=passed,
         newest=times[0] if times else None,
         oldest=times[-1] if times else None,
-        top_blocked_sources=_top(sources),
+        top_blocked_sources=[
+            TopItem(label=k, count=v, country=country(k) if country else None)
+            for k, v in sources.most_common(TOP_N)
+        ],
         top_blocked_destinations=_top(destinations),
         top_blocked_ports=_top(ports),
         blocked_by_interface=_top(interfaces),
         blocked_by_rule=_top(rules),
+        blocked_by_country=_top(countries),
     )

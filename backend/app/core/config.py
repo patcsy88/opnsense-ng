@@ -75,6 +75,8 @@ class Settings(BaseSettings):
     allowed_firewall_networks: CsvList = list(DEFAULT_ALLOWED_NETWORKS)
     denied_firewall_networks: CsvList = []
     allow_insecure_tls: bool = False
+    # Optional GeoLite2-Country .mmdb for country labels on blocked source addresses.
+    geoip_db_path: str = ""
 
     opnsense_connect_timeout_s: float = Field(default=5.0, gt=0)
     opnsense_read_timeout_s: float = Field(default=15.0, gt=0)
