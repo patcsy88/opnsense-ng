@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth";
-import { ChangeStatusBadge, describeChange, statusLabel } from "@/features/changes/status";
+import { ChangeStatusBadge, describeChange, describeEffect, statusLabel } from "@/features/changes/status";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { ChangeDetail } from "@/lib/schemas";
@@ -16,8 +16,8 @@ import type { ChangeDetail } from "@/lib/schemas";
 type Verb = "submit" | "approve" | "reject" | "cancel";
 const OPEN = new Set(["draft", "validated", "in_review", "approved"]);
 
-function proposalRows(c: ChangeDetail): [string, string][] {
-  const p = c.proposed ?? {};
+function proposalRows(source: Record<string, unknown> | null): [string, string][] {
+  const p = source ?? {};
   const content = Array.isArray(p.content) ? p.content.map(String).join("\n") : "";
   return [
     ["Name", String(p.name ?? "—")],
@@ -96,7 +96,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>Proposal</CardTitle>
+          <CardTitle>{c.action === "delete" ? "Alias to delete" : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -105,13 +105,18 @@ export function ChangeDetailPage() {
         </CardHeader>
         <CardContent>
           <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
-            {proposalRows(c).map(([k, v]) => (
+            {proposalRows(c.proposed).map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="text-muted-foreground">{k}</dt>
                 <dd className="whitespace-pre-wrap break-all font-mono text-xs sm:text-sm">{v}</dd>
               </div>
             ))}
           </dl>
+          {c.action === "delete" && (
+            <p className="mt-3 text-sm font-medium text-destructive">
+              This alias will be deleted. The values above are what it holds now.
+            </p>
+          )}
         </CardContent>
       </Card>
 
@@ -165,6 +170,30 @@ export function ChangeDetailPage() {
         </Card>
       )}
 
+      {c.action === "update" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Before this change</CardTitle>
+            <CardDescription>
+              The alias as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {proposalRows({
+                ...c.base_snapshot,
+                enabled: c.base_snapshot.enabled !== false,
+              }).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="whitespace-pre-wrap break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
       <Card>
         <CardHeader>
           <CardTitle>History</CardTitle>
@@ -212,10 +241,7 @@ export function ChangeDetailPage() {
         error={apply.isError ? describeError(apply.error).message : null}
         description={
           <>
-            <p>
-              This creates the alias <strong>{aliasName}</strong> on <strong>{firewall}</strong> and
-              activates it immediately.
-            </p>
+            <p>{describeEffect(c, firewall)}</p>
             <p className="mt-2 font-medium">
               There is no automatic rollback. If you need to undo it, you must create and approve a new
               change request.

@@ -16,7 +16,10 @@ from app.changes import service
 from app.changes.schemas import AliasProposal
 from app.changes.states import Status
 from app.core.config import Settings, get_settings
-from app.db.models import ChangeRequest, Role
+from app.core.crypto import CredentialDecryptionError
+from app.db.models import ChangeRequest, Firewall, Role
+from app.opnsense.errors import FirewallError
+from app.opnsense.normalise.aliases import AliasInfo
 
 router = APIRouter(prefix="/api/v1/changes", tags=["changes"])
 
@@ -52,6 +55,7 @@ class ChangeOut(BaseModel):
     action: str
     target_uuid: str | None
     proposed: dict[str, Any] | None
+    base_snapshot: dict[str, Any] | None
     status: str
     high_risk: bool
     self_approved: bool
@@ -176,6 +180,220 @@ def stage_alias_create(
         ) from None
     db.commit()
     return _detail(db, cr)
+
+
+class AliasUpdateCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    alias: AliasProposal
+
+
+class AliasDeleteCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+
+
+OPEN_STATES = [s.value for s in (Status.draft, Status.validated, Status.in_review, Status.approved)]
+
+
+def _live_alias(
+    db: Session,
+    *,
+    firewall_id: uuid.UUID,
+    target: str,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    action: str,
+) -> AliasInfo:
+    """Read the alias from the firewall (read-only) so the request records what it is based on."""
+    fw = db.get(Firewall, firewall_id)
+    try:
+        if fw is None:
+            raise service.ChangeError("Unknown firewall")
+        rows = apply_changes.read_aliases(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    except FirewallError, CredentialDecryptionError:
+        raise _refuse(
+            db,
+            service.ChangeError("Could not read the alias from the firewall"),
+            action=action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    found = next((a for a in rows if a.uuid == target), None)
+    if found is None or found.name is None or found.type is None:
+        raise _refuse(
+            db,
+            service.ChangeError("That alias was not found on the firewall"),
+            action=action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        )
+    return found
+
+
+def _stage_alias_change(
+    *,
+    db: Session,
+    request: Request,
+    user: CurrentUser,
+    settings: Settings,
+    firewall_id: uuid.UUID,
+    target: str,
+    action: str,
+    proposal: AliasProposal | None,
+) -> ChangeDetailOut:
+    audit_action = f"change.stage_alias_{action}"
+    if not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid alias id")
+    current = _live_alias(
+        db,
+        firewall_id=firewall_id,
+        target=target,
+        user=user,
+        settings=settings,
+        request=request,
+        action=audit_action,
+    )
+    if proposal is not None and (proposal.name != current.name or proposal.type != current.type):
+        raise _refuse(
+            db,
+            service.ChangeError(
+                "Renaming an alias or changing its type is not supported; "
+                "create a new alias instead"
+            ),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        )
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "alias",
+            ChangeRequest.target_uuid == target,
+            ChangeRequest.status.in_(OPEN_STATES),
+        )
+    )
+    if duplicate is not None:
+        raise _refuse(
+            db,
+            service.ChangeError("An open request already changes this alias"),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=duplicate,
+        )
+    base = current.model_dump()
+    if proposal is not None:
+        proposed = proposal.model_dump()
+    else:
+        proposed = {
+            "name": current.name,
+            "type": current.type,
+            "content": current.content,
+            "description": current.description or "",
+            "enabled": current.enabled is not False,
+        }
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="alias",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=base,
+            high_risk=action == "delete",
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+def _is_uuid(value: str) -> bool:
+    try:
+        return str(uuid.UUID(value)) == value
+    except ValueError:
+        return False
+
+
+@router.post("/aliases/{target}/update", response_model=ChangeDetailOut, status_code=201)
+def stage_alias_update(
+    request: Request,
+    target: str,
+    body: AliasUpdateCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage new content for an existing alias. The live alias is read once (read-only) and its
+    state is recorded; apply refuses if the alias has changed since."""
+    return _stage_alias_change(
+        db=db,
+        request=request,
+        user=user,
+        settings=settings,
+        firewall_id=body.firewall_id,
+        target=target,
+        action="update",
+        proposal=body.alias,
+    )
+
+
+@router.post("/aliases/{target}/delete", response_model=ChangeDetailOut, status_code=201)
+def stage_alias_delete(
+    request: Request,
+    target: str,
+    body: AliasDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deletion of an alias. Always high risk: an admin must approve it and the name is
+    typed again at apply. The firewall itself refuses if the alias is still referenced."""
+    return _stage_alias_change(
+        db=db,
+        request=request,
+        user=user,
+        settings=settings,
+        firewall_id=body.firewall_id,
+        target=target,
+        action="delete",
+        proposal=None,
+    )
 
 
 @router.get("", response_model=list[ChangeOut])
@@ -304,7 +522,7 @@ def apply_change(
     cr = _get(db, change_id)
     firewall_id = cr.firewall_id
     try:
-        cr = apply_changes.apply_alias_create(
+        cr = apply_changes.apply_alias_change(
             db,
             change_id=change_id,
             user=user,

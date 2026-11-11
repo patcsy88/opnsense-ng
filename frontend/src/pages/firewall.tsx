@@ -1,12 +1,22 @@
-import { useQuery } from "@tanstack/react-query";
+import { useQuery, useQueryClient } from "@tanstack/react-query";
+import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
+import { Button } from "@/components/ui/button";
+import { ConfirmDialog } from "@/components/ui/confirm-dialog";
+import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } from "@/components/ui/dialog";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/features/auth/auth";
+import { AliasForm } from "@/features/changes/alias-form";
 import { api } from "@/lib/api";
-import type { RuleInfo } from "@/lib/schemas";
+import { describeError } from "@/lib/errors";
+import type { AliasInfo, AliasProposalInput, RuleInfo } from "@/lib/schemas";
+
+const EDITABLE_TYPES = ["host", "network", "port"];
 
 function actionBadge(r: RuleInfo) {
   if (!r.action) return <Badge>—</Badge>;
@@ -14,6 +24,33 @@ function actionBadge(r: RuleInfo) {
 }
 
 function AliasesCard({ firewallId }: { firewallId: string }) {
+  const { hasRole } = useAuth();
+  const canManage = hasRole("admin", "network_admin");
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [editing, setEditing] = useState<AliasInfo | null>(null);
+  const [deleting, setDeleting] = useState<AliasInfo | null>(null);
+  const [pending, setPending] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const close = () => {
+    setEditing(null);
+    setDeleting(null);
+    setError(null);
+  };
+  const stage = async (run: () => Promise<{ id: string }>) => {
+    setError(null);
+    setPending(true);
+    try {
+      const made = await run();
+      await qc.invalidateQueries({ queryKey: ["changes"] });
+      close();
+      navigate(`/changes/${made.id}`);
+    } catch (e) {
+      setError(describeError(e).message);
+    } finally {
+      setPending(false);
+    }
+  };
   const q = useQuery({
     queryKey: ["firewalls", firewallId, "aliases"],
     queryFn: () => api.firewallAliases(firewallId),
@@ -46,6 +83,7 @@ function AliasesCard({ firewallId }: { firewallId: string }) {
                   <TableHead>Content</TableHead>
                   <TableHead>Description</TableHead>
                   <TableHead>Enabled</TableHead>
+                  {canManage && <TableHead className="text-right">Change</TableHead>}
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -59,6 +97,22 @@ function AliasesCard({ firewallId }: { firewallId: string }) {
                     </TableCell>
                     <TableCell>{a.description ?? "—"}</TableCell>
                     <TableCell>{a.enabled === null ? "—" : a.enabled ? "Yes" : "No"}</TableCell>
+                    {canManage && (
+                      <TableCell className="space-x-1 text-right">
+                        {a.uuid && a.name && a.type && EDITABLE_TYPES.includes(a.type) && !a.content_truncated ? (
+                          <>
+                            <Button size="sm" variant="outline" onClick={() => setEditing(a)}>
+                              <Pencil className="h-3 w-3" /> Edit
+                            </Button>
+                            <Button size="sm" variant="ghost" onClick={() => setDeleting(a)}>
+                              <Trash2 className="h-3 w-3" /> Delete
+                            </Button>
+                          </>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">Not editable here</span>
+                        )}
+                      </TableCell>
+                    )}
                   </TableRow>
                 ))}
               </TableBody>
@@ -66,6 +120,51 @@ function AliasesCard({ firewallId }: { firewallId: string }) {
           </>
         )}
       </CardContent>
+      <Dialog open={editing !== null} onOpenChange={(o) => !o && close()}>
+        <DialogContent>
+          <DialogHeader>
+            <DialogTitle>Change alias {editing?.name}</DialogTitle>
+            <DialogDescription>
+              This creates a change request. Nothing is sent to the firewall until it is reviewed,
+              approved and applied. Name and type cannot be changed.
+            </DialogDescription>
+          </DialogHeader>
+          {editing && (
+            <AliasForm
+              initial={{
+                name: editing.name ?? "",
+                type: editing.type as AliasProposalInput["type"],
+                content: editing.content,
+                description: editing.description ?? "",
+                enabled: editing.enabled !== false,
+              }}
+              pending={pending}
+              error={error}
+              onCancel={close}
+              onSubmit={(alias) =>
+                void stage(() => api.stageAliasUpdate(firewallId, editing.uuid as string, alias))
+              }
+            />
+          )}
+        </DialogContent>
+      </Dialog>
+      <ConfirmDialog
+        open={deleting !== null}
+        onOpenChange={(o) => !o && close()}
+        title="Request deletion of this alias?"
+        destructive
+        confirmLabel="Create delete request"
+        pending={pending}
+        error={error}
+        description={
+          <>
+            This creates a high-risk change request to delete <strong>{deleting?.name}</strong>. An
+            administrator must approve it and type the name again to apply it. The firewall refuses to
+            delete an alias that is still in use.
+          </>
+        }
+        onConfirm={() => deleting && void stage(() => api.stageAliasDelete(firewallId, deleting.uuid as string))}
+      />
     </Card>
   );
 }

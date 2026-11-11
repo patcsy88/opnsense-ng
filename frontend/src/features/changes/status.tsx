@@ -35,3 +35,10 @@ export function describeChange(c: ChangeRequest): string {
   const name = typeof c.proposed?.name === "string" ? c.proposed.name : "?";
   return `${c.action} ${c.kind} ${name}`;
 }
+
+export function describeEffect(c: ChangeRequest, firewall: string): string {
+  const name = typeof c.proposed?.name === "string" ? c.proposed.name : "?";
+  if (c.action === "delete") return `This deletes the alias ${name} from ${firewall} and activates the removal immediately.`;
+  if (c.action === "update") return `This changes the alias ${name} on ${firewall} and activates it immediately.`;
+  return `This creates the alias ${name} on ${firewall} and activates it immediately.`;
+}

@@ -187,6 +187,7 @@ export const changeSchema = z.object({
   action: z.string(),
   target_uuid: z.string().nullable(),
   proposed: z.record(z.string(), z.unknown()).nullable(),
+  base_snapshot: z.record(z.string(), z.unknown()).nullable(),
   status: z.string(),
   high_risk: z.boolean(),
   self_approved: z.boolean(),
@@ -208,4 +209,5 @@ export interface AliasProposalInput {
   type: (typeof ALIAS_TYPES)[number];
   content: string[];
   description: string;
+  enabled?: boolean;
 }

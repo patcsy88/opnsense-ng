@@ -74,7 +74,12 @@ class OPNsenseClient:
     async def aclose(self) -> None:
         await self._http.aclose()
 
-    async def execute(self, operation_id: str, payload: dict[str, Any] | None = None) -> Any:
+    async def execute(
+        self,
+        operation_id: str,
+        payload: dict[str, Any] | None = None,
+        path_params: dict[str, str] | None = None,
+    ) -> Any:
         """Run a registry operation by id. Raises UnknownOperationError/UnsupportedOperationError
         for ids that are not executable, and FirewallError for connectivity/API failures."""
         op = get_operation(operation_id)
@@ -82,7 +87,8 @@ class OPNsenseClient:
             raise UnsupportedOperationError(f"{operation_id} is a stream; use sample_stream")
         if not self.policy.host_allowed(self._host):
             raise FirewallError(ConnectionStatus.blocked_target, "Firewall address is not allowed")
-        return await self._send(op, payload)
+        endpoint = op.resolve_endpoint(path_params)
+        return await self._send(op, payload, endpoint)
 
     async def sample_stream(
         self, operation_id: str, *, max_events: int = 1, timeout_s: float = 3.0
@@ -137,14 +143,14 @@ class OPNsenseClient:
         except httpx.HTTPError as exc:
             raise _translate(exc) from None
 
-    async def _send(self, op: Operation, payload: dict[str, Any] | None) -> Any:
+    async def _send(self, op: Operation, payload: dict[str, Any] | None, endpoint: str) -> Any:
         # Only idempotent reads are retried; state-changing calls are attempted exactly once.
         retryable = op.method is HttpMethod.GET and op.read_only
         attempts = self._max_retries + 1 if retryable else 1
         last: FirewallError | None = None
         for attempt in range(attempts):
             try:
-                return await self._once(op, payload)
+                return await self._once(op, payload, endpoint)
             except FirewallError as exc:
                 last = exc
                 transient = exc.status in {
@@ -160,10 +166,10 @@ class OPNsenseClient:
                 await asyncio.sleep(delay)
         raise last or FirewallError(ConnectionStatus.unreachable, "Request not attempted")
 
-    async def _once(self, op: Operation, payload: dict[str, Any] | None) -> Any:
+    async def _once(self, op: Operation, payload: dict[str, Any] | None, endpoint: str) -> Any:
         try:
             response = await self._http.request(
-                op.method.value, op.endpoint, json=payload if op.method is HttpMethod.POST else None
+                op.method.value, endpoint, json=payload if op.method is HttpMethod.POST else None
             )
         except httpx.HTTPError as exc:
             raise _translate(exc) from None

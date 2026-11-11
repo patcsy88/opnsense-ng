@@ -232,6 +232,16 @@ export const api = {
       body: { firewall_id: firewallId, alias },
       schema: changeDetailSchema,
     }),
+  stageAliasUpdate: (firewallId: string, uuid: string, alias: AliasProposalInput & { enabled?: boolean }) =>
+    request("POST", `${base}/changes/aliases/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, alias },
+      schema: changeDetailSchema,
+    }),
+  stageAliasDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/aliases/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
+    }),
   moveChange: (id: string, verb: "submit" | "approve" | "reject" | "cancel", note?: string) =>
     request("POST", `${base}/changes/${encodeURIComponent(id)}/${verb}`, {
       body: note ? { note } : {},

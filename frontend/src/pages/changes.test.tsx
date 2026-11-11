@@ -16,6 +16,7 @@ function change(over: Record<string, unknown> = {}) {
     action: "create",
     target_uuid: null,
     proposed: { name: "web_hosts", type: "host", content: ["10.0.0.1", "10.0.0.2"], description: "Web", enabled: true },
+    base_snapshot: null,
     status: "validated",
     high_risk: false,
     self_approved: false,
@@ -207,5 +208,117 @@ describe("Changes", () => {
     fireEvent.change(screen.getByLabelText(/type/i), { target: { value: FW.name } });
     fireEvent.click(screen.getAllByRole("button", { name: "Enable writes" }).at(-1) ?? confirm);
     await waitFor(() => expect(patches).toEqual([{ allow_writes: true }]));
+  });
+});
+
+describe("Alias update and delete", () => {
+  const ALIAS_UUID = "ec691b46-6d4c-4fa5-88cc-54589859a1c9";
+  const alias = {
+    uuid: ALIAS_UUID,
+    name: "web",
+    type: "host",
+    enabled: true,
+    description: "Web",
+    content: ["10.0.0.1"],
+    content_truncated: false,
+  };
+
+  function firewallPage(user: object) {
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(user)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get(`/api/v1/firewalls/${FW.id}/firewall/rules`, () =>
+        HttpResponse.json({ firewall_id: FW.id, rules: [], truncated: false, registry_verified: true }),
+      ),
+      http.get(`/api/v1/firewalls/${FW.id}/firewall/aliases`, () =>
+        HttpResponse.json({
+          firewall_id: FW.id,
+          aliases: [alias, { ...alias, uuid: null, name: "geo", type: "geoip" }],
+          truncated: false,
+          registry_verified: true,
+        }),
+      ),
+    );
+  }
+
+  it("shows Edit and Delete only to managers, and only for editable aliases", async () => {
+    firewallPage(NETADMIN);
+    renderApp(<App />, "/firewall");
+    expect(await screen.findByRole("button", { name: /^edit$/i })).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: /^delete$/i })).toBeInTheDocument();
+    expect(screen.getAllByText("Not editable here")).toHaveLength(1);
+  });
+
+  it("hides Edit and Delete from view-only roles", async () => {
+    firewallPage(READER);
+    renderApp(<App />, "/firewall");
+    await screen.findByText("web");
+    expect(screen.queryByRole("button", { name: /^edit$/i })).not.toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /^delete$/i })).not.toBeInTheDocument();
+  });
+
+  it("stages an update with the alias uuid, fixed name and type, and the changed content", async () => {
+    let body: Record<string, unknown> | null = null;
+    let path = "";
+    document.cookie = "csrf_token=tok; path=/";
+    firewallPage(NETADMIN);
+    server.use(
+      http.post("/api/v1/changes/aliases/:uuid/update", async ({ request, params }) => {
+        path = String(params.uuid);
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(change({ action: "update", target_uuid: ALIAS_UUID }), { status: 201 });
+      }),
+      http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(change({ action: "update" }))),
+    );
+    renderApp(<App />, "/firewall");
+    fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
+    expect(await screen.findByLabelText("Name")).toHaveAttribute("readonly");
+    expect(screen.getByLabelText("Type")).toBeDisabled();
+    fireEvent.change(screen.getByLabelText("Content"), { target: { value: "10.0.0.1\n10.0.0.9" } });
+    fireEvent.click(screen.getByRole("button", { name: "Create change request" }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(path).toBe(ALIAS_UUID);
+    expect(body).toEqual({
+      firewall_id: FW.id,
+      alias: { name: "web", type: "host", content: ["10.0.0.1", "10.0.0.9"], description: "Web", enabled: true },
+    });
+  });
+
+  it("stages a delete only after confirmation and explains it is high risk", async () => {
+    const calls: string[] = [];
+    document.cookie = "csrf_token=tok; path=/";
+    firewallPage(NETADMIN);
+    server.use(
+      http.post("/api/v1/changes/aliases/:uuid/delete", ({ params }) => {
+        calls.push(String(params.uuid));
+        return HttpResponse.json(change({ action: "delete", high_risk: true }), { status: 201 });
+      }),
+      http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(change({ action: "delete", high_risk: true }))),
+    );
+    renderApp(<App />, "/firewall");
+    fireEvent.click(await screen.findByRole("button", { name: /^delete$/i }));
+    expect(await screen.findByText(/high-risk change request/i)).toBeInTheDocument();
+    expect(calls).toEqual([]);
+    fireEvent.click(screen.getByRole("button", { name: "Create delete request" }));
+    await waitFor(() => expect(calls).toEqual([ALIAS_UUID]));
+    expect(await screen.findByText("High risk")).toBeInTheDocument();
+  });
+
+  it("shows the before-state of an update and warns clearly on a delete apply", async () => {
+    base(ADMIN, {
+      action: "update",
+      status: "validated",
+      base_snapshot: { name: "web", type: "host", content: ["10.0.0.1"], description: "Web", enabled: true },
+    });
+    renderApp(<App />, `/changes/${CID}`);
+    expect(await screen.findByText("Before this change")).toBeInTheDocument();
+  });
+
+  it("describes the deletion in the apply dialog and requires the typed name", async () => {
+    base(ADMIN, { action: "delete", status: "approved", high_risk: true });
+    renderApp(<App />, `/changes/${CID}`);
+    fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
+    expect(await screen.findByText(/deletes the alias web_hosts/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
   });
 });

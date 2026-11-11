@@ -22,18 +22,22 @@ from starlette.requests import Request
 from app import audit
 from app.auth.deps import CurrentUser
 from app.changes import service
+from app.changes.fingerprint import fingerprint
 from app.changes.states import Status
 from app.core.config import Settings
 from app.core.crypto import CredentialDecryptionError
 from app.core.logging import get_logger
 from app.db.models import ChangeRequest, Firewall
 from app.opnsense.client import OPNsenseClient
-from app.opnsense.errors import FirewallError
+from app.opnsense.errors import ConnectionStatus, FirewallError
 from app.opnsense.normalise import normalise_aliases
+from app.opnsense.normalise.aliases import AliasInfo
 from app.opnsense.registry.entries import (
     FIREWALL_ALIASES_ADD,
+    FIREWALL_ALIASES_DELETE,
     FIREWALL_ALIASES_LIST,
     FIREWALL_ALIASES_RECONFIGURE,
+    FIREWALL_ALIASES_UPDATE,
 )
 
 log = get_logger("changes.apply")
@@ -63,10 +67,32 @@ def _validation_message(reply: Any) -> str:
             f"{str(field)[:60]}: {str(msg)[:120]}" for field, msg in list(validations.items())[:5]
         ]
         return "The firewall rejected the alias: " + "; ".join(parts)
-    return "The firewall did not save the alias"
+    message = reply.get("message") if isinstance(reply, dict) else None
+    if isinstance(message, str) and message.strip():
+        return "The firewall refused the change: " + " ".join(message.split())[:300]
+    return "The firewall did not complete the change"
 
 
-def apply_alias_create(
+def read_aliases(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[AliasInfo]:
+    """Read-only: the aliases currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, FIREWALL_ALIASES_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_aliases(raw).aliases)
+
+
+def apply_alias_change(
     db: Session,
     *,
     change_id: uuid.UUID,
@@ -80,8 +106,10 @@ def apply_alias_create(
     cr = db.get(ChangeRequest, change_id)
     if cr is None:
         raise ApplyRefused("Change request not found")
-    if cr.kind != "alias" or cr.action != "create" or not cr.proposed:
-        raise ApplyRefused("Only alias creation can be applied in this release")
+    if cr.kind != "alias" or cr.action not in ("create", "update", "delete") or not cr.proposed:
+        raise ApplyRefused("Only alias changes can be applied in this release")
+    if cr.action != "create" and not cr.target_uuid:
+        raise ApplyRefused("This request has no target alias")
     if cr.high_risk and confirm_name != cr.proposed.get("name"):
         raise ApplyRefused("Type the alias name to confirm this high-risk change")
     fw = db.get(Firewall, cr.firewall_id)
@@ -107,6 +135,9 @@ def apply_alias_create(
     db.commit()
 
     proposed = dict(cr.proposed or {})
+    action = cr.action
+    target = cr.target_uuid
+    params = {"uuid": target} if action != "create" and target else None
     client: OPNsenseClient | None = None
     saved = False
     try:
@@ -122,25 +153,55 @@ def apply_alias_create(
             listing = _call(db, client, FIREWALL_ALIASES_LIST, None, user, fw.id, request)
         except FirewallError as exc:
             return _finish(db, cr, Status.failed, user, request, f"Check failed: {exc.message}")
-        existing = {a.name for a in normalise_aliases(listing).aliases}
-        if proposed["name"] in existing:
-            return _finish(
-                db,
-                cr,
-                Status.stale,
-                user,
-                request,
-                "An alias with this name now exists on the firewall; nothing was changed",
-            )
+        rows = normalise_aliases(listing).aliases
+        if action == "create":
+            if proposed["name"] in {a.name for a in rows}:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "An alias with this name now exists on the firewall; nothing was changed",
+                )
+        else:
+            current = next((a for a in rows if a.uuid == target), None)
+            if current is None:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The alias no longer exists on the firewall; nothing was changed",
+                )
+            if fingerprint(current.model_dump()) != cr.base_fingerprint:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The alias was changed on the firewall after this request was made; "
+                    "nothing was changed. Create a new request.",
+                )
 
         # 3. save
+        if action == "create":
+            op_id, body, done = FIREWALL_ALIASES_ADD, _payload(proposed), "saved"
+        elif action == "update":
+            op_id, body, done = FIREWALL_ALIASES_UPDATE, _payload(proposed), "saved"
+        else:
+            op_id, body, done = FIREWALL_ALIASES_DELETE, {}, "deleted"
         try:
-            reply = _call(
-                db, client, FIREWALL_ALIASES_ADD, _payload(proposed), user, fw.id, request
-            )
+            reply = _call(db, client, op_id, body, user, fw.id, request, params)
         except FirewallError as exc:
-            return _finish(db, cr, Status.failed, user, request, f"Not saved: {exc.message}")
-        if not isinstance(reply, dict) or reply.get("result") != "saved":
+            if action == "delete" and exc.status is ConnectionStatus.server_error:
+                note = "The firewall refused to delete the alias; it may still be in use"
+            else:
+                note = f"Not saved: {exc.message}"
+            return _finish(db, cr, Status.failed, user, request, note)
+        if not isinstance(reply, dict) or reply.get("result") != done:
             return _finish(db, cr, Status.failed, user, request, _validation_message(reply))
         saved = True
 
@@ -154,7 +215,7 @@ def apply_alias_create(
                 Status.failed,
                 user,
                 request,
-                f"The alias is saved on the firewall but NOT active: {exc.message}",
+                f"The change is saved on the firewall but NOT active: {exc.message}",
             )
         if not isinstance(result, dict) or result.get("status") != "ok":
             return _finish(
@@ -163,7 +224,7 @@ def apply_alias_create(
                 Status.failed,
                 user,
                 request,
-                "The alias is saved on the firewall but NOT active: activation was not confirmed",
+                "The change is saved on the firewall but NOT active: activation was not confirmed",
             )
 
         # 5. read back (best effort) and finish
@@ -171,7 +232,12 @@ def apply_alias_create(
         try:
             after = _call(db, client, FIREWALL_ALIASES_LIST, None, user, fw.id, request)
             match = next(
-                (a for a in normalise_aliases(after).aliases if a.name == proposed["name"]), None
+                (
+                    a
+                    for a in normalise_aliases(after).aliases
+                    if (a.uuid == target if action != "create" else a.name == proposed["name"])
+                ),
+                None,
             )
             snapshot = match.model_dump() if match else None
         except FirewallError:
@@ -202,11 +268,12 @@ def _call(
     user: CurrentUser,
     firewall_id: uuid.UUID,
     request: Request,
+    path_params: dict[str, str] | None = None,
 ) -> Any:
     """Run one registry operation and audit it, whatever the outcome."""
     action = f"firewall.{operation_id}"
     try:
-        result = anyio.from_thread.run(client.execute, operation_id, payload)
+        result = anyio.from_thread.run(client.execute, operation_id, payload, path_params)
     except FirewallError as exc:
         audit.record(
             db,

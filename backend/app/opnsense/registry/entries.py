@@ -17,6 +17,8 @@ FIREWALL_RULES_LIST = "firewall.rules.list"
 FIREWALL_ALIASES_LIST = "firewall.aliases.list"
 FIREWALL_ALIASES_ADD = "firewall.aliases.add"
 FIREWALL_ALIASES_RECONFIGURE = "firewall.aliases.reconfigure"
+FIREWALL_ALIASES_UPDATE = "firewall.aliases.update"
+FIREWALL_ALIASES_DELETE = "firewall.aliases.delete"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -112,6 +114,28 @@ _ENTRIES = (
         verified=True,
         min_version="26.7.8_2",
         notes="Activates saved alias changes. Only called from the reviewed apply procedure.",
+    ),
+    Operation(
+        operation_id=FIREWALL_ALIASES_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/alias/setItem/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Firewall: Alias: Edit",
+        read_only=False,
+        apply_required=True,
+        notes="Saves changes to an existing alias without activating them. setItem is an upsert "
+        "on the firewall, so apply must confirm the alias exists first. Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=FIREWALL_ALIASES_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/alias/delItem/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Firewall: Alias: Edit",
+        read_only=False,
+        apply_required=True,
+        notes="Deletes an alias. The firewall refuses when it is still referenced. Reviewed "
+        "apply only.",
     ),
     Operation(
         operation_id=CPU_USAGE,
