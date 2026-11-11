@@ -185,8 +185,10 @@ _ENTRIES = (
         required_privilege="Firewall: Rules [new]",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Flips a rule's enabled flag. Apply passes no explicit state, so it checks the "
-        "stored state first. Reviewed apply only. Unverified.",
+        "stored state first. Reviewed apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_APPLY,
@@ -194,8 +196,9 @@ _ENTRIES = (
         endpoint="/api/firewall/filter/apply",
         required_privilege="Firewall: Rules [new]",
         read_only=False,
-        notes="Activates saved rule changes (filter reload). Reply: {status: ...}, wording "
-        "unverified. Only called from the reviewed apply procedure.",
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Activates saved rule changes (filter reload). Reply: {status: ok}. Only called from the reviewed apply procedure.",
     ),
     Operation(
         operation_id=CPU_USAGE,

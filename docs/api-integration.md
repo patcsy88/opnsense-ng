@@ -34,8 +34,8 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.rules.add` | POST | `/api/firewall/filter/addRule` | Firewall: Rules [new] | no | yes | - | **no** |
 | `firewall.rules.update` | POST | `/api/firewall/filter/setRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
 | `firewall.rules.delete` | POST | `/api/firewall/filter/delRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
-| `firewall.rules.toggle` | POST | `/api/firewall/filter/toggleRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
-| `firewall.rules.apply` | POST | `/api/firewall/filter/apply` | Firewall: Rules [new] | no | no | - | **no** |
+| `firewall.rules.toggle` | POST | `/api/firewall/filter/toggleRule/{uuid}` | Firewall: Rules [new] | no | yes | 26.7.8_2 | yes |
+| `firewall.rules.apply` | POST | `/api/firewall/filter/apply` | Firewall: Rules [new] | no | no | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -80,3 +80,7 @@ declared `{uuid}` path slot, filled only with a canonical lowercase UUID. Both w
 alias list first and refuses (status `stale`) if the alias is gone or differs from the recorded base.
 Update cannot rename or change the type. Delete is always high risk. The wording for a delete refused
 because the alias is in use is still unverified on the wire.
+
+## Rule writes (staged flow, ADR-0005 step 6)
+
+`firewall.rules.toggle` and `firewall.rules.apply` (`filter/apply`, activates saved rule changes) were verified on the lab (26.7.8_2) on 2026-11-12 through the full staged flow: disable, then enable, a user rule. Apply compares the rule's normalised state with the state recorded at staging and refuses (`stale`) on any difference. Add, update and delete remain unverified. There is no savepoint/revert on master, so undo is a new reviewed request.
