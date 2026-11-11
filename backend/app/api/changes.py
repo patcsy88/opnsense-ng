@@ -597,6 +597,174 @@ def stage_rule_toggle(
     return _detail(db, cr)
 
 
+class RuleUpdateCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    rule: RuleProposal
+
+
+class RuleDeleteCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+
+
+def _existing_risky(rule: RuleInfo) -> bool:
+    return (
+        rule.sequence is None
+        or rule.interface == "wan"
+        or (
+            rule.action == "pass"
+            and rule.source in (None, "any")
+            and rule.destination in (None, "any")
+        )
+    )
+
+
+def _stage_rule_edit(
+    request: Request,
+    target: str,
+    firewall_id: uuid.UUID,
+    proposal: RuleProposal | None,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+) -> ChangeDetailOut:
+    action = "update" if proposal is not None else "delete"
+    audit_action = f"change.stage_rule_{action}"
+    if not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid rule id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_rules(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+        aliases = (
+            apply_changes.read_aliases(
+                db, firewall=fw, user=user, settings=settings, request=request
+            )
+            if proposal is not None and proposal.alias_references()
+            else []
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the rule from the firewall") from None
+    current = next((r for r in rows if r.uuid == target), None)
+    if current is None:
+        raise refuse("That rule was not found on the firewall")
+    reasons: list[str] = []
+    if proposal is not None:
+        if current.sequence is None:
+            raise refuse("Automatic and system rules cannot be edited here")
+        if not current.description:
+            raise refuse("Only rules with a description can be edited here")
+        if proposal.interface != current.interface or proposal.description != current.description:
+            raise refuse("The interface and description of a rule cannot be changed")
+        problem = apply_changes.alias_problem(
+            proposal.alias_references(), aliases, proposal.model_dump()
+        )
+        if problem:
+            raise refuse(problem)
+        reasons = proposal.risk_reasons()
+    else:
+        reasons = ["deletes a rule"]
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "rule",
+            ChangeRequest.target_uuid == target,
+            ChangeRequest.status.in_(OPEN_STATES),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already changes this rule", duplicate)
+    if (
+        proposal is not None
+        and _existing_risky(current)
+        and "existing rule is high risk" not in reasons
+    ):
+        reasons.append("existing rule is high risk")
+    proposed: dict[str, Any] = (
+        {**proposal.model_dump(), "label": _rule_label(current), "risk": reasons}
+        if proposal is not None
+        else {
+            "label": _rule_label(current),
+            "description": current.description or "",
+            "risk": reasons,
+        }
+    )
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="rule",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump(),
+            high_risk=bool(reasons),
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post(
+    "/rules/{target}/update", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED
+)
+def stage_rule_update(
+    request: Request,
+    target: str,
+    body: RuleUpdateCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing an existing rule. Interface and description stay fixed."""
+    return _stage_rule_edit(request, target, body.firewall_id, body.rule, user, db, settings)
+
+
+@router.post(
+    "/rules/{target}/delete", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED
+)
+def stage_rule_delete(
+    request: Request,
+    target: str,
+    body: RuleDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting a rule. Always high risk."""
+    return _stage_rule_edit(request, target, body.firewall_id, None, user, db, settings)
+
+
 @router.get("", response_model=list[ChangeOut])
 def list_changes(
     firewall_id: uuid.UUID | None = None,

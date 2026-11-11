@@ -42,8 +42,10 @@ from app.opnsense.registry.entries import (
     FIREWALL_ALIASES_UPDATE,
     FIREWALL_RULES_ADD,
     FIREWALL_RULES_APPLY,
+    FIREWALL_RULES_DELETE,
     FIREWALL_RULES_LIST,
     FIREWALL_RULES_TOGGLE,
+    FIREWALL_RULES_UPDATE,
 )
 
 log = get_logger("changes.apply")
@@ -371,7 +373,7 @@ def apply_rule_change(
         user=user,
         request=request,
         kind="rule",
-        actions=("toggle", "create"),
+        actions=("toggle", "create", "update", "delete"),
         confirm_name=confirm_name,
         confirm_key="label",
     )
@@ -379,7 +381,7 @@ def apply_rule_change(
     action = cr.action
     target = cr.target_uuid
     proposed = dict(cr.proposed or {})
-    params = {"uuid": target} if action == "toggle" and target else None
+    params = {"uuid": target} if action != "create" and target else None
     client: OPNsenseClient | None = None
     saved = False
     try:
@@ -396,7 +398,7 @@ def apply_rule_change(
             return _finish(db, cr, Status.failed, user, request, f"Check failed: {exc.message}")
         rules = normalise_rules(listing).rules
         sequence = 0
-        if action == "toggle":
+        if action != "create":
             current = next((r for r in rules if r.uuid == target), None)
             if current is None:
                 return _finish(
@@ -417,16 +419,17 @@ def apply_rule_change(
                     "The rule was changed on the firewall after this request was made; "
                     "nothing was changed. Create a new request.",
                 )
-        else:
-            if any(r.description == proposed["description"] for r in rules):
-                return _finish(
-                    db,
-                    cr,
-                    Status.stale,
-                    user,
-                    request,
-                    "A rule with this description now exists on the firewall; nothing was changed",
-                )
+            sequence = current.sequence or 0
+        if action == "create" and any(r.description == proposed["description"] for r in rules):
+            return _finish(
+                db,
+                cr,
+                Status.stale,
+                user,
+                request,
+                "A rule with this description now exists on the firewall; nothing was changed",
+            )
+        if action in ("create", "update"):
             references = RuleProposal.model_validate(
                 {k: v for k, v in proposed.items() if k not in ("label", "risk")}
             ).alias_references()
@@ -444,12 +447,28 @@ def apply_rule_change(
                     return _finish(
                         db, cr, Status.stale, user, request, f"{problem}; nothing was changed"
                     )
-            sequence = next_sequence(rules)
+            if action == "create":
+                sequence = next_sequence(rules)
 
         try:
             if action == "toggle":
                 reply = _call(db, client, FIREWALL_RULES_TOGGLE, {}, user, fw.id, request, params)
                 want = "Enabled" if proposed.get("enabled") else "Disabled"
+            elif action == "delete":
+                reply = _call(db, client, FIREWALL_RULES_DELETE, {}, user, fw.id, request, params)
+                want = "deleted"
+            elif action == "update":
+                reply = _call(
+                    db,
+                    client,
+                    FIREWALL_RULES_UPDATE,
+                    rule_payload(proposed, sequence),
+                    user,
+                    fw.id,
+                    request,
+                    params,
+                )
+                want = "saved"
             else:
                 reply = _call(
                     db,
@@ -493,6 +512,8 @@ def apply_rule_change(
             )
 
         snapshot: dict[str, Any] | None
+        if action == "delete":
+            return _finish(db, cr, Status.applied, user, request, None, None)
         try:
             after = _call(db, client, FIREWALL_RULES_LIST, None, user, fw.id, request)
             match = next(
