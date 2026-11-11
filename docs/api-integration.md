@@ -26,6 +26,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `system.disk` | GET | `/api/diagnostics/system/system_disk` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `interfaces.overview` | GET | `/api/interfaces/overview/interfacesInfo` | Status: Interfaces | yes | no | 26.7.8_2 | yes |
 | `firewall.rules.list` | GET | `/api/firewall/filter/searchRule` | Firewall: Rules [new] | yes | no | 26.7.8_2 | yes |
+| `firewall.aliases.list` | GET | `/api/firewall/alias/searchItem` | Firewall: Aliases | yes | no | - | no |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -50,3 +51,7 @@ Observed `system_disk` response: `devices` list; the dashboard uses the entry wi
 ## Firewall rules
 
 `firewall.rules.list` needs **Firewall: Rules [new]**. That privilege also covers the rule write endpoints under `/api/firewall/filter/*`, so grant it only to a lab or trusted API user; this app only reads. The result is search-style (`rows`) with flags as "0"/"1" strings. The backend keeps uuid, enabled, action, interface, direction, IP protocol, protocol, source/destination network and port, description, log and sequence. It drops categories, statistics and other metadata, and caps the list at 2000 rules. Verified on 26.7.8_2: user rules come back with sequence and interface, and the list also includes auto-generated system rules (default deny, IPv6 ICMP, sshlockout, DHCP, anti-lockout) that have no sequence, and sometimes no interface (floating).
+
+## Firewall aliases
+
+`firewall.aliases.list` needs **Firewall: Aliases**, which in the OPNsense source covers `api/firewall/alias/search*`, `list*`, `get*` and `export`; the Edit privilege (add, set, delete) is separate. The result is search-style (`rows`) with `content` as a comma-separated string. The backend keeps uuid, name, type, enabled, description and content (split into a list, at most 200 items per alias, 1000 aliases), and drops categories. Not yet verified on the lab.

@@ -10,6 +10,7 @@ from sqlalchemy.orm import Session
 
 from app import audit
 from app.api.schemas import (
+    AliasesOut,
     ConnectivityOut,
     FirewallCreate,
     FirewallOption,
@@ -30,6 +31,7 @@ from app.opnsense.cpu_sampler import sample_cpu
 from app.opnsense.errors import ConnectionStatus, FirewallError, public_status
 from app.opnsense.netpolicy import TargetPolicy, split_host
 from app.opnsense.normalise import (
+    normalise_aliases,
     normalise_cpu_events,
     normalise_interfaces,
     normalise_rules,
@@ -39,6 +41,7 @@ from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
+    FIREWALL_ALIASES_LIST,
     FIREWALL_RULES_LIST,
     INTERFACES_OVERVIEW,
     SYSTEM_DISK,
@@ -602,4 +605,40 @@ def firewall_rules(
         rules=result.rules,
         truncated=result.truncated,
         registry_verified=get_operation(FIREWALL_RULES_LIST).verified,
+    )
+
+
+@router.get("/{firewall_id}/firewall/aliases", response_model=AliasesOut)
+def firewall_aliases(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> AliasesOut:
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=FIREWALL_ALIASES_LIST,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        if user.role is not Role.admin:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                {"status": public_status(exc.status), "message": "Firewall is unreachable"},
+            ) from None
+        raise HTTPException(
+            _HTTP_FOR_STATUS.get(exc.status, status.HTTP_502_BAD_GATEWAY),
+            {"status": exc.status.value, "message": exc.message},
+        ) from None
+    result = normalise_aliases(raw)
+    return AliasesOut(
+        firewall_id=firewall_id,
+        aliases=result.aliases,
+        truncated=result.truncated,
+        registry_verified=get_operation(FIREWALL_ALIASES_LIST).verified,
     )

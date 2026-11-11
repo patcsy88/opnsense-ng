@@ -200,4 +200,29 @@ describe("role-based rendering", () => {
     expect(screen.getByText("Unverified API mapping")).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /delete|add|edit/i })).toBeNull();
   });
+
+  it("firewall page lists aliases read-only", async () => {
+    mockSession(READER);
+    server.use(
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: "edge-1" }])),
+      http.get("/api/v1/firewalls/:id/firewall/rules", () =>
+        HttpResponse.json({ firewall_id: FW.id, truncated: false, registry_verified: true, rules: [] }),
+      ),
+      http.get("/api/v1/firewalls/:id/firewall/aliases", () =>
+        HttpResponse.json({
+          firewall_id: FW.id,
+          truncated: false,
+          registry_verified: false,
+          aliases: [
+            { uuid: "a1", name: "lan_hosts", type: "host", enabled: true, description: "LAN servers", content: ["10.0.0.1", "10.0.0.2"], content_truncated: false },
+          ],
+        }),
+      ),
+    );
+    renderApp(<App />, "/firewall");
+    expect(await screen.findByText("lan_hosts")).toBeInTheDocument();
+    expect(screen.getByText("10.0.0.1, 10.0.0.2")).toBeInTheDocument();
+    expect(screen.getByText("Unverified API mapping")).toBeInTheDocument();
+    expect(screen.queryByRole("button", { name: /delete|add|edit/i })).toBeNull();
+  });
 });

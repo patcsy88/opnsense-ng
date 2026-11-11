@@ -13,6 +13,63 @@ function actionBadge(r: RuleInfo) {
   return <Badge variant={r.action === "pass" ? "success" : "critical"}>{r.action}</Badge>;
 }
 
+function AliasesCard({ firewallId }: { firewallId: string }) {
+  const q = useQuery({
+    queryKey: ["firewalls", firewallId, "aliases"],
+    queryFn: () => api.firewallAliases(firewallId),
+  });
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle className="flex flex-wrap items-center gap-2">
+          Aliases {q.data && !q.data.registry_verified && <UnverifiedBadge />}
+        </CardTitle>
+        <CardDescription>Read-only list of aliases</CardDescription>
+      </CardHeader>
+      <CardContent>
+        {q.isPending ? (
+          <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+        ) : q.isError ? (
+          <ErrorState error={q.error} onRetry={() => void q.refetch()} />
+        ) : q.data.aliases.length === 0 ? (
+          <p className="text-sm text-muted-foreground">The firewall reported no aliases.</p>
+        ) : (
+          <>
+            {q.data.truncated && (
+              <p className="mb-2 text-sm text-muted-foreground">Only the first aliases are shown.</p>
+            )}
+            <Table>
+              <TableHeader>
+                <TableRow>
+                  <TableHead>Name</TableHead>
+                  <TableHead>Type</TableHead>
+                  <TableHead>Content</TableHead>
+                  <TableHead>Description</TableHead>
+                  <TableHead>Enabled</TableHead>
+                </TableRow>
+              </TableHeader>
+              <TableBody>
+                {q.data.aliases.map((a, n) => (
+                  <TableRow key={`${a.uuid ?? "?"}-${n}`}>
+                    <TableCell className="font-medium">{a.name ?? "—"}</TableCell>
+                    <TableCell>{a.type ?? "—"}</TableCell>
+                    <TableCell className="font-mono text-xs">
+                      {a.content.join(", ") || "—"}
+                      {a.content_truncated && " …"}
+                    </TableCell>
+                    <TableCell>{a.description ?? "—"}</TableCell>
+                    <TableCell>{a.enabled === null ? "—" : a.enabled ? "Yes" : "No"}</TableCell>
+                  </TableRow>
+                ))}
+              </TableBody>
+            </Table>
+          </>
+        )}
+      </CardContent>
+    </Card>
+  );
+}
+
 function endpoint(net: string | null, port: string | null) {
   return [net ?? "any", port].filter(Boolean).join(":");
 }
@@ -115,6 +172,7 @@ export function FirewallPage() {
           </CardContent>
         </Card>
       )}
+      {selected && <AliasesCard firewallId={selected} />}
     </div>
   );
 }

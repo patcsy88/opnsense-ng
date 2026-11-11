@@ -108,6 +108,24 @@ export const rulesResponseSchema = z.object({
   registry_verified: z.boolean(),
 });
 
+export const aliasSchema = z.object({
+  uuid: z.string().nullable(),
+  name: z.string().nullable(),
+  type: z.string().nullable(),
+  enabled: z.boolean().nullable(),
+  description: z.string().nullable(),
+  content: z.array(z.string()),
+  content_truncated: z.boolean(),
+});
+export type AliasInfo = z.infer<typeof aliasSchema>;
+
+export const aliasesResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  aliases: z.array(aliasSchema),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export type SystemStatusResponse = z.infer<typeof systemStatusResponseSchema>;
 
 // Request payloads (write-only secrets live only in these).

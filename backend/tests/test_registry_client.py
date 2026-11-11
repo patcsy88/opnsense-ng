@@ -5,6 +5,7 @@ import respx
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.errors import ConnectionStatus, FirewallError
 from app.opnsense.normalise import (
+    normalise_aliases,
     normalise_cpu_events,
     normalise_interfaces,
     normalise_rules,
@@ -411,3 +412,33 @@ def test_normalise_rules_truncates_and_rejects_bad_shapes() -> None:
     bad_shapes: list[object] = [None, [], {}, {"rows": "x"}]
     for bad in bad_shapes:
         assert normalise_rules(bad).rules == []
+
+
+def test_normalise_aliases_splits_content_and_drops_extras() -> None:
+    raw = {
+        "rows": [
+            {
+                "uuid": "a1",
+                "name": "web_hosts",
+                "type": "host",
+                "enabled": "1",
+                "description": "Web servers",
+                "content": "10.0.0.1, 10.0.0.2,,",
+                "categories": "secret-cat",
+                "categories_uuid": ["c1"],
+            },
+            "junk",
+            {"enabled": "maybe", "content": ",".join(str(n) for n in range(300))},
+        ]
+    }
+    result = normalise_aliases(raw)
+    first, big = result.aliases
+    assert first.content == ["10.0.0.1", "10.0.0.2"] and first.enabled is True
+    assert "secret-cat" not in first.model_dump_json() and "c1" not in first.model_dump_json()
+    assert big.enabled is None and len(big.content) == 200 and big.content_truncated is True
+
+
+def test_normalise_aliases_rejects_bad_shapes() -> None:
+    bad_shapes: list[object] = [None, [], {}, {"rows": "x"}]
+    for bad in bad_shapes:
+        assert normalise_aliases(bad).aliases == []

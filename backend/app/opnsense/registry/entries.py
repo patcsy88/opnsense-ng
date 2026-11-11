@@ -14,6 +14,7 @@ CPU_USAGE = "cpu.usage"
 SYSTEM_DISK = "system.disk"
 INTERFACES_OVERVIEW = "interfaces.overview"
 FIREWALL_RULES_LIST = "firewall.rules.list"
+FIREWALL_ALIASES_LIST = "firewall.aliases.list"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -77,6 +78,15 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Lists rules. The privilege also covers rule write endpoints; this app only reads.",
+    ),
+    Operation(
+        operation_id=FIREWALL_ALIASES_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/firewall/alias/searchItem",
+        required_privilege="Firewall: Aliases",
+        read_only=True,
+        verified=False,
+        notes="Lists aliases with their content. Shape from the OPNsense source.",
     ),
     Operation(
         operation_id=CPU_USAGE,
