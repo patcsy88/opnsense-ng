@@ -153,8 +153,10 @@ _ENTRIES = (
         required_privilege="Firewall: Rules [new]",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Saves a new rule without activating it. Reviewed apply only (ADR-0005). Body: "
-        "{rule: {...}}; reply: result and uuid. Unverified.",
+        "{rule: {...}}; reply: result and uuid.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_UPDATE,

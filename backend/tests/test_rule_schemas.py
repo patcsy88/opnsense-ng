@@ -78,7 +78,7 @@ def test_rule_operations_are_registered_as_writes() -> None:
     for op_id in ("add", "update", "delete", "toggle"):
         op = get_operation(f"firewall.rules.{op_id}")
         assert not op.read_only and op.apply_required
-        assert op.verified == (op_id == "toggle")
+        assert op.verified == (op_id in ("toggle", "add"))
     assert get_operation("firewall.rules.update").resolve_endpoint({"uuid": UUID}).endswith(UUID)
     apply = get_operation("firewall.rules.apply")
     assert apply.endpoint == "/api/firewall/filter/apply" and not apply.read_only
