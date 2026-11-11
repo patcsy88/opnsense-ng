@@ -242,6 +242,11 @@ export const api = {
       body: { firewall_id: firewallId },
       schema: changeDetailSchema,
     }),
+  stageRuleToggle: (firewallId: string, uuid: string, enabled: boolean) =>
+    request("POST", `${base}/changes/rules/${encodeURIComponent(uuid)}/toggle`, {
+      body: { firewall_id: firewallId, enabled },
+      schema: changeDetailSchema,
+    }),
   moveChange: (id: string, verb: "submit" | "approve" | "reject" | "cancel", note?: string) =>
     request("POST", `${base}/changes/${encodeURIComponent(id)}/${verb}`, {
       body: note ? { note } : {},

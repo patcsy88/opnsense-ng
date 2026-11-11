@@ -8,7 +8,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { ConfirmDialog } from "@/components/ui/confirm-dialog";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth";
-import { ChangeStatusBadge, describeChange, describeEffect, statusLabel } from "@/features/changes/status";
+import { ChangeStatusBadge, describeChange, describeEffect, statusLabel, targetName } from "@/features/changes/status";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { ChangeDetail } from "@/lib/schemas";
@@ -16,8 +16,32 @@ import type { ChangeDetail } from "@/lib/schemas";
 type Verb = "submit" | "approve" | "reject" | "cancel";
 const OPEN = new Set(["draft", "validated", "in_review", "approved"]);
 
-function proposalRows(source: Record<string, unknown> | null): [string, string][] {
+const RULE_FIELDS: [string, string][] = [
+  ["Interface", "interface"],
+  ["Action", "action"],
+  ["Direction", "direction"],
+  ["Protocol", "protocol"],
+  ["Source", "source"],
+  ["Source port", "source_port"],
+  ["Destination", "destination"],
+  ["Destination port", "destination_port"],
+  ["Sequence", "sequence"],
+];
+
+function ruleRows(snapshot: Record<string, unknown>): [string, string][] {
+  const rows: [string, string][] = RULE_FIELDS.map(([label, key]) => [label, String(snapshot[key] ?? "") || "—"]);
+  rows.push(["Enabled", snapshot.enabled === false ? "No" : "Yes"]);
+  return rows;
+}
+
+function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
+  if (kind === "rule") {
+    return [
+      ["Rule", String(p.label ?? "—")],
+      ["New state", p.enabled === false ? "Disabled" : "Enabled"],
+    ];
+  }
   const content = Array.isArray(p.content) ? p.content.map(String).join("\n") : "";
   return [
     ["Name", String(p.name ?? "—")],
@@ -60,7 +84,7 @@ export function ChangeDetailPage() {
   const manage = hasRole("admin", "network_admin");
   const own = user?.username === c.requester_username;
   const firewall = options.data?.find((f) => f.id === c.firewall_id)?.name ?? "—";
-  const aliasName = typeof c.proposed?.name === "string" ? c.proposed.name : undefined;
+  const aliasName = targetName(c);
   const busy = move.isPending || apply.isPending;
 
   const canSubmit = c.status === "validated" && manage && (own || isAdmin);
@@ -105,7 +129,7 @@ export function ChangeDetailPage() {
         </CardHeader>
         <CardContent>
           <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
-            {proposalRows(c.proposed).map(([k, v]) => (
+            {proposalRows(c.proposed, c.kind).map(([k, v]) => (
               <div key={k} className="contents">
                 <dt className="text-muted-foreground">{k}</dt>
                 <dd className="whitespace-pre-wrap break-all font-mono text-xs sm:text-sm">{v}</dd>
@@ -170,7 +194,28 @@ export function ChangeDetailPage() {
         </Card>
       )}
 
-      {c.action === "update" && c.base_snapshot && (
+      {c.kind === "rule" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current rule</CardTitle>
+            <CardDescription>
+              The rule as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {ruleRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "alias" && c.action === "update" && c.base_snapshot && (
         <Card>
           <CardHeader>
             <CardTitle>Before this change</CardTitle>

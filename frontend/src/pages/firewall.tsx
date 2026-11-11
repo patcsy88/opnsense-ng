@@ -174,6 +174,17 @@ function endpoint(net: string | null, port: string | null) {
 }
 
 export function FirewallPage() {
+  const { hasRole } = useAuth();
+  const canManage = hasRole("admin", "network_admin");
+  const navigate = useNavigate();
+  const qc = useQueryClient();
+  const [toggling, setToggling] = useState<RuleInfo | null>(null);
+  const [togglePending, setTogglePending] = useState(false);
+  const [toggleError, setToggleError] = useState<string | null>(null);
+  const closeToggle = () => {
+    setToggling(null);
+    setToggleError(null);
+  };
   const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
   const [chosen, setChosen] = useState<string | null>(null);
   const firewalls = options.data ?? [];
@@ -247,6 +258,7 @@ export function FirewallPage() {
                       <TableHead>Description</TableHead>
                       <TableHead>Enabled</TableHead>
                       <TableHead>Log</TableHead>
+                      {canManage && <TableHead className="text-right">Change</TableHead>}
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -262,6 +274,17 @@ export function FirewallPage() {
                         <TableCell>{r.description ?? "—"}</TableCell>
                         <TableCell>{r.enabled === null ? "—" : r.enabled ? "Yes" : "No"}</TableCell>
                         <TableCell>{r.log === null ? "—" : r.log ? "Yes" : "No"}</TableCell>
+                        {canManage && (
+                          <TableCell className="text-right">
+                            {r.uuid && r.enabled !== null ? (
+                              <Button size="sm" variant="outline" onClick={() => setToggling(r)}>
+                                {r.enabled ? "Disable" : "Enable"}
+                              </Button>
+                            ) : (
+                              <span className="text-xs text-muted-foreground">Not editable here</span>
+                            )}
+                          </TableCell>
+                        )}
                       </TableRow>
                     ))}
                   </TableBody>
@@ -272,6 +295,36 @@ export function FirewallPage() {
         </Card>
       )}
       {selected && <AliasesCard firewallId={selected} />}
+      <ConfirmDialog
+        open={toggling !== null}
+        onOpenChange={(o) => !o && closeToggle()}
+        title={toggling?.enabled ? "Request disabling this rule?" : "Request enabling this rule?"}
+        confirmLabel="Create change request"
+        pending={togglePending}
+        error={toggleError}
+        description={
+          <>
+            This creates a change request for the rule{" "}
+            <strong>{toggling?.description ?? toggling?.uuid?.slice(0, 8)}</strong>. Nothing is sent to the
+            firewall until it is reviewed, approved and applied. Rules on WAN, pass-any rules and
+            system rules are marked high risk.
+          </>
+        }
+        onConfirm={() => {
+          if (!toggling?.uuid || !selected) return;
+          setToggleError(null);
+          setTogglePending(true);
+          api
+            .stageRuleToggle(selected, toggling.uuid, !toggling.enabled)
+            .then(async (made) => {
+              await qc.invalidateQueries({ queryKey: ["changes"] });
+              closeToggle();
+              navigate(`/changes/${made.id}`);
+            })
+            .catch((e: unknown) => setToggleError(describeError(e).message))
+            .finally(() => setTogglePending(false));
+        }}
+      />
     </div>
   );
 }

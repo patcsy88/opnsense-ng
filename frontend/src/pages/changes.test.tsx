@@ -322,3 +322,98 @@ describe("Alias update and delete", () => {
     expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
   });
 });
+
+describe("Rule enable/disable", () => {
+  const RULE_UUID = "0b3a6c1e-1d2f-4a5b-8c7d-9e0f1a2b3c4d";
+  const rule = {
+    uuid: RULE_UUID,
+    enabled: true,
+    action: "pass",
+    interface: "lan",
+    direction: "in",
+    ip_protocol: "inet",
+    protocol: "TCP",
+    source: "10.0.0.0/24",
+    source_port: null,
+    destination: "10.0.1.5",
+    destination_port: "443",
+    description: "Web out",
+    log: false,
+    sequence: 10,
+  };
+  const ruleChange = (over: Record<string, unknown> = {}) =>
+    change({
+      kind: "rule",
+      action: "toggle",
+      target_uuid: RULE_UUID,
+      proposed: { label: "Web out", enabled: false, description: "Web out" },
+      base_snapshot: rule,
+      ...over,
+    });
+
+  function rulesPage(user: object) {
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(user)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get(`/api/v1/firewalls/${FW.id}/firewall/rules`, () =>
+        HttpResponse.json({
+          firewall_id: FW.id,
+          rules: [rule, { ...rule, uuid: null, description: "system" }],
+          truncated: false,
+          registry_verified: true,
+        }),
+      ),
+      http.get(`/api/v1/firewalls/${FW.id}/firewall/aliases`, () =>
+        HttpResponse.json({ firewall_id: FW.id, aliases: [], truncated: false, registry_verified: true }),
+      ),
+    );
+  }
+
+  it("offers Disable only to managers and only for rules with an id", async () => {
+    rulesPage(NETADMIN);
+    renderApp(<App />, "/firewall");
+    expect(await screen.findByRole("button", { name: "Disable" })).toBeInTheDocument();
+    expect(screen.getAllByText("Not editable here")).toHaveLength(1);
+  });
+
+  it("hides the button from view-only roles", async () => {
+    rulesPage(READER);
+    renderApp(<App />, "/firewall");
+    await screen.findByText("Web out");
+    expect(screen.queryByRole("button", { name: "Disable" })).not.toBeInTheDocument();
+  });
+
+  it("stages a disable only after confirmation and opens the request", async () => {
+    const calls: { uuid: string; body: unknown }[] = [];
+    document.cookie = "csrf_token=tok; path=/";
+    rulesPage(NETADMIN);
+    server.use(
+      http.post("/api/v1/changes/rules/:uuid/toggle", async ({ request, params }) => {
+        calls.push({ uuid: String(params.uuid), body: await request.json() });
+        return HttpResponse.json(ruleChange(), { status: 201 });
+      }),
+      http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(ruleChange())),
+    );
+    renderApp(<App />, "/firewall");
+    fireEvent.click(await screen.findByRole("button", { name: "Disable" }));
+    expect(calls).toEqual([]);
+    fireEvent.click(await screen.findByRole("button", { name: "Create change request" }));
+    await waitFor(() => expect(calls).toHaveLength(1));
+    expect(calls[0]).toEqual({ uuid: RULE_UUID, body: { firewall_id: FW.id, enabled: false } });
+    expect(await screen.findByText("Current rule")).toBeInTheDocument();
+  });
+
+  it("describes the rule in the apply dialog and needs the typed label when high risk", async () => {
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(ADMIN)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get(`/api/v1/changes/${CID}`, () =>
+        HttpResponse.json(ruleChange({ status: "approved", high_risk: true })),
+      ),
+    );
+    renderApp(<App />, `/changes/${CID}`);
+    fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
+    expect(await screen.findByText(/disables the rule "Web out"/i)).toBeInTheDocument();
+    expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
+  });
+});
