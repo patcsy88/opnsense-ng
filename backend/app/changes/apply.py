@@ -23,6 +23,7 @@ from app import audit
 from app.auth.deps import CurrentUser
 from app.changes import service
 from app.changes.fingerprint import fingerprint
+from app.changes.rule_schemas import RuleProposal
 from app.changes.states import Status
 from app.core.config import Settings
 from app.core.crypto import CredentialDecryptionError
@@ -39,6 +40,7 @@ from app.opnsense.registry.entries import (
     FIREWALL_ALIASES_LIST,
     FIREWALL_ALIASES_RECONFIGURE,
     FIREWALL_ALIASES_UPDATE,
+    FIREWALL_RULES_ADD,
     FIREWALL_RULES_APPLY,
     FIREWALL_RULES_LIST,
     FIREWALL_RULES_TOGGLE,
@@ -309,6 +311,48 @@ def read_rules(
     return list(normalise_rules(raw).rules)
 
 
+def rule_payload(proposed: dict[str, Any], sequence: int) -> dict[str, Any]:
+    return {
+        "rule": {
+            "enabled": "1" if proposed.get("enabled", True) else "0",
+            "sequence": str(sequence),
+            "action": proposed["action"],
+            "quick": "1",
+            "interface": proposed["interface"],
+            "direction": proposed["direction"],
+            "ipprotocol": proposed["ip_protocol"],
+            "protocol": proposed["protocol"],
+            "source_net": proposed["source"],
+            "source_port": proposed.get("source_port", ""),
+            "destination_net": proposed["destination"],
+            "destination_port": proposed.get("destination_port", ""),
+            "log": "1" if proposed.get("log") else "0",
+            "description": proposed["description"],
+        }
+    }
+
+
+def next_sequence(rules: list[RuleInfo]) -> int:
+    """After the last user rule, never first: OPNsense would default a new rule to 1."""
+    used = [r.sequence for r in rules if r.sequence is not None]
+    return min((max(used) + 1) if used else 1, 999999)
+
+
+def alias_problem(
+    references: set[str], aliases: list[AliasInfo], proposed: dict[str, Any]
+) -> str | None:
+    """Every alias a rule names must exist, as the right kind (ports vs addresses)."""
+    by_name = {a.name: a for a in aliases if a.name}
+    port_names = {proposed.get("source_port", ""), proposed.get("destination_port", "")}
+    for name in sorted(references):
+        alias = by_name.get(name)
+        if alias is None:
+            return f"The alias {name} does not exist on the firewall"
+        if (alias.type == "port") != (name in port_names):
+            return f"The alias {name} is the wrong type for this field"
+    return None
+
+
 def apply_rule_change(
     db: Session,
     *,
@@ -327,13 +371,15 @@ def apply_rule_change(
         user=user,
         request=request,
         kind="rule",
-        actions=("toggle",),
+        actions=("toggle", "create"),
         confirm_name=confirm_name,
         confirm_key="label",
     )
     firewall_id = fw.id
+    action = cr.action
     target = cr.target_uuid
-    params = {"uuid": target} if target else None
+    proposed = dict(cr.proposed or {})
+    params = {"uuid": target} if action == "toggle" and target else None
     client: OPNsenseClient | None = None
     saved = False
     try:
@@ -348,35 +394,81 @@ def apply_rule_change(
             listing = _call(db, client, FIREWALL_RULES_LIST, None, user, fw.id, request)
         except FirewallError as exc:
             return _finish(db, cr, Status.failed, user, request, f"Check failed: {exc.message}")
-        current = next((r for r in normalise_rules(listing).rules if r.uuid == target), None)
-        if current is None:
-            return _finish(
-                db,
-                cr,
-                Status.stale,
-                user,
-                request,
-                "The rule no longer exists on the firewall; nothing was changed",
-            )
-        if fingerprint(current.model_dump()) != cr.base_fingerprint:
-            return _finish(
-                db,
-                cr,
-                Status.stale,
-                user,
-                request,
-                "The rule was changed on the firewall after this request was made; "
-                "nothing was changed. Create a new request.",
-            )
+        rules = normalise_rules(listing).rules
+        sequence = 0
+        if action == "toggle":
+            current = next((r for r in rules if r.uuid == target), None)
+            if current is None:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The rule no longer exists on the firewall; nothing was changed",
+                )
+            if fingerprint(current.model_dump()) != cr.base_fingerprint:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The rule was changed on the firewall after this request was made; "
+                    "nothing was changed. Create a new request.",
+                )
+        else:
+            if any(r.description == proposed["description"] for r in rules):
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "A rule with this description now exists on the firewall; nothing was changed",
+                )
+            references = RuleProposal.model_validate(
+                {k: v for k, v in proposed.items() if k not in ("label", "risk")}
+            ).alias_references()
+            if references:
+                try:
+                    aliases = normalise_aliases(
+                        _call(db, client, FIREWALL_ALIASES_LIST, None, user, fw.id, request)
+                    ).aliases
+                except FirewallError as exc:
+                    return _finish(
+                        db, cr, Status.failed, user, request, f"Check failed: {exc.message}"
+                    )
+                problem = alias_problem(references, list(aliases), proposed)
+                if problem:
+                    return _finish(
+                        db, cr, Status.stale, user, request, f"{problem}; nothing was changed"
+                    )
+            sequence = next_sequence(rules)
 
         try:
-            reply = _call(db, client, FIREWALL_RULES_TOGGLE, {}, user, fw.id, request, params)
+            if action == "toggle":
+                reply = _call(db, client, FIREWALL_RULES_TOGGLE, {}, user, fw.id, request, params)
+                want = "Enabled" if proposed.get("enabled") else "Disabled"
+            else:
+                reply = _call(
+                    db,
+                    client,
+                    FIREWALL_RULES_ADD,
+                    rule_payload(proposed, sequence),
+                    user,
+                    fw.id,
+                    request,
+                )
+                want = "saved"
         except FirewallError as exc:
             return _finish(db, cr, Status.failed, user, request, f"Not saved: {exc.message}")
-        want = "Enabled" if (cr.proposed or {}).get("enabled") else "Disabled"
         if not isinstance(reply, dict) or reply.get("result") != want:
             return _finish(db, cr, Status.failed, user, request, _validation_message(reply))
         saved = True
+        if action == "create":
+            new_id = reply.get("uuid")
+            target = new_id if isinstance(new_id, str) else None
 
         try:
             result = _call(db, client, FIREWALL_RULES_APPLY, {}, user, fw.id, request)
@@ -403,7 +495,16 @@ def apply_rule_change(
         snapshot: dict[str, Any] | None
         try:
             after = _call(db, client, FIREWALL_RULES_LIST, None, user, fw.id, request)
-            match = next((r for r in normalise_rules(after).rules if r.uuid == target), None)
+            match = next(
+                (
+                    r
+                    for r in normalise_rules(after).rules
+                    if (
+                        r.uuid == target if target else r.description == proposed.get("description")
+                    )
+                ),
+                None,
+            )
             snapshot = match.model_dump() if match else None
         except FirewallError:
             snapshot = None

@@ -19,7 +19,7 @@ PORT_PROTOCOLS = frozenset({"TCP", "UDP", "TCP/UDP"})
 Action = Literal["pass", "block", "reject"]
 Direction = Literal["in", "out"]
 IpProtocol = Literal["inet", "inet6"]
-Protocol = Literal["any", "TCP", "UDP", "TCP/UDP", "ICMP", "IPv6-ICMP"]
+Protocol = Literal["any", "TCP", "UDP", "TCP/UDP", "ICMP"]
 
 
 def _address(value: str) -> str:
@@ -66,7 +66,7 @@ class RuleProposal(BaseModel):
     destination: str = Field(default="any", min_length=1, max_length=64)
     destination_port: str = Field(default="", max_length=64)
     log: bool = False
-    description: str = Field(default="", max_length=255)
+    description: str = Field(default="", max_length=255)  # required; checked after stripping
 
     @field_validator("interface")
     @classmethod
@@ -97,9 +97,9 @@ class RuleProposal(BaseModel):
         if (self.source_port or self.destination_port) and self.protocol not in PORT_PROTOCOLS:
             raise ValueError("Ports can only be set for TCP, UDP or TCP/UDP")
         if self.protocol == "ICMP" and self.ip_protocol != "inet":
-            raise ValueError("ICMP applies to IPv4; use IPv6-ICMP for IPv6")
-        if self.protocol == "IPv6-ICMP" and self.ip_protocol != "inet6":
-            raise ValueError("IPv6-ICMP applies to IPv6")
+            raise ValueError("ICMP applies to IPv4 only")
+        if not self.description:
+            raise ValueError("A description is required; it identifies the rule")
         return self
 
     def alias_references(self) -> set[str]:

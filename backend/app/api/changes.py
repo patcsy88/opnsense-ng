@@ -13,6 +13,7 @@ from app import audit
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
 from app.changes import apply as apply_changes
 from app.changes import service
+from app.changes.rule_schemas import RuleProposal
 from app.changes.schemas import AliasProposal
 from app.changes.states import Status
 from app.core.config import Settings, get_settings
@@ -395,6 +396,99 @@ def stage_alias_delete(
         action="delete",
         proposal=None,
     )
+
+
+class RuleCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    rule: RuleProposal
+
+
+@router.post("/rules", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED)
+def stage_rule_create(
+    request: Request,
+    body: RuleCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new rule. The rules and any aliases it names are read (read-only) to check that the
+    description is unused and the aliases exist. High risk for pass-any rules and WAN rules."""
+    audit_action = "change.stage_rule_create"
+    firewall_id = body.firewall_id
+    rule = body.rule
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_rules(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+        aliases = (
+            apply_changes.read_aliases(
+                db, firewall=fw, user=user, settings=settings, request=request
+            )
+            if rule.alias_references()
+            else []
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the current configuration from the firewall") from None
+    if any(r.description == rule.description for r in rows):
+        raise refuse("A rule with this description already exists on the firewall")
+    problem = apply_changes.alias_problem(rule.alias_references(), aliases, rule.model_dump())
+    if problem:
+        raise refuse(problem)
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "rule",
+            ChangeRequest.action == "create",
+            ChangeRequest.proposed["description"].astext == rule.description,
+            ChangeRequest.status.in_(OPEN_STATES),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already creates a rule with this description", duplicate)
+    reasons = rule.risk_reasons()
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="rule",
+            action="create",
+            target_uuid=None,
+            proposed={**rule.model_dump(), "label": rule.description, "risk": reasons},
+            base_snapshot=None,
+            high_risk=bool(reasons),
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
 
 
 class RuleToggleCreate(BaseModel):

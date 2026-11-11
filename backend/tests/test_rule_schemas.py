@@ -12,7 +12,7 @@ UUID = "ec691b46-6d4c-4fa5-88cc-54589859a1c9"
 
 
 def make(**kw: Any) -> RuleProposal:
-    base: dict[str, Any] = {"action": "pass", "interface": "lan"}
+    base: dict[str, Any] = {"action": "pass", "interface": "lan", "description": "Test rule"}
     base.update(kw)
     return RuleProposal(**base)
 
@@ -52,7 +52,8 @@ def test_accepts_address_forms_and_ports() -> None:
         {"protocol": "TCP", "destination_port": "90:80"},
         {"protocol": "any", "destination_port": "80"},
         {"protocol": "ICMP", "ip_protocol": "inet6"},
-        {"protocol": "IPv6-ICMP", "ip_protocol": "inet"},
+        {"protocol": "IPv6-ICMP", "ip_protocol": "inet6"},
+        {"description": "   "},
         {"description": "a\nb"},
         {"gateway": "WAN_GW"},
         {"direction": "both"},
