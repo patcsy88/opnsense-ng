@@ -20,6 +20,7 @@ from app.core.crypto import CredentialDecryptionError
 from app.db.models import ChangeRequest, Firewall, Role
 from app.opnsense.errors import FirewallError
 from app.opnsense.normalise.aliases import AliasInfo
+from app.opnsense.normalise.rules import RuleInfo
 
 router = APIRouter(prefix="/api/v1/changes", tags=["changes"])
 
@@ -396,6 +397,112 @@ def stage_alias_delete(
     )
 
 
+class RuleToggleCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    enabled: bool
+
+
+def _rule_label(rule: RuleInfo) -> str:
+    return (rule.description or str(rule.uuid)[:8])[:64]
+
+
+@router.post(
+    "/rules/{target}/toggle", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED
+)
+def stage_rule_toggle(
+    request: Request,
+    target: str,
+    body: RuleToggleCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage enabling or disabling an existing rule. The live rule is read once (read-only) and
+    recorded; apply refuses if it has changed since. High risk when the rule is a pass-any rule or
+    sits on WAN."""
+    audit_action = "change.stage_rule_toggle"
+    firewall_id = body.firewall_id
+    if not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid rule id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_rules(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the rule from the firewall") from None
+    current = next((r for r in rows if r.uuid == target), None)
+    if current is None:
+        raise refuse("That rule was not found on the firewall")
+    if (current.enabled is not False) == body.enabled:
+        raise refuse("The rule is already " + ("enabled" if body.enabled else "disabled"))
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "rule",
+            ChangeRequest.target_uuid == target,
+            ChangeRequest.status.in_(OPEN_STATES),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already changes this rule", duplicate)
+    high_risk = (
+        current.sequence is None  # auto-generated system rule (anti-lockout and similar)
+        or current.interface == "wan"
+        or (
+            current.action == "pass"
+            and current.source in (None, "any")
+            and current.destination in (None, "any")
+        )
+    )
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="rule",
+            action="toggle",
+            target_uuid=target,
+            proposed={
+                "label": _rule_label(current),
+                "enabled": body.enabled,
+                "description": current.description or "",
+            },
+            base_snapshot=current.model_dump(),
+            high_risk=high_risk,
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
 @router.get("", response_model=list[ChangeOut])
 def list_changes(
     firewall_id: uuid.UUID | None = None,
@@ -522,7 +629,12 @@ def apply_change(
     cr = _get(db, change_id)
     firewall_id = cr.firewall_id
     try:
-        cr = apply_changes.apply_alias_change(
+        run = (
+            apply_changes.apply_rule_change
+            if cr.kind == "rule"
+            else apply_changes.apply_alias_change
+        )
+        cr = run(
             db,
             change_id=change_id,
             user=user,

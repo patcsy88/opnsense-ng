@@ -30,14 +30,18 @@ from app.core.logging import get_logger
 from app.db.models import ChangeRequest, Firewall
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.errors import ConnectionStatus, FirewallError
-from app.opnsense.normalise import normalise_aliases
+from app.opnsense.normalise import normalise_aliases, normalise_rules
 from app.opnsense.normalise.aliases import AliasInfo
+from app.opnsense.normalise.rules import RuleInfo
 from app.opnsense.registry.entries import (
     FIREWALL_ALIASES_ADD,
     FIREWALL_ALIASES_DELETE,
     FIREWALL_ALIASES_LIST,
     FIREWALL_ALIASES_RECONFIGURE,
     FIREWALL_ALIASES_UPDATE,
+    FIREWALL_RULES_APPLY,
+    FIREWALL_RULES_LIST,
+    FIREWALL_RULES_TOGGLE,
 )
 
 log = get_logger("changes.apply")
@@ -92,6 +96,52 @@ def read_aliases(
     return list(normalise_aliases(raw).aliases)
 
 
+def begin_apply(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    request: Request,
+    kind: str,
+    actions: tuple[str, ...],
+    confirm_name: str | None,
+    confirm_key: str = "name",
+) -> tuple[ChangeRequest, Firewall]:
+    """Checks shared by every apply: request shape, typed confirmation, per-firewall lock, and
+    approved -> applying. Raises ApplyRefused when nothing was started."""
+    cr = db.get(ChangeRequest, change_id)
+    if cr is None:
+        raise ApplyRefused("Change request not found")
+    if cr.kind != kind or cr.action not in actions or not cr.proposed:
+        raise ApplyRefused(f"Only {kind} changes of this type can be applied here")
+    if cr.action != "create" and not cr.target_uuid:
+        raise ApplyRefused(f"This request has no target {kind}")
+    if cr.high_risk and confirm_name != cr.proposed.get(confirm_key):
+        what = "alias name" if kind == "alias" else "rule label"
+        raise ApplyRefused(f"Type the {what} to confirm this high-risk change")
+    fw = db.get(Firewall, cr.firewall_id)
+    if fw is None:
+        raise ApplyRefused("Firewall not found")
+
+    # Serialise starts per firewall; the "applying" status then blocks everyone else.
+    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": str(fw.id)})
+    busy = db.scalar(
+        select(func.count())
+        .select_from(ChangeRequest)
+        .where(
+            ChangeRequest.firewall_id == fw.id,
+            ChangeRequest.status == Status.applying.value,
+            ChangeRequest.id != cr.id,
+        )
+    )
+    if busy:
+        db.rollback()
+        raise ApplyRefused("Another change is being applied to this firewall")
+    service.transition(db, cr, Status.applying, user=user, request=request)
+    db.commit()
+    return cr, fw
+
+
 def apply_alias_change(
     db: Session,
     *,
@@ -103,36 +153,16 @@ def apply_alias_change(
 ) -> ChangeRequest:
     from app.api.firewalls import open_client  # local: avoids an import cycle with the router
 
-    cr = db.get(ChangeRequest, change_id)
-    if cr is None:
-        raise ApplyRefused("Change request not found")
-    if cr.kind != "alias" or cr.action not in ("create", "update", "delete") or not cr.proposed:
-        raise ApplyRefused("Only alias changes can be applied in this release")
-    if cr.action != "create" and not cr.target_uuid:
-        raise ApplyRefused("This request has no target alias")
-    if cr.high_risk and confirm_name != cr.proposed.get("name"):
-        raise ApplyRefused("Type the alias name to confirm this high-risk change")
-    fw = db.get(Firewall, cr.firewall_id)
-    if fw is None:
-        raise ApplyRefused("Firewall not found")
-    firewall_id = fw.id
-
-    # Serialise starts per firewall; the "applying" status then blocks everyone else.
-    db.execute(text("SELECT pg_advisory_xact_lock(hashtext(:k))"), {"k": str(firewall_id)})
-    busy = db.scalar(
-        select(func.count())
-        .select_from(ChangeRequest)
-        .where(
-            ChangeRequest.firewall_id == firewall_id,
-            ChangeRequest.status == Status.applying.value,
-            ChangeRequest.id != cr.id,
-        )
+    cr, fw = begin_apply(
+        db,
+        change_id=change_id,
+        user=user,
+        request=request,
+        kind="alias",
+        actions=("create", "update", "delete"),
+        confirm_name=confirm_name,
     )
-    if busy:
-        db.rollback()
-        raise ApplyRefused("Another change is being applied to this firewall")
-    service.transition(db, cr, Status.applying, user=user, request=request)
-    db.commit()
+    firewall_id = fw.id
 
     proposed = dict(cr.proposed or {})
     action = cr.action
@@ -239,6 +269,141 @@ def apply_alias_change(
                 ),
                 None,
             )
+            snapshot = match.model_dump() if match else None
+        except FirewallError:
+            snapshot = None
+        return _finish(db, cr, Status.applied, user, request, None, snapshot)
+    except Exception:
+        log.exception("apply_crashed", change_request=str(cr.id), firewall_id=str(firewall_id))
+        db.rollback()
+        db.refresh(cr)
+        state = (
+            "saved on the firewall, activation unknown"
+            if saved
+            else "the firewall state is unknown"
+        )
+        return _finish(
+            db, cr, Status.failed, user, request, f"Unexpected error; {state}. Check the firewall."
+        )
+    finally:
+        if client is not None:
+            anyio.from_thread.run(client.aclose)
+
+
+def read_rules(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[RuleInfo]:
+    """Read-only: the rules currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, FIREWALL_RULES_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_rules(raw).rules)
+
+
+def apply_rule_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    """Rule counterpart of apply_alias_change: stale check, save, `filter/apply`, read back."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    cr, fw = begin_apply(
+        db,
+        change_id=change_id,
+        user=user,
+        request=request,
+        kind="rule",
+        actions=("toggle",),
+        confirm_name=confirm_name,
+        confirm_key="label",
+    )
+    firewall_id = fw.id
+    target = cr.target_uuid
+    params = {"uuid": target} if target else None
+    client: OPNsenseClient | None = None
+    saved = False
+    try:
+        try:
+            client = open_client(fw, settings)
+        except CredentialDecryptionError:
+            return _finish(
+                db, cr, Status.failed, user, request, "Stored credentials could not be decrypted"
+            )
+
+        try:
+            listing = _call(db, client, FIREWALL_RULES_LIST, None, user, fw.id, request)
+        except FirewallError as exc:
+            return _finish(db, cr, Status.failed, user, request, f"Check failed: {exc.message}")
+        current = next((r for r in normalise_rules(listing).rules if r.uuid == target), None)
+        if current is None:
+            return _finish(
+                db,
+                cr,
+                Status.stale,
+                user,
+                request,
+                "The rule no longer exists on the firewall; nothing was changed",
+            )
+        if fingerprint(current.model_dump()) != cr.base_fingerprint:
+            return _finish(
+                db,
+                cr,
+                Status.stale,
+                user,
+                request,
+                "The rule was changed on the firewall after this request was made; "
+                "nothing was changed. Create a new request.",
+            )
+
+        try:
+            reply = _call(db, client, FIREWALL_RULES_TOGGLE, {}, user, fw.id, request, params)
+        except FirewallError as exc:
+            return _finish(db, cr, Status.failed, user, request, f"Not saved: {exc.message}")
+        want = "Enabled" if (cr.proposed or {}).get("enabled") else "Disabled"
+        if not isinstance(reply, dict) or reply.get("result") != want:
+            return _finish(db, cr, Status.failed, user, request, _validation_message(reply))
+        saved = True
+
+        try:
+            result = _call(db, client, FIREWALL_RULES_APPLY, {}, user, fw.id, request)
+        except FirewallError as exc:
+            return _finish(
+                db,
+                cr,
+                Status.failed,
+                user,
+                request,
+                f"The change is saved on the firewall but NOT active: {exc.message}",
+            )
+        status_text = result.get("status") if isinstance(result, dict) else None
+        if not isinstance(status_text, str) or status_text.strip().lower() != "ok":
+            return _finish(
+                db,
+                cr,
+                Status.failed,
+                user,
+                request,
+                "The change is saved on the firewall but NOT active: activation was not confirmed",
+            )
+
+        snapshot: dict[str, Any] | None
+        try:
+            after = _call(db, client, FIREWALL_RULES_LIST, None, user, fw.id, request)
+            match = next((r for r in normalise_rules(after).rules if r.uuid == target), None)
             snapshot = match.model_dump() if match else None
         except FirewallError:
             snapshot = None
