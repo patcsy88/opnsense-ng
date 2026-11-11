@@ -18,9 +18,11 @@ import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav";
 
 function NavLinks({ onNavigate, className }: { onNavigate?: () => void; className?: string }) {
+  const { user } = useAuth();
+  const items = NAV_ITEMS.filter((n) => !n.roles || (user !== null && n.roles.includes(user.role)));
   return (
     <nav aria-label="Main" className={cn("flex flex-col gap-1", className)}>
-      {NAV_ITEMS.map(({ to, label, icon: Icon, implemented }) => (
+      {items.map(({ to, label, icon: Icon, implemented }) => (
         <NavLink
           key={to}
           to={to}
@@ -118,7 +120,7 @@ export function AppLayout() {
           aria-label="Quick"
           className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-card md:hidden"
         >
-          {[NAV_ITEMS[0], NAV_ITEMS[1], NAV_ITEMS[2], NAV_ITEMS[6]].map((item) =>
+          {["/", "/firewall", "/changes", "/services"].map((path) => NAV_ITEMS.find((n) => n.to === path)).map((item) =>
             item ? (
               <NavLink
                 key={item.to}

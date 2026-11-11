@@ -12,6 +12,7 @@ import {
   changeDetailSchema,
   changeListSchema,
   rulesResponseSchema,
+  logsResponseSchema,
   systemStatusResponseSchema,
   userSchema,
   type AliasProposalInput,
@@ -214,6 +215,10 @@ export const api = {
   firewallRules: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/firewall/rules`, {
       schema: rulesResponseSchema,
+    }),
+  firewallLogs: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/firewall/logs`, {
+      schema: logsResponseSchema,
     }),
   interfaces: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/interfaces`, {

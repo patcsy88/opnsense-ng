@@ -109,6 +109,29 @@ export const rulesResponseSchema = z.object({
   registry_verified: z.boolean(),
 });
 
+export const logEntrySchema = z.object({
+  time: z.string().nullable(),
+  action: z.string().nullable(),
+  interface: z.string().nullable(),
+  direction: z.string().nullable(),
+  ip_version: z.number().nullable(),
+  protocol: z.string().nullable(),
+  source: z.string().nullable(),
+  source_port: z.number().nullable(),
+  destination: z.string().nullable(),
+  destination_port: z.number().nullable(),
+  rule: z.string().nullable(),
+  reason: z.string().nullable(),
+});
+export type LogEntry = z.infer<typeof logEntrySchema>;
+
+export const logsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  entries: z.array(logEntrySchema),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export const aliasSchema = z.object({
   uuid: z.string().nullable(),
   name: z.string().nullable(),
