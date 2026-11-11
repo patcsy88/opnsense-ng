@@ -74,7 +74,8 @@ _ENTRIES = (
         endpoint="/api/firewall/filter/searchRule",
         required_privilege="Firewall: Rules [new]",
         read_only=True,
-        verified=False,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Lists rules. The privilege also covers rule write endpoints; this app only reads.",
     ),
     Operation(

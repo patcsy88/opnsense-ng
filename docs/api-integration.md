@@ -1,6 +1,6 @@
 # OPNsense API Integration
 
-Status: seven read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`. New endpoints must be verified against a lab OPNsense before `verified=True`.
+Status: eight read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`.
 
 ## Rules
 
@@ -25,7 +25,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `cpu.usage` (SSE) | GET | `/api/diagnostics/cpu_usage/stream` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `system.disk` | GET | `/api/diagnostics/system/system_disk` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `interfaces.overview` | GET | `/api/interfaces/overview/interfacesInfo` | Status: Interfaces | yes | no | 26.7.8_2 | yes |
-| `firewall.rules.list` | GET | `/api/firewall/filter/searchRule` | Firewall: Rules [new] | yes | no | - | no |
+| `firewall.rules.list` | GET | `/api/firewall/filter/searchRule` | Firewall: Rules [new] | yes | no | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -49,4 +49,4 @@ Observed `system_disk` response: `devices` list; the dashboard uses the entry wi
 
 ## Firewall rules
 
-`firewall.rules.list` needs **Firewall: Rules [new]**. That privilege also covers the rule write endpoints under `/api/firewall/filter/*`, so grant it only to a lab or trusted API user; this app only reads. The result is search-style (`rows`) with flags as "0"/"1" strings. The backend keeps uuid, enabled, action, interface, direction, IP protocol, protocol, source/destination network and port, description, log and sequence. It drops categories, statistics and other metadata, and caps the list at 2000 rules. Not yet verified on the lab.
+`firewall.rules.list` needs **Firewall: Rules [new]**. That privilege also covers the rule write endpoints under `/api/firewall/filter/*`, so grant it only to a lab or trusted API user; this app only reads. The result is search-style (`rows`) with flags as "0"/"1" strings. The backend keeps uuid, enabled, action, interface, direction, IP protocol, protocol, source/destination network and port, description, log and sequence. It drops categories, statistics and other metadata, and caps the list at 2000 rules. Verified on 26.7.8_2: user rules come back with sequence and interface, and the list also includes auto-generated system rules (default deny, IPv6 ICMP, sshlockout, DHCP, anti-lockout) that have no sequence, and sometimes no interface (floating).
