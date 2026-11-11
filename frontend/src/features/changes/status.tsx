@@ -38,6 +38,7 @@ export function targetName(c: ChangeRequest): string | undefined {
 }
 
 export function describeChange(c: ChangeRequest): string {
+  if (c.kind === "rule" && c.action === "create") return `create rule ${targetName(c) ?? "?"}`;
   if (c.kind === "rule" && c.action === "toggle") {
     return `${c.proposed?.enabled === false ? "disable" : "enable"} rule ${targetName(c) ?? "?"}`;
   }
@@ -46,6 +47,9 @@ export function describeChange(c: ChangeRequest): string {
 
 export function describeEffect(c: ChangeRequest, firewall: string): string {
   const name = targetName(c) ?? "?";
+  if (c.kind === "rule" && c.action === "create") {
+    return `This creates the rule "${name}" on ${firewall} after the last existing rule and reloads the firewall rules immediately.`;
+  }
   if (c.kind === "rule") {
     const verb = c.proposed?.enabled === false ? "disables" : "enables";
     return `This ${verb} the rule "${name}" on ${firewall} and reloads the firewall rules immediately.`;

@@ -417,3 +417,109 @@ describe("Rule enable/disable", () => {
     expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
   });
 });
+
+describe("New rule", () => {
+  it("creates a rule request with the entered fields and opens it", async () => {
+    let body: Record<string, unknown> | null = null;
+    document.cookie = "csrf_token=tok; path=/";
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(NETADMIN)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get("/api/v1/changes", () => HttpResponse.json([])),
+      http.post("/api/v1/changes/rules", async ({ request }) => {
+        body = (await request.json()) as Record<string, unknown>;
+        return HttpResponse.json(
+          change({
+            kind: "rule",
+            action: "create",
+            target_uuid: null,
+            proposed: {
+              label: "Block telnet",
+              description: "Block telnet",
+              action: "block",
+              interface: "lan",
+              direction: "in",
+              ip_protocol: "inet",
+              protocol: "TCP",
+              source: "any",
+              source_port: "",
+              destination: "any",
+              destination_port: "23",
+              log: true,
+              enabled: true,
+              risk: [],
+            },
+          }),
+          { status: 201 },
+        );
+      }),
+      http.get(`/api/v1/changes/${CID}`, () =>
+        HttpResponse.json(
+          change({
+            kind: "rule",
+            action: "create",
+            proposed: { label: "Block telnet", description: "Block telnet", action: "block", interface: "lan", direction: "in", ip_protocol: "inet", protocol: "TCP", source: "any", source_port: "", destination: "any", destination_port: "23", log: true, enabled: true, risk: [] },
+          }),
+        ),
+      ),
+    );
+    renderApp(<App />, "/changes");
+    const newRule = await screen.findByRole("button", { name: /new rule/i });
+    await waitFor(() => expect(newRule).toBeEnabled());
+    fireEvent.click(newRule);
+    fireEvent.change(await screen.findByLabelText("Description"), { target: { value: "Block telnet" } });
+    fireEvent.change(screen.getByLabelText("Interface"), { target: { value: "lan" } });
+    fireEvent.change(screen.getByLabelText("Protocol"), { target: { value: "TCP" } });
+    fireEvent.change(await screen.findByLabelText("Destination port"), { target: { value: "23" } });
+    fireEvent.click(screen.getByLabelText(/log matching/i));
+    fireEvent.click(screen.getByRole("button", { name: "Create request" }));
+    await waitFor(() => expect(body).not.toBeNull());
+    expect(body).toEqual({
+      firewall_id: FW.id,
+      rule: {
+        action: "block",
+        interface: "lan",
+        direction: "in",
+        ip_protocol: "inet",
+        protocol: "TCP",
+        source: "any",
+        source_port: "",
+        destination: "any",
+        destination_port: "23",
+        log: true,
+        enabled: true,
+        description: "Block telnet",
+      },
+    });
+    expect(await screen.findByText("Block telnet")).toBeInTheDocument();
+  });
+
+  it("requires a description and hides ports unless the protocol has them", async () => {
+    document.cookie = "csrf_token=tok; path=/";
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(NETADMIN)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get("/api/v1/changes", () => HttpResponse.json([])),
+    );
+    renderApp(<App />, "/changes");
+    const newRule = await screen.findByRole("button", { name: /new rule/i });
+    await waitFor(() => expect(newRule).toBeEnabled());
+    fireEvent.click(newRule);
+    await screen.findByLabelText("Description");
+    expect(screen.queryByLabelText("Destination port")).not.toBeInTheDocument();
+    fireEvent.click(screen.getByRole("button", { name: "Create request" }));
+    expect(await screen.findByRole("alert")).toHaveTextContent("description is required");
+  });
+
+  it("hides New rule from view-only roles", async () => {
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(READER)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get("/api/v1/changes", () => HttpResponse.json([])),
+    );
+    renderApp(<App />, "/changes");
+    await screen.findByRole("heading", { name: "Changes" });
+    await screen.findByRole("combobox", { name: /firewall/i });
+    expect(screen.queryByRole("button", { name: /new rule/i })).not.toBeInTheDocument();
+  });
+});

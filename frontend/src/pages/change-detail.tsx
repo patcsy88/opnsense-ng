@@ -36,6 +36,20 @@ function ruleRows(snapshot: Record<string, unknown>): [string, string][] {
 
 function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
+  if (kind === "rule" && p.action !== undefined) {
+    const ports = (v: unknown) => (v ? `:${String(v)}` : "");
+    return [
+      ["Description", String(p.description ?? "—")],
+      ["Action", String(p.action)],
+      ["Interface", `${String(p.interface)} (${String(p.direction)}, ${p.ip_protocol === "inet6" ? "IPv6" : "IPv4"})`],
+      ["Protocol", String(p.protocol)],
+      ["Source", `${String(p.source)}${ports(p.source_port)}`],
+      ["Destination", `${String(p.destination)}${ports(p.destination_port)}`],
+      ["Log", p.log ? "Yes" : "No"],
+      ["Enabled", p.enabled === false ? "No" : "Yes"],
+      ...(Array.isArray(p.risk) && p.risk.length > 0 ? ([["High risk because", p.risk.join("; ")]] as [string, string][]) : []),
+    ];
+  }
   if (kind === "rule") {
     return [
       ["Rule", String(p.label ?? "—")],

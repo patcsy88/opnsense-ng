@@ -15,6 +15,7 @@ import {
   systemStatusResponseSchema,
   userSchema,
   type AliasProposalInput,
+  type RuleProposalInput,
   type FirewallCreateInput,
   type FirewallUpdateInput,
 } from "./schemas";
@@ -240,6 +241,11 @@ export const api = {
   stageAliasDelete: (firewallId: string, uuid: string) =>
     request("POST", `${base}/changes/aliases/${encodeURIComponent(uuid)}/delete`, {
       body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
+    }),
+  stageRule: (firewallId: string, rule: RuleProposalInput) =>
+    request("POST", `${base}/changes/rules`, {
+      body: { firewall_id: firewallId, rule },
       schema: changeDetailSchema,
     }),
   stageRuleToggle: (firewallId: string, uuid: string, enabled: boolean) =>

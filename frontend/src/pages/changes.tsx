@@ -9,10 +9,11 @@ import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle } f
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth";
 import { AliasForm } from "@/features/changes/alias-form";
+import { RuleForm } from "@/features/changes/rule-form";
 import { ChangeStatusBadge, describeChange, statusLabel } from "@/features/changes/status";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import { CHANGE_STATUSES, type AliasProposalInput } from "@/lib/schemas";
+import { CHANGE_STATUSES, type AliasProposalInput, type RuleProposalInput } from "@/lib/schemas";
 
 export function ChangesPage() {
   const { hasRole } = useAuth();
@@ -22,7 +23,7 @@ export function ChangesPage() {
   const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
   const [chosen, setChosen] = useState<string | null>(null);
   const [status, setStatus] = useState("");
-  const [creating, setCreating] = useState(false);
+  const [creating, setCreating] = useState<"alias" | "rule" | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -36,14 +37,17 @@ export function ChangesPage() {
     enabled: selected !== null,
   });
 
-  const create = async (alias: AliasProposalInput) => {
+  const create = async (input: AliasProposalInput | RuleProposalInput) => {
     if (!selected) return;
     setFormError(null);
     setSaving(true);
     try {
-      const made = await api.stageAlias(selected, alias);
+      const made =
+        creating === "rule"
+          ? await api.stageRule(selected, input as RuleProposalInput)
+          : await api.stageAlias(selected, input as AliasProposalInput);
       await qc.invalidateQueries({ queryKey: ["changes"] });
-      setCreating(false);
+      setCreating(null);
       navigate(`/changes/${made.id}`);
     } catch (e) {
       setFormError(describeError(e).message);
@@ -89,9 +93,14 @@ export function ChangesPage() {
             </select>
           </label>
           {canManage && (
-            <Button onClick={() => setCreating(true)} disabled={selected === null}>
-              <Plus className="h-4 w-4" /> New alias
-            </Button>
+            <>
+              <Button onClick={() => setCreating("alias")} disabled={selected === null}>
+                <Plus className="h-4 w-4" /> New alias
+              </Button>
+              <Button variant="outline" onClick={() => setCreating("rule")} disabled={selected === null}>
+                <Plus className="h-4 w-4" /> New rule
+              </Button>
+            </>
           )}
         </div>
       </div>
@@ -152,30 +161,46 @@ export function ChangesPage() {
       )}
 
       <Dialog
-        open={creating}
+        open={creating !== null}
         onOpenChange={(o) => {
           if (!o) {
-            setCreating(false);
+            setCreating(null);
             setFormError(null);
           }
         }}
       >
         <DialogContent>
           <DialogHeader>
-            <DialogTitle>New alias</DialogTitle>
+            <DialogTitle>{creating === "rule" ? "New rule" : "New alias"}</DialogTitle>
             <DialogDescription>
-              Propose a new host, network or port alias for {selected ? names.get(selected) : "the firewall"}.
+              {creating === "rule"
+                ? "Propose a new firewall rule for "
+                : "Propose a new host, network or port alias for "}
+              {selected ? names.get(selected) : "the firewall"}. Nothing is sent until it is reviewed, approved and
+              applied.
             </DialogDescription>
           </DialogHeader>
-          <AliasForm
-            pending={saving}
-            error={formError}
-            onSubmit={(a) => void create(a)}
-            onCancel={() => {
-              setCreating(false);
-              setFormError(null);
-            }}
-          />
+          {creating === "rule" ? (
+            <RuleForm
+              pending={saving}
+              error={formError}
+              onSubmit={(r) => void create(r)}
+              onCancel={() => {
+                setCreating(null);
+                setFormError(null);
+              }}
+            />
+          ) : (
+            <AliasForm
+              pending={saving}
+              error={formError}
+              onSubmit={(a) => void create(a)}
+              onCancel={() => {
+                setCreating(null);
+                setFormError(null);
+              }}
+            />
+          )}
         </DialogContent>
       </Dialog>
     </div>

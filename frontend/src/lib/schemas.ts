@@ -203,6 +203,21 @@ export const changeListSchema = z.array(changeSchema);
 export const changeDetailSchema = changeSchema.extend({ events: z.array(changeEventSchema) });
 export type ChangeDetail = z.infer<typeof changeDetailSchema>;
 
+export interface RuleProposalInput {
+  action: "pass" | "block" | "reject";
+  interface: string;
+  direction: "in" | "out";
+  ip_protocol: "inet" | "inet6";
+  protocol: "any" | "TCP" | "UDP" | "TCP/UDP" | "ICMP";
+  source: string;
+  source_port: string;
+  destination: string;
+  destination_port: string;
+  log: boolean;
+  enabled: boolean;
+  description: string;
+}
+
 export const ALIAS_TYPES = ["host", "network", "port"] as const;
 export interface AliasProposalInput {
   name: string;
