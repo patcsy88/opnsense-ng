@@ -17,6 +17,7 @@ from app.api.schemas import (
     FirewallOut,
     FirewallUpdate,
     InterfacesOut,
+    LogsOut,
     RulesOut,
     SystemStatusOut,
 )
@@ -34,6 +35,7 @@ from app.opnsense.normalise import (
     normalise_aliases,
     normalise_cpu_events,
     normalise_interfaces,
+    normalise_log,
     normalise_rules,
     normalise_system_status,
 )
@@ -42,6 +44,7 @@ from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
     FIREWALL_ALIASES_LIST,
+    FIREWALL_LOG,
     FIREWALL_RULES_LIST,
     INTERFACES_OVERVIEW,
     SYSTEM_DISK,
@@ -660,4 +663,44 @@ def firewall_aliases(
         aliases=result.aliases,
         truncated=result.truncated,
         registry_verified=get_operation(FIREWALL_ALIASES_LIST).verified,
+    )
+
+
+LOG_ROLES = (Role.admin, Role.network_admin, Role.security_admin)
+
+
+@router.get("/{firewall_id}/firewall/logs", response_model=LogsOut)
+def firewall_logs(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> LogsOut:
+    """Recent packet-filter log. Not for read_only: it exposes internal addresses and traffic."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=FIREWALL_LOG,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        if user.role is not Role.admin:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                {"status": public_status(exc.status), "message": "Firewall is unreachable"},
+            ) from None
+        raise HTTPException(
+            _HTTP_FOR_STATUS.get(exc.status, status.HTTP_502_BAD_GATEWAY),
+            {"status": exc.status.value, "message": exc.message},
+        ) from None
+    result = normalise_log(raw)
+    return LogsOut(
+        firewall_id=firewall_id,
+        entries=result.entries,
+        truncated=result.truncated,
+        registry_verified=get_operation(FIREWALL_LOG).verified,
     )

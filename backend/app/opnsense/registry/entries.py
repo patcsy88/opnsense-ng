@@ -24,6 +24,7 @@ FIREWALL_RULES_UPDATE = "firewall.rules.update"
 FIREWALL_RULES_DELETE = "firewall.rules.delete"
 FIREWALL_RULES_TOGGLE = "firewall.rules.toggle"
 FIREWALL_RULES_APPLY = "firewall.rules.apply"
+FIREWALL_LOG = "firewall.log"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -206,6 +207,15 @@ _ENTRIES = (
         verified=True,
         notes="Activates saved rule changes (filter reload). Reply: {status: ok}. Only called "
         "from the reviewed apply procedure.",
+    ),
+    Operation(
+        operation_id=FIREWALL_LOG,
+        method=HttpMethod.GET,
+        endpoint="/api/diagnostics/firewall/log",
+        required_privilege="Diagnostics: Logs: Firewall: Live View",
+        read_only=True,
+        notes="Recent packet-filter log records, newest first (default 1000, capped when "
+        "normalised). Unverified.",
     ),
     Operation(
         operation_id=CPU_USAGE,
