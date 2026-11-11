@@ -212,6 +212,7 @@ _ENTRIES = (
         operation_id=FIREWALL_LOG,
         method=HttpMethod.GET,
         endpoint="/api/diagnostics/firewall/log",
+        query_params=("limit", "digest"),
         required_privilege="Diagnostics: Logs: Firewall: Live View",
         read_only=True,
         min_version="26.7.8_2",

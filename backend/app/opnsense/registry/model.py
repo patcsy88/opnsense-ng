@@ -24,6 +24,8 @@ class UnsupportedOperationError(Exception):
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
 _ALLOWED_PARAMS = frozenset({"uuid"})
+_ALLOWED_QUERY = frozenset({"limit", "digest"})
+_QUERY_VALUE = re.compile(r"^[A-Za-z0-9]{1,64}$")
 
 
 class Operation(BaseModel):
@@ -36,6 +38,8 @@ class Operation(BaseModel):
     # Fixed path, never user supplied. The only variable part is a declared trailing {uuid} slot.
     endpoint: str = Field(pattern=r"^/api/[A-Za-z0-9_/]+(/\{uuid\})?$")
     path_params: tuple[str, ...] = ()
+    # Declared query parameter names (GET only). Values are checked to be short alphanumerics.
+    query_params: tuple[str, ...] = ()
     required_privilege: str  # OPNsense ACL privilege the API key needs (documentation/diagnostics)
     read_only: bool
     response_kind: ResponseKind = ResponseKind.json
@@ -52,7 +56,20 @@ class Operation(BaseModel):
         declared = set(self.path_params)
         if not declared <= _ALLOWED_PARAMS or ("{uuid}" in self.endpoint) != ("uuid" in declared):
             raise ValueError("endpoint placeholders and path_params must match")
+        if self.query_params and (
+            not set(self.query_params) <= _ALLOWED_QUERY or self.method is not HttpMethod.GET
+        ):
+            raise ValueError("query_params must be declared names on a GET operation")
         return self
+
+    def check_query(self, query: dict[str, str] | None) -> dict[str, str]:
+        given = query or {}
+        if not set(given) <= set(self.query_params):
+            raise ValueError(f"{self.operation_id} does not accept those query parameters")
+        for name, value in given.items():
+            if not isinstance(value, str) or not _QUERY_VALUE.match(value):
+                raise ValueError(f"Invalid value for query parameter {name}")
+        return dict(given)
 
     def resolve_endpoint(self, params: dict[str, str] | None = None) -> str:
         """Fill the declared slots. Values must be canonical lowercase UUIDs, nothing else."""

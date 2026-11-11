@@ -1,5 +1,6 @@
 """Map the OPNsense firewall log (`diagnostics/firewall/log`) to our internal schema."""
 
+import re
 from collections import Counter
 from typing import Any
 
@@ -32,12 +33,34 @@ class LogResult(BaseModel):
     truncated: bool = False
 
 
-def normalise_log(raw: Any) -> LogResult:
+_DIGEST = re.compile(r"^[0-9a-f]{32}$")
+
+
+def log_cursor(raw: Any) -> str | None:
+    """Digest of the newest record, used as an opaque position marker for the live view."""
+    rows = raw.get("rows") if isinstance(raw, dict) else raw
+    if isinstance(rows, list) and rows and isinstance(rows[0], dict):
+        digest = rows[0].get("__digest__")
+        if isinstance(digest, str) and _DIGEST.match(digest):
+            return digest
+    return None
+
+
+def normalise_log(raw: Any, after: str | None = None) -> LogResult:
     """Tolerant mapping of the record list (newest first). Only the fields shown in the UI are
-    passed on; TCP internals, digests and raw lines are dropped. Output is capped."""
+    passed on; TCP internals, digests and raw lines are dropped. Output is capped. `after` is a
+    digest: records from that one onwards (older) are cut off."""
     rows = raw.get("rows") if isinstance(raw, dict) else raw
     if not isinstance(rows, list):
         return LogResult(entries=[])
+    if after is not None:
+        # The firewall includes the marker record itself; stop there.
+        trimmed: list[Any] = []
+        for row in rows:
+            if isinstance(row, dict) and row.get("__digest__") == after:
+                break
+            trimmed.append(row)
+        rows = trimmed
     entries: list[LogEntry] = []
     for row in rows[:MAX_LOG_ROWS]:
         if not isinstance(row, dict):

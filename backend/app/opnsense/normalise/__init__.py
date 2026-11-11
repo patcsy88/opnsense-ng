@@ -5,6 +5,7 @@ from app.opnsense.normalise.logs import (
     LogResult,
     LogSummary,
     TopItem,
+    log_cursor,
     normalise_log,
     summarise_log,
 )
@@ -26,6 +27,7 @@ __all__ = [
     "RulesResult",
     "SystemStatus",
     "TopItem",
+    "log_cursor",
     "normalise_aliases",
     "normalise_cpu_events",
     "normalise_interfaces",

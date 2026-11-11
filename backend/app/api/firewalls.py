@@ -3,7 +3,7 @@ import uuid
 from typing import Any
 
 import anyio.from_thread
-from fastapi import APIRouter, Depends, HTTPException, Request, status
+from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from sqlalchemy import select
 from sqlalchemy.exc import IntegrityError
 from sqlalchemy.orm import Session
@@ -17,6 +17,7 @@ from app.api.schemas import (
     FirewallOut,
     FirewallUpdate,
     InterfacesOut,
+    LogsNewOut,
     LogsOut,
     RulesOut,
     SystemStatusOut,
@@ -32,6 +33,7 @@ from app.opnsense.cpu_sampler import sample_cpu
 from app.opnsense.errors import ConnectionStatus, FirewallError, public_status
 from app.opnsense.netpolicy import TargetPolicy, split_host
 from app.opnsense.normalise import (
+    log_cursor,
     normalise_aliases,
     normalise_cpu_events,
     normalise_interfaces,
@@ -358,6 +360,7 @@ def _run_operation(
     db: Session,
     settings: Settings,
     request: Request,
+    query: dict[str, str] | None = None,
 ) -> Any:
     """Load the firewall, execute a registry operation, audit the outcome.
     Raises FirewallError (already audited) on connection/API failure. Any other unexpected
@@ -386,7 +389,7 @@ def _run_operation(
         if get_operation(operation_id).response_kind is ResponseKind.sse:
             result = anyio.from_thread.run(lambda: client.sample_stream(operation_id, max_events=2))
         else:
-            result = anyio.from_thread.run(client.execute, operation_id)
+            result = anyio.from_thread.run(lambda: client.execute(operation_id, query=query))
     except FirewallError as exc:
         detail: dict[str, Any] = {"status": exc.status.value}
         if exc.status is ConnectionStatus.endpoint_not_found:
@@ -670,6 +673,18 @@ def firewall_aliases(
 LOG_ROLES = (Role.admin, Role.network_admin, Role.security_admin)
 
 
+def _log_error(exc: FirewallError, user: CurrentUser) -> HTTPException:
+    if user.role is not Role.admin:
+        return HTTPException(
+            status.HTTP_502_BAD_GATEWAY,
+            {"status": public_status(exc.status), "message": "Firewall is unreachable"},
+        )
+    return HTTPException(
+        _HTTP_FOR_STATUS.get(exc.status, status.HTTP_502_BAD_GATEWAY),
+        {"status": exc.status.value, "message": exc.message},
+    )
+
+
 @router.get("/{firewall_id}/firewall/logs", response_model=LogsOut)
 def firewall_logs(
     request: Request,
@@ -689,20 +704,44 @@ def firewall_logs(
             request=request,
         )
     except FirewallError as exc:
-        if user.role is not Role.admin:
-            raise HTTPException(
-                status.HTTP_502_BAD_GATEWAY,
-                {"status": public_status(exc.status), "message": "Firewall is unreachable"},
-            ) from None
-        raise HTTPException(
-            _HTTP_FOR_STATUS.get(exc.status, status.HTTP_502_BAD_GATEWAY),
-            {"status": exc.status.value, "message": exc.message},
-        ) from None
+        raise _log_error(exc, user) from None
     result = normalise_log(raw)
     return LogsOut(
         firewall_id=firewall_id,
         entries=result.entries,
         summary=summarise_log(raw),
+        cursor=log_cursor(raw),
         truncated=result.truncated,
         registry_verified=get_operation(FIREWALL_LOG).verified,
+    )
+
+
+@router.get("/{firewall_id}/firewall/logs/new", response_model=LogsNewOut)
+def firewall_logs_new(
+    request: Request,
+    firewall_id: uuid.UUID,
+    since: str = Query(pattern=r"^[0-9a-f]{32}$"),
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> LogsNewOut:
+    """Log records newer than the cursor from a previous response (used by the live view)."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=FIREWALL_LOG,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+            query={"limit": "200", "digest": since},
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_log(raw, after=since)
+    return LogsNewOut(
+        firewall_id=firewall_id,
+        entries=result.entries,
+        cursor=log_cursor(raw) or since,
+        truncated=result.truncated,
     )

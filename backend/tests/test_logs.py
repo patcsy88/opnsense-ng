@@ -7,7 +7,7 @@ import respx
 from sqlalchemy import select
 
 from app.db.models import AuditLog, Role
-from app.opnsense.normalise import normalise_log, summarise_log
+from app.opnsense.normalise import log_cursor, normalise_log, summarise_log
 from tests.test_api import create_fw, login_as
 from tests.test_changes_api import switch
 
@@ -118,3 +118,65 @@ async def test_log_errors_are_collapsed_for_non_admins(app_client: httpx.AsyncCl
         other = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/logs")
     assert admin.status_code == 502 and admin.json()["detail"]["status"] == "forbidden"
     assert other.status_code == 502 and other.json()["detail"]["status"] != "forbidden"
+
+
+D1, D2, D3 = "a" * 32, "b" * 32, "c" * 32
+
+
+def test_cursor_and_after_cut_off_older_records() -> None:
+    rows = [record(__digest__=D3), record(__digest__=D2), record(__digest__=D1)]
+    assert log_cursor(rows) == D3 and log_cursor([]) is None
+    assert log_cursor([record(__digest__="not-a-digest")]) is None
+    assert len(normalise_log(rows, after=D2).entries) == 1
+    assert len(normalise_log(rows, after=D3).entries) == 0
+    assert len(normalise_log(rows, after="f" * 32).entries) == 3
+
+
+def test_registry_query_params_are_declared_and_checked() -> None:
+    import pytest
+
+    from app.opnsense.registry import get_operation
+
+    op = get_operation("firewall.log")
+    assert op.check_query({"limit": "200", "digest": D1}) == {"limit": "200", "digest": D1}
+    for bad in ({"other": "1"}, {"digest": "x/../y"}, {"digest": ""}, {"limit": "1 2"}):
+        with pytest.raises(ValueError):
+            op.check_query(bad)
+    with pytest.raises(ValueError):
+        get_operation("system.status").check_query({"limit": "1"})
+
+
+async def test_live_endpoint_returns_only_newer_entries(app_client: httpx.AsyncClient) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    await switch(app_client, Role.security_admin, "sec")
+    rows = [
+        record(__digest__=D3, src="198.51.100.3"),
+        record(__digest__=D2, src="198.51.100.2"),
+        record(__digest__=D1, src="198.51.100.1"),
+    ]
+    with respx.mock() as router:
+        route = router.get(URL).respond(200, json=rows)
+        first = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/logs")
+        r = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/logs/new?since={D2}")
+    assert first.json()["cursor"] == D3
+    body = r.json()
+    assert r.status_code == 200 and [e["source"] for e in body["entries"]] == ["198.51.100.3"]
+    assert body["cursor"] == D3
+    sent = route.calls.last.request.url.params
+    assert sent["digest"] == D2 and sent["limit"] == "200"
+    assert D3 not in r.text.replace(body["cursor"], "")  # digests only appear as the cursor
+
+
+async def test_live_endpoint_validates_cursor_and_role(app_client: httpx.AsyncClient) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    base = f"/api/v1/firewalls/{fid}/firewall/logs/new"
+    with respx.mock(assert_all_called=False) as router:
+        route = router.get(URL)
+        assert (await app_client.get(f"{base}?since=nope")).status_code == 422
+        assert (await app_client.get(base)).status_code == 422
+        assert (await app_client.get(f"{base}?since={D1}%26limit=1")).status_code == 422
+        await switch(app_client, Role.read_only, "ro")
+        assert (await app_client.get(f"{base}?since={D1}")).status_code == 403
+    assert route.call_count == 0

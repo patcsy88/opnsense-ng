@@ -79,6 +79,7 @@ class OPNsenseClient:
         operation_id: str,
         payload: dict[str, Any] | None = None,
         path_params: dict[str, str] | None = None,
+        query: dict[str, str] | None = None,
     ) -> Any:
         """Run a registry operation by id. Raises UnknownOperationError/UnsupportedOperationError
         for ids that are not executable, and FirewallError for connectivity/API failures."""
@@ -88,7 +89,7 @@ class OPNsenseClient:
         if not self.policy.host_allowed(self._host):
             raise FirewallError(ConnectionStatus.blocked_target, "Firewall address is not allowed")
         endpoint = op.resolve_endpoint(path_params)
-        return await self._send(op, payload, endpoint)
+        return await self._send(op, payload, endpoint, op.check_query(query))
 
     async def sample_stream(
         self, operation_id: str, *, max_events: int = 1, timeout_s: float = 3.0
@@ -143,14 +144,20 @@ class OPNsenseClient:
         except httpx.HTTPError as exc:
             raise _translate(exc) from None
 
-    async def _send(self, op: Operation, payload: dict[str, Any] | None, endpoint: str) -> Any:
+    async def _send(
+        self,
+        op: Operation,
+        payload: dict[str, Any] | None,
+        endpoint: str,
+        query: dict[str, str] | None = None,
+    ) -> Any:
         # Only idempotent reads are retried; state-changing calls are attempted exactly once.
         retryable = op.method is HttpMethod.GET and op.read_only
         attempts = self._max_retries + 1 if retryable else 1
         last: FirewallError | None = None
         for attempt in range(attempts):
             try:
-                return await self._once(op, payload, endpoint)
+                return await self._once(op, payload, endpoint, query)
             except FirewallError as exc:
                 last = exc
                 transient = exc.status in {
@@ -166,10 +173,19 @@ class OPNsenseClient:
                 await asyncio.sleep(delay)
         raise last or FirewallError(ConnectionStatus.unreachable, "Request not attempted")
 
-    async def _once(self, op: Operation, payload: dict[str, Any] | None, endpoint: str) -> Any:
+    async def _once(
+        self,
+        op: Operation,
+        payload: dict[str, Any] | None,
+        endpoint: str,
+        query: dict[str, str] | None = None,
+    ) -> Any:
         try:
             response = await self._http.request(
-                op.method.value, endpoint, json=payload if op.method is HttpMethod.POST else None
+                op.method.value,
+                endpoint,
+                json=payload if op.method is HttpMethod.POST else None,
+                params=query or None,
             )
         except httpx.HTTPError as exc:
             raise _translate(exc) from None

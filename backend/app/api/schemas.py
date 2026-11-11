@@ -124,8 +124,16 @@ class LogsOut(BaseModel):
     firewall_id: uuid.UUID
     entries: list[LogEntry]
     summary: LogSummary
+    cursor: str | None
     truncated: bool
     registry_verified: bool
+
+
+class LogsNewOut(BaseModel):
+    firewall_id: uuid.UUID
+    entries: list[LogEntry]
+    cursor: str
+    truncated: bool
 
 
 class ConnectivityOut(BaseModel):
