@@ -4,6 +4,7 @@ from app.opnsense.registry.entries import REGISTRY, get_operation, list_operatio
 from app.opnsense.registry.model import (
     HttpMethod,
     Operation,
+    ResponseKind,
     UnknownOperationError,
     UnsupportedOperationError,
 )
@@ -12,6 +13,7 @@ __all__ = [
     "REGISTRY",
     "HttpMethod",
     "Operation",
+    "ResponseKind",
     "UnknownOperationError",
     "UnsupportedOperationError",
     "get_operation",

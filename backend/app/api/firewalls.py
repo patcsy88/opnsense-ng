@@ -22,11 +22,18 @@ from app.core.crypto import CredentialCipher, CredentialDecryptionError
 from app.core.logging import get_logger, register_secret
 from app.db.models import Firewall, Role
 from app.opnsense.client import OPNsenseClient
+from app.opnsense.cpu_sampler import sample_cpu
 from app.opnsense.errors import ConnectionStatus, FirewallError, public_status
 from app.opnsense.netpolicy import TargetPolicy, split_host
-from app.opnsense.normalise import normalise_system_status
-from app.opnsense.registry import get_operation
-from app.opnsense.registry.entries import CONNECTIVITY_CHECK, SYSTEM_STATUS, SYSTEM_TIME
+from app.opnsense.normalise import normalise_cpu_events, normalise_system_status
+from app.opnsense.registry import ResponseKind, get_operation
+from app.opnsense.registry.entries import (
+    CONNECTIVITY_CHECK,
+    CPU_USAGE,
+    SYSTEM_RESOURCES,
+    SYSTEM_STATUS,
+    SYSTEM_TIME,
+)
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["firewalls"])
 log = get_logger("api.firewalls")
@@ -305,7 +312,10 @@ def _run_operation(
             max_retries=settings.opnsense_max_retries,
             backoff_base_s=settings.opnsense_backoff_base_s,
         )
-        result = anyio.from_thread.run(client.execute, operation_id)
+        if get_operation(operation_id).response_kind is ResponseKind.sse:
+            result = anyio.from_thread.run(lambda: client.sample_stream(operation_id, max_events=2))
+        else:
+            result = anyio.from_thread.run(client.execute, operation_id)
     except FirewallError as exc:
         detail: dict[str, Any] = {"status": exc.status.value}
         if exc.status is ConnectionStatus.endpoint_not_found:
@@ -430,8 +440,39 @@ def system_status(
         )
     except FirewallError:
         pass
+    resources_raw = None
+    try:
+        resources_raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=SYSTEM_RESOURCES,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError:
+        pass
+
+    def fetch_cpu() -> float | None:
+        try:
+            events = _run_operation(
+                firewall_id=firewall_id,
+                operation_id=CPU_USAGE,
+                user=user,
+                db=db,
+                settings=settings,
+                request=request,
+            )
+        except FirewallError:
+            return None
+        return normalise_cpu_events(events)
+
+    cpu = sample_cpu(firewall_id, fetch_cpu)
     return SystemStatusOut(
         firewall_id=firewall_id,
-        status=normalise_system_status(raw, time_raw),
-        registry_verified=get_operation(SYSTEM_STATUS).verified,
+        status=normalise_system_status(raw, time_raw, resources_raw, cpu),
+        registry_verified=all(
+            get_operation(op).verified
+            for op in (SYSTEM_STATUS, SYSTEM_TIME, SYSTEM_RESOURCES, CPU_USAGE)
+        ),
     )

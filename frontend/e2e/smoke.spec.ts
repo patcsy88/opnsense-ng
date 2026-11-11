@@ -28,7 +28,7 @@ test("login with a mocked API and see the dashboard", async ({ page }) => {
       case `/api/v1/firewalls/${FW.id}/system/status`:
         return json({
           firewall_id: FW.id,
-          status: { hostname: "fw.lan", versions: ["OPNsense 26.1"], updates: null, server_time: null, uptime: "3 days" },
+          status: { hostname: "fw.lan", versions: ["OPNsense 26.1"], updates: null, server_time: null, uptime: "3 days", load_average: null, memory_total_bytes: null, memory_used_bytes: null, memory_used_percent: null, cpu_used_percent: null },
           registry_verified: false,
         });
       default:

@@ -202,6 +202,14 @@ async def test_reachable_collapsed_and_registry_flag(app_client: httpx.AsyncClie
         router.get("https://fw.example.test/api/diagnostics/system/system_information").respond(
             200, json={"name": "x"}
         )
+        router.get("https://fw.example.test/api/diagnostics/system/system_resources").respond(
+            200, json={}
+        )
+        router.get("https://fw.example.test/api/diagnostics/cpu_usage/stream").respond(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=b'data: {"total": 12, "user": 8}\n\ndata: {"total": 40}\n\n',
+        )
         c = (await app_client.get(f"/api/v1/firewalls/{fid}/connectivity")).json()
         s = (await app_client.get(f"/api/v1/firewalls/{fid}/system/status")).json()
     assert c["status"] == "reachable" and c["registry_verified"] is True

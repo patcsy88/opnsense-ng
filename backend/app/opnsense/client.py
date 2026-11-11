@@ -1,6 +1,7 @@
 """Async OPNsense client. It can only execute operations declared in the capability registry."""
 
 import asyncio
+import json
 import ssl
 from typing import Any
 
@@ -14,12 +15,23 @@ from app.opnsense.netpolicy import (
     TargetPolicy,
     split_host,
 )
-from app.opnsense.registry import HttpMethod, Operation, get_operation
+from app.opnsense.registry import (
+    HttpMethod,
+    Operation,
+    ResponseKind,
+    UnsupportedOperationError,
+    get_operation,
+)
 from app.opnsense.tls import build_ssl_context
 
 log = get_logger("opnsense.client")
 
 _RETRY_STATUS = {502, 503, 504}
+
+STREAM_MAX_EVENTS = 3
+STREAM_MAX_SECONDS = 5.0
+STREAM_MAX_BYTES = 256 * 1024
+STREAM_MAX_LINE_BYTES = 64 * 1024
 
 
 class OPNsenseClient:
@@ -66,9 +78,64 @@ class OPNsenseClient:
         """Run a registry operation by id. Raises UnknownOperationError/UnsupportedOperationError
         for ids that are not executable, and FirewallError for connectivity/API failures."""
         op = get_operation(operation_id)
+        if op.response_kind is not ResponseKind.json:
+            raise UnsupportedOperationError(f"{operation_id} is a stream; use sample_stream")
         if not self.policy.host_allowed(self._host):
             raise FirewallError(ConnectionStatus.blocked_target, "Firewall address is not allowed")
         return await self._send(op, payload)
+
+    async def sample_stream(
+        self, operation_id: str, *, max_events: int = 1, timeout_s: float = 3.0
+    ) -> list[Any]:
+        """Open an SSE operation, collect a few JSON events, close the connection. Bounded in
+        events, time, line length and bytes; never retried."""
+        op = get_operation(operation_id)
+        if op.response_kind is not ResponseKind.sse:
+            raise UnsupportedOperationError(f"{operation_id} is not a stream operation")
+        if not self.policy.host_allowed(self._host):
+            raise FirewallError(ConnectionStatus.blocked_target, "Firewall address is not allowed")
+        wanted = min(max(max_events, 1), STREAM_MAX_EVENTS)
+        events: list[Any] = []
+        try:
+            async with asyncio.timeout(min(timeout_s, STREAM_MAX_SECONDS)):
+                await self._read_events(op, wanted, events)
+        except TimeoutError:
+            if not events:
+                raise FirewallError(
+                    ConnectionStatus.timeout, "Firewall stream produced no data in time"
+                ) from None
+        if not events:
+            raise FirewallError(ConnectionStatus.bad_response, "Firewall stream sent no events")
+        return events
+
+    async def _read_events(self, op: Operation, wanted: int, events: list[Any]) -> None:
+        try:
+            async with self._http.stream(
+                "GET", op.endpoint, headers={"Accept": "text/event-stream"}
+            ) as response:
+                _check_status(op, response.status_code)
+                buffer = b""
+                total = 0
+                async for chunk in response.aiter_bytes():
+                    total += len(chunk)
+                    buffer += chunk
+                    if total > STREAM_MAX_BYTES or len(buffer) > STREAM_MAX_LINE_BYTES:
+                        raise FirewallError(
+                            ConnectionStatus.bad_response, "Firewall stream exceeded size limits"
+                        )
+                    *lines, buffer = buffer.split(b"\n")
+                    for raw in lines:
+                        line = raw.decode("utf-8", "replace").strip()
+                        if not line.startswith("data:"):
+                            continue
+                        try:
+                            events.append(json.loads(line[5:].strip()))
+                        except ValueError:
+                            continue
+                        if len(events) >= wanted:
+                            return
+        except httpx.HTTPError as exc:
+            raise _translate(exc) from None
 
     async def _send(self, op: Operation, payload: dict[str, Any] | None) -> Any:
         # Only idempotent reads are retried; state-changing calls are attempted exactly once.
@@ -98,54 +165,49 @@ class OPNsenseClient:
             response = await self._http.request(
                 op.method.value, op.endpoint, json=payload if op.method is HttpMethod.POST else None
             )
-        except httpx.TimeoutException:
-            raise FirewallError(ConnectionStatus.timeout, "Firewall request timed out") from None
-        except httpx.ConnectError as exc:
-            if _has_cause(exc, TargetNotAllowedError):
-                raise FirewallError(
-                    ConnectionStatus.blocked_target, "Firewall address is not allowed"
-                ) from None
-            if _is_tls_error(exc):
-                raise FirewallError(
-                    ConnectionStatus.tls_error, "TLS certificate verification failed"
-                ) from None
-            raise FirewallError(ConnectionStatus.unreachable, "Firewall is unreachable") from None
-        except httpx.HTTPError:
-            raise FirewallError(
-                ConnectionStatus.unreachable, "Communication with firewall failed"
-            ) from None
-
-        code = response.status_code
-        if code == 401:
-            raise FirewallError(
-                ConnectionStatus.auth_failed, "Firewall rejected the API credentials"
-            )
-        if code == 403:
-            raise FirewallError(
-                ConnectionStatus.forbidden, "API key lacks the privilege for this operation"
-            )
-        if code == 404:
-            # Not "operation unavailable": our registry path or the firewall version differs.
-            log.error(
-                "registry_endpoint_not_found", endpoint=op.endpoint, operation=op.operation_id
-            )
-            err = FirewallError(
-                ConnectionStatus.endpoint_not_found,
-                "Registry endpoint not found on this firewall (registry or version problem)",
-            )
-            raise err
-        if code >= 500 or code in _RETRY_STATUS:
-            err = FirewallError(ConnectionStatus.server_error, f"Firewall returned HTTP {code}")
-            err.retry_ok = code in _RETRY_STATUS
-            raise err
-        if code >= 400:
-            raise FirewallError(ConnectionStatus.bad_response, f"Firewall returned HTTP {code}")
+        except httpx.HTTPError as exc:
+            raise _translate(exc) from None
+        _check_status(op, response.status_code)
         try:
             return response.json()
         except ValueError:
             raise FirewallError(
                 ConnectionStatus.bad_response, "Firewall returned a non-JSON response"
             ) from None
+
+
+def _translate(exc: httpx.HTTPError) -> FirewallError:
+    if isinstance(exc, httpx.TimeoutException):
+        return FirewallError(ConnectionStatus.timeout, "Firewall request timed out")
+    if isinstance(exc, httpx.ConnectError):
+        if _has_cause(exc, TargetNotAllowedError):
+            return FirewallError(ConnectionStatus.blocked_target, "Firewall address is not allowed")
+        if _is_tls_error(exc):
+            return FirewallError(ConnectionStatus.tls_error, "TLS certificate verification failed")
+        return FirewallError(ConnectionStatus.unreachable, "Firewall is unreachable")
+    return FirewallError(ConnectionStatus.unreachable, "Communication with firewall failed")
+
+
+def _check_status(op: Operation, code: int) -> None:
+    if code == 401:
+        raise FirewallError(ConnectionStatus.auth_failed, "Firewall rejected the API credentials")
+    if code == 403:
+        raise FirewallError(
+            ConnectionStatus.forbidden, "API key lacks the privilege for this operation"
+        )
+    if code == 404:
+        # Not "operation unavailable": our registry path or the firewall version differs.
+        log.error("registry_endpoint_not_found", endpoint=op.endpoint, operation=op.operation_id)
+        raise FirewallError(
+            ConnectionStatus.endpoint_not_found,
+            "Registry endpoint not found on this firewall (registry or version problem)",
+        )
+    if code >= 500 or code in _RETRY_STATUS:
+        err = FirewallError(ConnectionStatus.server_error, f"Firewall returned HTTP {code}")
+        err.retry_ok = code in _RETRY_STATUS
+        raise err
+    if code >= 400:
+        raise FirewallError(ConnectionStatus.bad_response, f"Firewall returned HTTP {code}")
 
 
 def _has_cause(exc: BaseException, kind: type[BaseException]) -> bool:

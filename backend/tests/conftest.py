@@ -97,3 +97,12 @@ async def login(
 
 def csrf_headers(client: httpx.AsyncClient) -> dict[str, str]:
     return {"X-CSRF-Token": client.cookies.get("__Host-csrf_token") or ""}
+
+
+@pytest.fixture(autouse=True)
+def _reset_cpu_sampler() -> Iterator[None]:
+    from app.opnsense import cpu_sampler
+
+    cpu_sampler.clear()
+    yield
+    cpu_sampler.clear()

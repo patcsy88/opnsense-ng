@@ -1,6 +1,6 @@
 # OPNsense API Integration
 
-Status: three read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`.
+Status: five read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`.
 
 ## Rules
 
@@ -21,6 +21,8 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `system.status` | GET | `/api/diagnostics/system/system_information` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `system.time` | GET | `/api/diagnostics/system/system_time` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `system.connectivity` | GET | `/api/diagnostics/system/system_time` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
+| `system.resources` | GET | `/api/diagnostics/system/system_resources` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
+| `cpu.usage` (SSE) | GET | `/api/diagnostics/cpu_usage/stream` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -28,4 +30,10 @@ Observed response fields (non-secret):
 
 ## Candidates for the dashboard (not yet in the registry, unverified)
 
-From the OPNsense ACL definition (master branch), also under "Lobby: Dashboard": `system_resources` (memory), `system_disk`, `system_swap`, `system_temperature`, `cpu_usage`, `pf_states`. Verify each against the lab before adding.
+From the OPNsense ACL definition (master branch), also under "Lobby: Dashboard": `system_disk`, `system_swap`, `system_temperature`, `pf_states`. Verify each against the lab before adding.
+
+## Streaming (SSE) operations
+
+Operations with `response_kind=sse` are never run through `execute()`. `OPNsenseClient.sample_stream()` opens the stream, collects at most 3 JSON `data:` events (the status route asks for 2), and closes it. Limits: 5 s, 64 kB per line, 256 kB total, no retries. The CPU route allows one sample per firewall at a time and caches the result for 5 s. See ADR-0004.
+
+Observed CPU event fields on 26.7.8_2: `total`, `user`, `nice`, `sys`, `intr`, `idle`, all integers. `total` is the used percentage (an idle firewall reported total 0, idle 100). Only an idle reading has been observed so far.

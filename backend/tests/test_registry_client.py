@@ -4,7 +4,7 @@ import respx
 
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.errors import ConnectionStatus, FirewallError
-from app.opnsense.normalise import normalise_system_status
+from app.opnsense.normalise import normalise_cpu_events, normalise_system_status
 from app.opnsense.registry import (
     REGISTRY,
     Operation,
@@ -101,6 +101,33 @@ def test_normalise_maps_time_fields() -> None:
     assert normalise_system_status(info, None).uptime is None
 
 
+def test_normalise_maps_memory_and_load() -> None:
+    resources = {"memory": {"total": "8589934592", "used": 2147483648}}
+    status = normalise_system_status({}, {"loadavg": "0.10, 0.20, 0.30"}, resources)
+    assert status.memory_total_bytes == 8589934592
+    assert status.memory_used_bytes == 2147483648
+    assert status.memory_used_percent == 25.0
+    assert status.load_average == "0.10, 0.20, 0.30"
+
+
+@pytest.mark.parametrize(
+    "resources",
+    [
+        None,
+        [],
+        {"memory": {"used": "N/A"}},
+        {"memory": {"total": 100, "used": 200}},
+        {"memory": {"total": 0, "used": 0}},
+        {"memory": {"total": True, "used": 1}},
+        {"memory": {"total": -5, "used": 1}},
+    ],
+)
+def test_normalise_memory_rejects_bad_shapes(resources: object) -> None:
+    status = normalise_system_status({}, {"loadavg": "N/A"}, resources)
+    assert status.memory_total_bytes is None and status.memory_used_percent is None
+    assert status.load_average is None
+
+
 def test_normalise_tolerates_garbage() -> None:
     assert normalise_system_status(["x"]).hostname is None
 
@@ -178,3 +205,100 @@ async def test_state_changing_operations_are_never_retried() -> None:
         assert route.call_count == 1
     finally:
         del REGISTRY[op.operation_id]
+
+
+CPU_URL = "https://fw.example.test/api/diagnostics/cpu_usage/stream"
+
+
+async def test_sample_stream_reads_bounded_events() -> None:
+    body = b"".join(b'data: {"total": %d}\n\n' % n for n in range(10))
+    with respx.mock() as router:
+        route = router.get(CPU_URL).respond(200, content=body)
+        client = make_client()
+        events = await client.sample_stream("cpu.usage", max_events=99)
+        await client.aclose()
+    assert events == [{"total": 0}, {"total": 1}, {"total": 2}]  # capped at 3
+    assert route.calls.last.request.headers["accept"] == "text/event-stream"
+
+
+async def test_sample_stream_ignores_garbage_lines() -> None:
+    body = b': comment\nevent: x\ndata: not-json\ndata: {"total": 5}\n\n'
+    with respx.mock() as router:
+        router.get(CPU_URL).respond(200, content=body)
+        client = make_client()
+        events = await client.sample_stream("cpu.usage")
+        await client.aclose()
+    assert events == [{"total": 5}]
+
+
+async def test_sample_stream_size_limit() -> None:
+    with respx.mock() as router:
+        router.get(CPU_URL).respond(200, content=b"x" * (70 * 1024))
+        client = make_client()
+        with pytest.raises(FirewallError) as err:
+            await client.sample_stream("cpu.usage")
+        await client.aclose()
+    assert err.value.status is ConnectionStatus.bad_response
+
+
+@pytest.mark.parametrize(
+    ("code", "status"),
+    [
+        (401, ConnectionStatus.auth_failed),
+        (403, ConnectionStatus.forbidden),
+        (404, ConnectionStatus.endpoint_not_found),
+    ],
+)
+async def test_sample_stream_maps_http_errors(code: int, status: ConnectionStatus) -> None:
+    with respx.mock() as router:
+        router.get(CPU_URL).respond(code)
+        client = make_client()
+        with pytest.raises(FirewallError) as err:
+            await client.sample_stream("cpu.usage")
+        await client.aclose()
+    assert err.value.status is status
+
+
+async def test_sample_stream_no_data_is_error() -> None:
+    with respx.mock() as router:
+        router.get(CPU_URL).respond(200, content=b"")
+        client = make_client()
+        with pytest.raises(FirewallError):
+            await client.sample_stream("cpu.usage", timeout_s=0.2)
+        await client.aclose()
+
+
+async def test_stream_and_json_operations_are_not_interchangeable() -> None:
+    client = make_client()
+    with pytest.raises(UnsupportedOperationError):
+        await client.execute("cpu.usage")
+    with pytest.raises(UnsupportedOperationError):
+        await client.sample_stream("system.status")
+    await client.aclose()
+
+
+def test_normalise_cpu_events() -> None:
+    assert normalise_cpu_events([{"total": 12}, {"total": "40.26"}]) == 40.3
+    assert normalise_cpu_events([{"idle": 90}]) == 10.0
+    assert normalise_cpu_events([{"total": 150}, {"total": True}, "x"]) is None
+    assert normalise_cpu_events(None) is None
+    assert normalise_cpu_events([{"total": 150}, {"total": 7}]) == 7.0
+
+
+def test_cpu_sampler_caches_and_guards_concurrency() -> None:
+    import uuid
+
+    from app.opnsense import cpu_sampler
+
+    fid = uuid.uuid4()
+    calls: list[int] = []
+    nested: list[float | None] = []
+
+    def fetch() -> float | None:
+        calls.append(1)
+        nested.append(cpu_sampler.sample_cpu(fid, lambda: 99.0))  # overlapping request
+        return 20.0
+
+    assert cpu_sampler.sample_cpu(fid, fetch) == 20.0
+    assert nested == [None] and len(calls) == 1
+    assert cpu_sampler.sample_cpu(fid, lambda: 1.0) == 20.0  # served from cache

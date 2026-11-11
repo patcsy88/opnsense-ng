@@ -180,9 +180,19 @@ async def test_system_status_and_connectivity_any_role(app_client: httpx.AsyncCl
         router.get("https://fw.example.test/api/diagnostics/system/system_time").respond(
             200, json={"datetime": "now"}
         )
+        router.get("https://fw.example.test/api/diagnostics/system/system_resources").respond(
+            200, json={"memory": {"total": "1000", "used": 250}}
+        )
+        router.get("https://fw.example.test/api/diagnostics/cpu_usage/stream").respond(
+            200,
+            headers={"content-type": "text/event-stream"},
+            content=b'data: {"total": 12, "user": 8}\n\ndata: {"total": 40}\n\n',
+        )
         s = await app_client.get(f"/api/v1/firewalls/{fid}/system/status")
         c = await app_client.get(f"/api/v1/firewalls/{fid}/connectivity")
     assert s.status_code == 200 and s.json()["status"]["hostname"] == "fw1"
+    assert s.json()["status"]["memory_used_percent"] == 25.0
+    assert s.json()["status"]["cpu_used_percent"] == 40.0
     assert "secret_extra" not in s.text  # normalised, raw JSON not passed through
     assert c.json()["ok"] is True
     actions = [(a.action, a.outcome, a.firewall_id) for a in await audit_rows(app_client)]

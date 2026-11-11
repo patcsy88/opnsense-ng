@@ -3,6 +3,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { StatusBadge, UnverifiedBadge } from "@/components/ui/status-badge";
 import { ErrorState } from "@/components/error-state";
 import { api } from "@/lib/api";
+import type { SystemStatus } from "@/lib/schemas";
 import { useAuth } from "@/features/auth/auth";
 import { connectivityLevel, systemLevel } from "./health";
 
@@ -13,6 +14,14 @@ function Row({ label, value }: { label: string; value: string | null | undefined
       <dd className="text-right font-medium">{value || "—"}</dd>
     </div>
   );
+}
+
+function formatMemory(s: SystemStatus): string | null {
+  if (s.memory_used_bytes === null || s.memory_total_bytes === null || s.memory_used_percent === null) {
+    return null;
+  }
+  const mb = (n: number) => `${Math.round(n / 1024 / 1024)} MB`;
+  return `${mb(s.memory_used_bytes)} of ${mb(s.memory_total_bytes)} (${s.memory_used_percent}%)`;
 }
 
 export function ConnectivityCard({ firewallId, intervalMs }: { firewallId: string; intervalMs: number | false }) {
@@ -87,9 +96,12 @@ export function SystemStatusCard({ firewallId, intervalMs }: { firewallId: strin
               <Row label="Uptime" value={q.data.status.uptime} />
               <Row label="Updates" value={q.data.status.updates} />
               <Row label="Firewall time" value={q.data.status.server_time} />
+              <Row label="Load average" value={q.data.status.load_average} />
+              <Row label="CPU usage" value={q.data.status.cpu_used_percent === null ? null : `${q.data.status.cpu_used_percent}%`} />
+              <Row label="Memory" value={formatMemory(q.data.status)} />
             </dl>
             <p className="text-xs text-muted-foreground">
-              CPU, memory and disk are not provided by the backend yet.
+              Disk usage is not provided by the backend yet.
             </p>
           </div>
         )}

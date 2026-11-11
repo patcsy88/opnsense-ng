@@ -8,6 +8,11 @@ class HttpMethod(enum.StrEnum):
     POST = "POST"
 
 
+class ResponseKind(enum.StrEnum):
+    json = "json"
+    sse = "sse"  # long-running event stream; only sampled in a bounded way
+
+
 class UnknownOperationError(KeyError):
     """The operation id is not in the registry."""
 
@@ -26,6 +31,7 @@ class Operation(BaseModel):
     endpoint: str = Field(pattern=r"^/api/[A-Za-z0-9_/]+$")  # fixed path, never user supplied
     required_privilege: str  # OPNsense ACL privilege the API key needs (documentation/diagnostics)
     read_only: bool
+    response_kind: ResponseKind = ResponseKind.json
     apply_required: bool = False
     min_version: str | None = None
     required_plugin: str | None = None

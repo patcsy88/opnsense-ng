@@ -7,7 +7,14 @@ import { ADMIN, FW, READER, renderApp } from "@/test/utils";
 
 const okStatus = {
   firewall_id: FW.id,
-  status: { hostname: "fw.lan", versions: ["OPNsense 26.1"], updates: null, server_time: null, uptime: "3 days" },
+  status: { hostname: "fw.lan", versions: ["OPNsense 26.1"], updates: null, server_time: null,
+    uptime: "3 days",
+    load_average: "0.10, 0.20, 0.30",
+    memory_total_bytes: 8589934592,
+    memory_used_bytes: 2147483648,
+    memory_used_percent: 25,
+    cpu_used_percent: 37.5,
+  },
   registry_verified: false,
 };
 
@@ -100,6 +107,9 @@ describe("role-based rendering", () => {
     expect(await screen.findByText("tls_error")).toBeInTheDocument();
     expect(await screen.findByText("fw.lan")).toBeInTheDocument();
     expect(await screen.findByText("Unverified API mapping")).toBeInTheDocument();
+    expect(await screen.findByText("2048 MB of 8192 MB (25%)")).toBeInTheDocument();
+    expect(await screen.findByText("0.10, 0.20, 0.30")).toBeInTheDocument();
+    expect(await screen.findByText("37.5%")).toBeInTheDocument();
   });
 
   it("read-only user gets the collapsed status and no firewall list call", async () => {
