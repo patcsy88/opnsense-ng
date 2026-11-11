@@ -47,6 +47,9 @@ export const systemStatusSchema = z.object({
   memory_used_bytes: z.number().nullable(),
   memory_used_percent: z.number().nullable(),
   cpu_used_percent: z.number().nullable(),
+  disk_total_bytes: z.number().nullable(),
+  disk_used_bytes: z.number().nullable(),
+  disk_used_percent: z.number().nullable(),
 });
 export type SystemStatus = z.infer<typeof systemStatusSchema>;
 

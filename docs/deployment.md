@@ -83,4 +83,4 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 - Rate-limit counters (per IP) are in memory, so a single backend process is assumed. Per-username lockout is stored in the database.
 - Not yet tested against a real OPNsense.
 - The Playwright e2e test is written but has not been run (browser binaries not installed).
-- The dashboard shows hostname, versions, updates, uptime, load average, CPU and memory. Disk usage is not provided yet.
+- The dashboard shows hostname, versions, updates, uptime, load average, CPU and memory. Disk shows only the root filesystem.

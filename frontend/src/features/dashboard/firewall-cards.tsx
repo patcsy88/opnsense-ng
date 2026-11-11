@@ -24,6 +24,14 @@ function formatMemory(s: SystemStatus): string | null {
   return `${mb(s.memory_used_bytes)} of ${mb(s.memory_total_bytes)} (${s.memory_used_percent}%)`;
 }
 
+function formatDisk(s: SystemStatus): string | null {
+  if (s.disk_used_bytes === null || s.disk_total_bytes === null || s.disk_used_percent === null) {
+    return null;
+  }
+  const gb = (n: number) => `${(n / 1024 ** 3).toFixed(1)} GB`;
+  return `${gb(s.disk_used_bytes)} of ${gb(s.disk_total_bytes)} (${s.disk_used_percent}%)`;
+}
+
 export function ConnectivityCard({ firewallId, intervalMs }: { firewallId: string; intervalMs: number | false }) {
   const { hasRole } = useAuth();
   const admin = hasRole("admin");
@@ -99,10 +107,8 @@ export function SystemStatusCard({ firewallId, intervalMs }: { firewallId: strin
               <Row label="Load average" value={q.data.status.load_average} />
               <Row label="CPU usage" value={q.data.status.cpu_used_percent === null ? null : `${q.data.status.cpu_used_percent}%`} />
               <Row label="Memory" value={formatMemory(q.data.status)} />
+              <Row label="Disk (/)" value={formatDisk(q.data.status)} />
             </dl>
-            <p className="text-xs text-muted-foreground">
-              Disk usage is not provided by the backend yet.
-            </p>
           </div>
         )}
       </CardContent>

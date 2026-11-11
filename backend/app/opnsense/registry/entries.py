@@ -11,6 +11,7 @@ CONNECTIVITY_CHECK = "system.connectivity"
 SYSTEM_TIME = "system.time"
 SYSTEM_RESOURCES = "system.resources"
 CPU_USAGE = "cpu.usage"
+SYSTEM_DISK = "system.disk"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -44,6 +45,16 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Memory total/used.",
+    ),
+    Operation(
+        operation_id=SYSTEM_DISK,
+        method=HttpMethod.GET,
+        endpoint="/api/diagnostics/system/system_disk",
+        required_privilege="Lobby: Dashboard",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Filesystems with total/used bytes; the dashboard uses the root (/) mount.",
     ),
     Operation(
         operation_id=CPU_USAGE,

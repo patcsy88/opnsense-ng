@@ -302,3 +302,31 @@ def test_cpu_sampler_caches_and_guards_concurrency() -> None:
     assert cpu_sampler.sample_cpu(fid, fetch) == 20.0
     assert nested == [None] and len(calls) == 1
     assert cpu_sampler.sample_cpu(fid, lambda: 1.0) == 20.0  # served from cache
+
+
+def test_normalise_disk_uses_root_filesystem() -> None:
+    disk = {
+        "devices": [
+            {"mountpoint": "/var", "total_bytes": 10, "used_bytes": 9},
+            {"mountpoint": "/", "total_bytes": "4000", "used_bytes": 1000},
+        ]
+    }
+    status = normalise_system_status({}, None, None, None, disk)
+    assert status.disk_total_bytes == 4000 and status.disk_used_percent == 25.0
+
+
+@pytest.mark.parametrize(
+    "disk",
+    [
+        None,
+        [],
+        {"devices": "x"},
+        {"devices": [{"mountpoint": "/var", "total_bytes": 1, "used_bytes": 1}]},
+        {"devices": [{"mountpoint": "/", "total_bytes": 10, "used_bytes": 20}]},
+        {"devices": [{"mountpoint": "/", "total_bytes": 0, "used_bytes": 0}]},
+        {"devices": ["x", None]},
+    ],
+)
+def test_normalise_disk_rejects_bad_shapes(disk: object) -> None:
+    status = normalise_system_status({}, None, None, None, disk)
+    assert status.disk_total_bytes is None and status.disk_used_percent is None

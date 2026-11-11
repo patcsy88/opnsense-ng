@@ -30,6 +30,7 @@ from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
+    SYSTEM_DISK,
     SYSTEM_RESOURCES,
     SYSTEM_STATUS,
     SYSTEM_TIME,
@@ -467,12 +468,24 @@ def system_status(
             return None
         return normalise_cpu_events(events)
 
+    disk_raw = None
+    try:
+        disk_raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=SYSTEM_DISK,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError:
+        pass
     cpu = sample_cpu(firewall_id, fetch_cpu)
     return SystemStatusOut(
         firewall_id=firewall_id,
-        status=normalise_system_status(raw, time_raw, resources_raw, cpu),
+        status=normalise_system_status(raw, time_raw, resources_raw, cpu, disk_raw),
         registry_verified=all(
             get_operation(op).verified
-            for op in (SYSTEM_STATUS, SYSTEM_TIME, SYSTEM_RESOURCES, CPU_USAGE)
+            for op in (SYSTEM_STATUS, SYSTEM_TIME, SYSTEM_RESOURCES, CPU_USAGE, SYSTEM_DISK)
         ),
     )

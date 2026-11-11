@@ -14,6 +14,9 @@ const okStatus = {
     memory_used_bytes: 2147483648,
     memory_used_percent: 25,
     cpu_used_percent: 37.5,
+    disk_total_bytes: 21474836480,
+    disk_used_bytes: 5368709120,
+    disk_used_percent: 25,
   },
   registry_verified: false,
 };
@@ -110,6 +113,7 @@ describe("role-based rendering", () => {
     expect(await screen.findByText("2048 MB of 8192 MB (25%)")).toBeInTheDocument();
     expect(await screen.findByText("0.10, 0.20, 0.30")).toBeInTheDocument();
     expect(await screen.findByText("37.5%")).toBeInTheDocument();
+    expect(await screen.findByText("5.0 GB of 20.0 GB (25%)")).toBeInTheDocument();
   });
 
   it("read-only user gets the collapsed status and no firewall list call", async () => {

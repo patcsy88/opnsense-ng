@@ -205,6 +205,9 @@ async def test_reachable_collapsed_and_registry_flag(app_client: httpx.AsyncClie
         router.get("https://fw.example.test/api/diagnostics/system/system_resources").respond(
             200, json={}
         )
+        router.get("https://fw.example.test/api/diagnostics/system/system_disk").respond(
+            200, json={}
+        )
         router.get("https://fw.example.test/api/diagnostics/cpu_usage/stream").respond(
             200,
             headers={"content-type": "text/event-stream"},

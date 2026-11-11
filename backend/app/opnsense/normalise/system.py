@@ -16,6 +16,9 @@ class SystemStatus(BaseModel):
     memory_used_bytes: int | None = None
     memory_used_percent: float | None = None
     cpu_used_percent: float | None = None
+    disk_total_bytes: int | None = None
+    disk_used_bytes: int | None = None
+    disk_used_percent: float | None = None
 
 
 def normalise_system_status(
@@ -23,12 +26,14 @@ def normalise_system_status(
     time_info: Any = None,
     resources: Any = None,
     cpu_percent: float | None = None,
+    disk: Any = None,
 ) -> SystemStatus:
     """Tolerant mapping: unexpected shapes yield empty fields instead of leaking raw JSON."""
     info = information if isinstance(information, dict) else {}
     versions = info.get("versions")
     t = time_info if isinstance(time_info, dict) else {}
     total, used = _memory(resources)
+    disk_total, disk_used = _root_disk(disk)
     return SystemStatus(
         hostname=_str(info.get("name")),
         versions=[str(v) for v in versions] if isinstance(versions, list) else [],
@@ -40,7 +45,26 @@ def normalise_system_status(
         memory_used_bytes=used,
         memory_used_percent=round(used / total * 100, 1) if total and used is not None else None,
         cpu_used_percent=cpu_percent,
+        disk_total_bytes=disk_total,
+        disk_used_bytes=disk_used,
+        disk_used_percent=(
+            round(disk_used / disk_total * 100, 1) if disk_total and disk_used is not None else None
+        ),
     )
+
+
+def _root_disk(disk: Any) -> tuple[int | None, int | None]:
+    """Total/used bytes of the root filesystem (mountpoint "/")."""
+    devices = disk.get("devices") if isinstance(disk, dict) else None
+    if not isinstance(devices, list):
+        return None, None
+    for device in devices:
+        if isinstance(device, dict) and device.get("mountpoint") == "/":
+            total, used = _int(device.get("total_bytes")), _int(device.get("used_bytes"))
+            if not total or used is None or used > total:
+                return None, None
+            return total, used
+    return None, None
 
 
 def _memory(resources: Any) -> tuple[int | None, int | None]:
