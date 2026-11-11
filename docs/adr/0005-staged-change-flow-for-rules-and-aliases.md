@@ -158,8 +158,14 @@ buttons. The Apply button states what will run and that it cannot be rolled back
   Undo for an alias is a new reviewed change request (delete the alias we created).
 - **Rules:** the 25.7 and 26.1 branches of the filter controller have `savepoint` and
   `revert/{revision}` actions (revert reloads the filter). They are **not** on master, so they may be
-  gone on the lab's 26.7.8_2. They are not used in this release. Whether to use them for rules is
-  decided in build step 6, after checking the lab.
+  gone on the lab's 26.7.8_2. They are not used in this release. Decision (step 6, 2026-11-12): the
+  master filter controller has only add/set/del/toggle/toggleLog/moveBefore and `apply`; no savepoint
+  or revert. Rules follow the alias model: no automatic rollback, undo is a new reviewed request.
+  Activation is `filter/apply`. The first-release rule subset is enabled, action, one interface,
+  direction, IP version, protocol (any, TCP, UDP, TCP/UDP, ICMP, IPv6-ICMP), source and destination
+  (any, IP, CIDR or alias name), ports (number, range or alias), log and description. High risk:
+  pass from any to any, anything on WAN, changes to auto-generated or anti-lockout rules, and every
+  delete.
 - Apply therefore stays without automatic rollback, as decided above.
 
 ## Alternatives considered

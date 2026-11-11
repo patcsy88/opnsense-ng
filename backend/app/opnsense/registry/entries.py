@@ -19,6 +19,11 @@ FIREWALL_ALIASES_ADD = "firewall.aliases.add"
 FIREWALL_ALIASES_RECONFIGURE = "firewall.aliases.reconfigure"
 FIREWALL_ALIASES_UPDATE = "firewall.aliases.update"
 FIREWALL_ALIASES_DELETE = "firewall.aliases.delete"
+FIREWALL_RULES_ADD = "firewall.rules.add"
+FIREWALL_RULES_UPDATE = "firewall.rules.update"
+FIREWALL_RULES_DELETE = "firewall.rules.delete"
+FIREWALL_RULES_TOGGLE = "firewall.rules.toggle"
+FIREWALL_RULES_APPLY = "firewall.rules.apply"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -140,6 +145,57 @@ _ENTRIES = (
         verified=True,
         notes="Deletes an alias. The firewall refuses when it is still referenced. Reviewed "
         "apply only.",
+    ),
+    Operation(
+        operation_id=FIREWALL_RULES_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/filter/addRule",
+        required_privilege="Firewall: Rules [new]",
+        read_only=False,
+        apply_required=True,
+        notes="Saves a new rule without activating it. Reviewed apply only (ADR-0005). Body: "
+        "{rule: {...}}; reply: result and uuid. Unverified.",
+    ),
+    Operation(
+        operation_id=FIREWALL_RULES_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/filter/setRule/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Firewall: Rules [new]",
+        read_only=False,
+        apply_required=True,
+        notes="Saves changes to an existing rule. setRule is an upsert, so apply confirms the "
+        "rule exists first. Reviewed apply only. Unverified.",
+    ),
+    Operation(
+        operation_id=FIREWALL_RULES_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/filter/delRule/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Firewall: Rules [new]",
+        read_only=False,
+        apply_required=True,
+        notes="Deletes a rule. Always high risk. Reviewed apply only. Unverified.",
+    ),
+    Operation(
+        operation_id=FIREWALL_RULES_TOGGLE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/filter/toggleRule/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Firewall: Rules [new]",
+        read_only=False,
+        apply_required=True,
+        notes="Flips a rule's enabled flag. Apply passes no explicit state, so it checks the "
+        "stored state first. Reviewed apply only. Unverified.",
+    ),
+    Operation(
+        operation_id=FIREWALL_RULES_APPLY,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/filter/apply",
+        required_privilege="Firewall: Rules [new]",
+        read_only=False,
+        notes="Activates saved rule changes (filter reload). Reply: {status: ...}, wording "
+        "unverified. Only called from the reviewed apply procedure.",
     ),
     Operation(
         operation_id=CPU_USAGE,

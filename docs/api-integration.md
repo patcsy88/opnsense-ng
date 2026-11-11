@@ -31,6 +31,11 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.aliases.reconfigure` | POST | `/api/firewall/alias/reconfigure` | Firewall: Alias: Edit | no | no | 26.7.8_2 | yes |
 | `firewall.aliases.update` | POST | `/api/firewall/alias/setItem/{uuid}` | Firewall: Alias: Edit | no | yes | 26.7.8_2 | yes |
 | `firewall.aliases.delete` | POST | `/api/firewall/alias/delItem/{uuid}` | Firewall: Alias: Edit | no | yes | 26.7.8_2 | yes |
+| `firewall.rules.add` | POST | `/api/firewall/filter/addRule` | Firewall: Rules [new] | no | yes | - | **no** |
+| `firewall.rules.update` | POST | `/api/firewall/filter/setRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
+| `firewall.rules.delete` | POST | `/api/firewall/filter/delRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
+| `firewall.rules.toggle` | POST | `/api/firewall/filter/toggleRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
+| `firewall.rules.apply` | POST | `/api/firewall/filter/apply` | Firewall: Rules [new] | no | no | - | **no** |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
