@@ -98,7 +98,8 @@ _ENTRIES = (
         required_privilege="Firewall: Alias: Edit",
         read_only=False,
         apply_required=True,
-        verified=False,
+        verified=True,
+        min_version="26.7.8_2",
         notes="Saves a new alias on the firewall without activating it. Only called from the "
         "reviewed apply procedure (ADR-0005). Body: {alias: {...}}; reply: result and uuid.",
     ),
@@ -108,7 +109,8 @@ _ENTRIES = (
         endpoint="/api/firewall/alias/reconfigure",
         required_privilege="Firewall: Alias: Edit",
         read_only=False,
-        verified=False,
+        verified=True,
+        min_version="26.7.8_2",
         notes="Activates saved alias changes. Only called from the reviewed apply procedure.",
     ),
     Operation(
