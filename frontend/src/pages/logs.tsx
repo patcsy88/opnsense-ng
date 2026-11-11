@@ -8,7 +8,7 @@ import { Input } from "@/components/ui/input";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { api } from "@/lib/api";
-import type { LogEntry } from "@/lib/schemas";
+import type { LogEntry, LogSummary } from "@/lib/schemas";
 
 const ACTIONS = ["all", "block", "pass"] as const;
 
@@ -30,6 +30,54 @@ function matches(e: LogEntry, action: string, text: string): boolean {
     .join(" ")
     .toLowerCase();
   return haystack.includes(text.toLowerCase());
+}
+
+function TopList({ title, items }: { title: string; items: { label: string; count: number }[] }) {
+  return (
+    <div>
+      <h3 className="mb-1 text-sm font-medium">{title}</h3>
+      {items.length === 0 ? (
+        <p className="text-xs text-muted-foreground">None</p>
+      ) : (
+        <ol className="space-y-0.5 text-xs">
+          {items.map((i) => (
+            <li key={i.label} className="flex justify-between gap-3">
+              <span className="break-all font-mono">{i.label}</span>
+              <span className="tabular-nums text-muted-foreground">{i.count}</span>
+            </li>
+          ))}
+        </ol>
+      )}
+    </div>
+  );
+}
+
+function SummaryCard({ summary }: { summary: LogSummary }) {
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Blocked traffic</CardTitle>
+        <CardDescription>
+          Over the {summary.records} newest log records
+          {summary.oldest && summary.newest ? ` (${summary.oldest} to ${summary.newest})` : ""}: {summary.blocked}{" "}
+          blocked, {summary.passed} passed.
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        {summary.blocked === 0 ? (
+          <p className="text-sm text-muted-foreground">No blocked traffic in these records.</p>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <TopList title="Top blocked sources" items={summary.top_blocked_sources} />
+            <TopList title="Top blocked destinations" items={summary.top_blocked_destinations} />
+            <TopList title="Top blocked ports" items={summary.top_blocked_ports} />
+            <TopList title="Blocked by interface" items={summary.blocked_by_interface} />
+            <TopList title="Blocked by rule" items={summary.blocked_by_rule} />
+          </div>
+        )}
+      </CardContent>
+    </Card>
+  );
 }
 
 export function LogsPage() {
@@ -78,6 +126,7 @@ export function LogsPage() {
         </Card>
       )}
 
+      {q.data && <SummaryCard summary={q.data.summary} />}
       {selected && (
         <Card>
           <CardHeader>

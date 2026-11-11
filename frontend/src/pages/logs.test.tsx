@@ -21,12 +21,25 @@ const entry = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-function logs(user: object, entries: unknown[]) {
+const SUMMARY = {
+  records: 40,
+  blocked: 12,
+  passed: 28,
+  newest: "2026-11-12T10:00:00",
+  oldest: "2026-11-12T09:00:00",
+  top_blocked_sources: [{ label: "203.0.113.9", count: 7 }],
+  top_blocked_destinations: [{ label: "10.0.0.5", count: 9 }],
+  top_blocked_ports: [{ label: "23/tcp", count: 6 }],
+  blocked_by_interface: [{ label: "igb0", count: 12 }],
+  blocked_by_rule: [{ label: "Default deny", count: 12 }],
+};
+
+function logs(user: object, entries: unknown[], summary = SUMMARY) {
   server.use(
     http.get("/api/v1/auth/me", () => HttpResponse.json(user)),
     http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
     http.get(`/api/v1/firewalls/${FW.id}/firewall/logs`, () =>
-      HttpResponse.json({ firewall_id: FW.id, entries, truncated: false, registry_verified: false }),
+      HttpResponse.json({ firewall_id: FW.id, entries, summary, truncated: false, registry_verified: false }),
     ),
   );
 }
@@ -63,5 +76,20 @@ describe("Logs page", () => {
     logs(ADMIN, []);
     renderApp(<App />, "/logs");
     expect((await screen.findAllByRole("link", { name: "Logs" })).length).toBeGreaterThan(0);
+  });
+
+  it("shows the blocked-traffic summary", async () => {
+    logs(ADMIN, [entry()]);
+    renderApp(<App />, "/logs");
+    expect(await screen.findByText("Blocked traffic")).toBeInTheDocument();
+    expect(screen.getByText(/12\s+blocked, 28 passed/)).toBeInTheDocument();
+    expect(screen.getByText("Top blocked ports")).toBeInTheDocument();
+    expect(screen.getByText("23/tcp")).toBeInTheDocument();
+  });
+
+  it("says so when nothing was blocked", async () => {
+    logs(ADMIN, [entry({ action: "pass" })], { ...SUMMARY, blocked: 0, passed: 40 });
+    renderApp(<App />, "/logs");
+    expect(await screen.findByText(/no blocked traffic in these records/i)).toBeInTheDocument();
   });
 });

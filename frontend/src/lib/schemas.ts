@@ -125,9 +125,25 @@ export const logEntrySchema = z.object({
 });
 export type LogEntry = z.infer<typeof logEntrySchema>;
 
+export const topItemSchema = z.object({ label: z.string(), count: z.number() });
+export const logSummarySchema = z.object({
+  records: z.number(),
+  blocked: z.number(),
+  passed: z.number(),
+  newest: z.string().nullable(),
+  oldest: z.string().nullable(),
+  top_blocked_sources: z.array(topItemSchema),
+  top_blocked_destinations: z.array(topItemSchema),
+  top_blocked_ports: z.array(topItemSchema),
+  blocked_by_interface: z.array(topItemSchema),
+  blocked_by_rule: z.array(topItemSchema),
+});
+export type LogSummary = z.infer<typeof logSummarySchema>;
+
 export const logsResponseSchema = z.object({
   firewall_id: z.uuid(),
   entries: z.array(logEntrySchema),
+  summary: logSummarySchema,
   truncated: z.boolean(),
   registry_verified: z.boolean(),
 });
