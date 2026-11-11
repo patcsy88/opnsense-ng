@@ -1,6 +1,6 @@
 # OPNsense API Integration
 
-Status: eight read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`.
+Status: nine read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`.
 
 ## Rules
 
@@ -26,7 +26,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `system.disk` | GET | `/api/diagnostics/system/system_disk` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `interfaces.overview` | GET | `/api/interfaces/overview/interfacesInfo` | Status: Interfaces | yes | no | 26.7.8_2 | yes |
 | `firewall.rules.list` | GET | `/api/firewall/filter/searchRule` | Firewall: Rules [new] | yes | no | 26.7.8_2 | yes |
-| `firewall.aliases.list` | GET | `/api/firewall/alias/searchItem` | Firewall: Aliases | yes | no | - | no |
+| `firewall.aliases.list` | GET | `/api/firewall/alias/searchItem` | Firewall: Aliases | yes | no | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -54,4 +54,4 @@ Observed `system_disk` response: `devices` list; the dashboard uses the entry wi
 
 ## Firewall aliases
 
-`firewall.aliases.list` needs **Firewall: Aliases**, which in the OPNsense source covers `api/firewall/alias/search*`, `list*`, `get*` and `export`; the Edit privilege (add, set, delete) is separate. The result is search-style (`rows`) with `content` as a comma-separated string. The backend keeps uuid, name, type, enabled, description and content (split into a list, at most 200 items per alias, 1000 aliases), and drops categories. Not yet verified on the lab.
+`firewall.aliases.list` needs **Firewall: Aliases**, which in the OPNsense source covers `api/firewall/alias/search*`, `list*`, `get*` and `export`; the Edit privilege (add, set, delete) is separate. The result is search-style (`rows`) with `content` as one string. On 26.7.8_2 the entries are newline-separated; the normaliser also accepts commas. The backend keeps uuid, name, type, enabled, description and content (split into a list, at most 200 items per alias, 1000 aliases), and drops categories. Verified on 26.7.8_2: system aliases (bogons, sshlockout, virusprot, `__lan_network`, ...) have empty content, and a test host alias returned both entries.

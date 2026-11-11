@@ -85,8 +85,9 @@ _ENTRIES = (
         endpoint="/api/firewall/alias/searchItem",
         required_privilege="Firewall: Aliases",
         read_only=True,
-        verified=False,
-        notes="Lists aliases with their content. Shape from the OPNsense source.",
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Lists aliases with their content (newline-separated string).",
     ),
     Operation(
         operation_id=CPU_USAGE,

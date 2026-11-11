@@ -1,5 +1,6 @@
 """Map the OPNsense alias search result to our internal schema."""
 
+import re
 from typing import Any
 
 from pydantic import BaseModel
@@ -7,6 +8,7 @@ from pydantic import BaseModel
 MAX_ALIASES = 1000
 MAX_CONTENT_ITEMS = 200
 MAX_TEXT = 500
+_SEPARATORS = re.compile(r"[,\r\n]+")
 
 
 class AliasInfo(BaseModel):
@@ -25,8 +27,8 @@ class AliasesResult(BaseModel):
 
 
 def normalise_aliases(raw: Any) -> AliasesResult:
-    """Tolerant mapping of the `rows` list. `content` arrives as a comma-separated string.
-    Categories and runtime counters are not passed on."""
+    """Tolerant mapping of the `rows` list. `content` arrives as one string, separated by
+    newlines (commas are tolerated). Categories and runtime counters are not passed on."""
     rows = raw.get("rows") if isinstance(raw, dict) else None
     if not isinstance(rows, list):
         return AliasesResult(aliases=[])
@@ -56,7 +58,7 @@ def _text(value: Any, limit: int = MAX_TEXT) -> str | None:
 def _split(value: Any) -> list[str]:
     if not isinstance(value, str):
         return []
-    return [part.strip()[:MAX_TEXT] for part in value.split(",") if part.strip()]
+    return [part.strip()[:MAX_TEXT] for part in _SEPARATORS.split(value) if part.strip()]
 
 
 def _flag(value: Any) -> bool | None:

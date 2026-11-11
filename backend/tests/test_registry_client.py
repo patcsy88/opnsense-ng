@@ -423,7 +423,7 @@ def test_normalise_aliases_splits_content_and_drops_extras() -> None:
                 "type": "host",
                 "enabled": "1",
                 "description": "Web servers",
-                "content": "10.0.0.1, 10.0.0.2,,",
+                "content": "10.0.0.1\n10.0.0.2\r\n, 10.0.0.3,,",
                 "categories": "secret-cat",
                 "categories_uuid": ["c1"],
             },
@@ -433,7 +433,7 @@ def test_normalise_aliases_splits_content_and_drops_extras() -> None:
     }
     result = normalise_aliases(raw)
     first, big = result.aliases
-    assert first.content == ["10.0.0.1", "10.0.0.2"] and first.enabled is True
+    assert first.content == ["10.0.0.1", "10.0.0.2", "10.0.0.3"] and first.enabled is True
     assert "secret-cat" not in first.model_dump_json() and "c1" not in first.model_dump_json()
     assert big.enabled is None and len(big.content) == 200 and big.content_truncated is True
 
