@@ -198,7 +198,8 @@ _ENTRIES = (
         read_only=False,
         min_version="26.7.8_2",
         verified=True,
-        notes="Activates saved rule changes (filter reload). Reply: {status: ok}. Only called from the reviewed apply procedure.",
+        notes="Activates saved rule changes (filter reload). Reply: {status: ok}. Only called "
+        "from the reviewed apply procedure.",
     ),
     Operation(
         operation_id=CPU_USAGE,
