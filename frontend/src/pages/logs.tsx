@@ -87,40 +87,54 @@ export function LogsPage() {
   const [chosen, setChosen] = useState<string | null>(null);
   const [action, setAction] = useState<(typeof ACTIONS)[number]>("all");
   const [text, setText] = useState("");
-  const [live, setLive] = useState(false);
+  const [liveFor, setLiveFor] = useState<string | null>(null);
   const firewalls = options.data ?? [];
   const selected = chosen ?? firewalls[0]?.id ?? null;
 
+  const [extra, setExtra] = useState<LogEntry[]>([]);
+  const [liveError, setLiveError] = useState(false);
+  const cursor = useRef<string | null>(null);
+  const live = liveFor !== null && liveFor === selected;
+
   const q = useQuery({
     queryKey: ["firewalls", selected, "logs"],
-    queryFn: () => api.firewallLogs(selected as string),
+    queryFn: async () => {
+      const data = await api.firewallLogs(selected as string);
+      // A full (re)load is the new baseline for live updates.
+      cursor.current = data.cursor;
+      setExtra([]);
+      return data;
+    },
     enabled: selected !== null,
     refetchInterval: live ? false : 30_000,
   });
 
-  const [extra, setExtra] = useState<LogEntry[]>([]);
-  const cursor = useRef<string | null>(null);
-
-  // A full (re)load resets the live position; switching firewall turns live off.
   useEffect(() => {
-    setExtra([]);
-    cursor.current = q.data?.cursor ?? null;
-  }, [q.data]);
-  useEffect(() => setLive(false), [selected]);
-
-  const liveQ = useQuery({
-    queryKey: ["firewalls", selected, "logs-live"],
-    queryFn: () => api.firewallLogsNew(selected as string, cursor.current as string),
-    enabled: live && selected !== null && cursor.current !== null,
-    refetchInterval: LIVE_MS,
-    gcTime: 0,
-  });
-  useEffect(() => {
-    const d = liveQ.data;
-    if (!d) return;
-    cursor.current = d.cursor;
-    if (d.entries.length > 0) setExtra((prev) => [...d.entries, ...prev].slice(0, MAX_SHOWN));
-  }, [liveQ.data]);
+    if (!live || selected === null) return;
+    let stopped = false;
+    let busy = false;
+    const tick = async () => {
+      if (busy || cursor.current === null) return;
+      busy = true;
+      try {
+        const d = await api.firewallLogsNew(selected, cursor.current);
+        if (stopped) return;
+        cursor.current = d.cursor;
+        setLiveError(false);
+        if (d.entries.length > 0) setExtra((prev) => [...d.entries, ...prev].slice(0, MAX_SHOWN));
+      } catch {
+        if (!stopped) setLiveError(true);
+      } finally {
+        busy = false;
+      }
+    };
+    void tick();
+    const id = setInterval(() => void tick(), LIVE_MS);
+    return () => {
+      stopped = true;
+      clearInterval(id);
+    };
+  }, [live, selected]);
 
   const all = useMemo(() => [...extra, ...(q.data?.entries ?? [])].slice(0, MAX_SHOWN), [extra, q.data]);
   const shown = useMemo(() => all.filter((e) => matches(e, action, text)), [all, action, text]);
@@ -191,7 +205,7 @@ export function LogsPage() {
                 variant={live ? "default" : "outline"}
                 aria-pressed={live}
                 disabled={q.data?.cursor == null}
-                onClick={() => setLive((v) => !v)}
+                onClick={() => setLiveFor(live ? null : selected)}
               >
                 {live ? "Live: on" : "Live"}
               </Button>
@@ -209,7 +223,7 @@ export function LogsPage() {
               <p className="text-sm text-muted-foreground">No loaded entries match the filter.</p>
             ) : (
               <>
-                {liveQ.isError && (
+                {live && liveError && (
                   <p role="alert" className="text-sm text-destructive">
                     Live updates failed; showing the last loaded entries. Retrying.
                   </p>
