@@ -29,6 +29,8 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.aliases.list` | GET | `/api/firewall/alias/searchItem` | Firewall: Aliases | yes | no | 26.7.8_2 | yes |
 | `firewall.aliases.add` | POST | `/api/firewall/alias/addItem` | Firewall: Alias: Edit | no | yes | 26.7.8_2 | yes |
 | `firewall.aliases.reconfigure` | POST | `/api/firewall/alias/reconfigure` | Firewall: Alias: Edit | no | no | 26.7.8_2 | yes |
+| `firewall.aliases.update` | POST | `/api/firewall/alias/setItem/{uuid}` | Firewall: Alias: Edit | no | yes | 26.7.8_2 | yes |
+| `firewall.aliases.delete` | POST | `/api/firewall/alias/delItem/{uuid}` | Firewall: Alias: Edit | no | yes | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -66,3 +68,10 @@ with `allow_writes` on. They need **Firewall: Alias: Edit**. `addItem` saves the
 firewall without activating it; `reconfigure` activates it. Both are never retried. Both were verified on the lab (26.7.8_2) on 2026-11-11: the body
 (`{alias: {enabled, name, type, content, description}}`, content newline-separated) was accepted, the
 replies were `result: saved` and `status: ok`, and the alias appeared in the read-back.
+
+`firewall.aliases.update` (`setItem/{uuid}`) and `firewall.aliases.delete` (`delItem/{uuid}`) take one
+declared `{uuid}` path slot, filled only with a canonical lowercase UUID. Both were verified on the lab
+(26.7.8_2) on 2026-11-12 through the full staged flow. `setItem` is an upsert, so apply re-reads the
+alias list first and refuses (status `stale`) if the alias is gone or differs from the recorded base.
+Update cannot rename or change the type. Delete is always high risk. The wording for a delete refused
+because the alias is in use is still unverified on the wire.

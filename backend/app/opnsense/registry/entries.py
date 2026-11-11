@@ -123,6 +123,8 @@ _ENTRIES = (
         required_privilege="Firewall: Alias: Edit",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Saves changes to an existing alias without activating them. setItem is an upsert "
         "on the firewall, so apply must confirm the alias exists first. Reviewed apply only.",
     ),
@@ -134,6 +136,8 @@ _ENTRIES = (
         required_privilege="Firewall: Alias: Edit",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Deletes an alias. The firewall refuses when it is still referenced. Reviewed "
         "apply only.",
     ),
