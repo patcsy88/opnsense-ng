@@ -144,8 +144,16 @@ export const logsResponseSchema = z.object({
   firewall_id: z.uuid(),
   entries: z.array(logEntrySchema),
   summary: logSummarySchema,
+  cursor: z.string().nullable(),
   truncated: z.boolean(),
   registry_verified: z.boolean(),
+});
+
+export const logsNewResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  entries: z.array(logEntrySchema),
+  cursor: z.string(),
+  truncated: z.boolean(),
 });
 
 export const aliasSchema = z.object({

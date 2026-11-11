@@ -1,5 +1,5 @@
 import { useQuery } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -10,6 +10,8 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@
 import { api } from "@/lib/api";
 import type { LogEntry, LogSummary } from "@/lib/schemas";
 
+const LIVE_MS = 4_000;
+const MAX_SHOWN = 200;
 const ACTIONS = ["all", "block", "pass"] as const;
 
 function endpoint(host: string | null, port: number | null) {
@@ -85,6 +87,7 @@ export function LogsPage() {
   const [chosen, setChosen] = useState<string | null>(null);
   const [action, setAction] = useState<(typeof ACTIONS)[number]>("all");
   const [text, setText] = useState("");
+  const [live, setLive] = useState(false);
   const firewalls = options.data ?? [];
   const selected = chosen ?? firewalls[0]?.id ?? null;
 
@@ -92,10 +95,35 @@ export function LogsPage() {
     queryKey: ["firewalls", selected, "logs"],
     queryFn: () => api.firewallLogs(selected as string),
     enabled: selected !== null,
-    refetchInterval: 30_000,
+    refetchInterval: live ? false : 30_000,
   });
 
-  const shown = useMemo(() => (q.data?.entries ?? []).filter((e) => matches(e, action, text)), [q.data, action, text]);
+  const [extra, setExtra] = useState<LogEntry[]>([]);
+  const cursor = useRef<string | null>(null);
+
+  // A full (re)load resets the live position; switching firewall turns live off.
+  useEffect(() => {
+    setExtra([]);
+    cursor.current = q.data?.cursor ?? null;
+  }, [q.data]);
+  useEffect(() => setLive(false), [selected]);
+
+  const liveQ = useQuery({
+    queryKey: ["firewalls", selected, "logs-live"],
+    queryFn: () => api.firewallLogsNew(selected as string, cursor.current as string),
+    enabled: live && selected !== null && cursor.current !== null,
+    refetchInterval: LIVE_MS,
+    gcTime: 0,
+  });
+  useEffect(() => {
+    const d = liveQ.data;
+    if (!d) return;
+    cursor.current = d.cursor;
+    if (d.entries.length > 0) setExtra((prev) => [...d.entries, ...prev].slice(0, MAX_SHOWN));
+  }, [liveQ.data]);
+
+  const all = useMemo(() => [...extra, ...(q.data?.entries ?? [])].slice(0, MAX_SHOWN), [extra, q.data]);
+  const shown = useMemo(() => all.filter((e) => matches(e, action, text)), [all, action, text]);
 
   return (
     <div className="space-y-4">
@@ -134,7 +162,7 @@ export function LogsPage() {
               Firewall log {q.data && !q.data.registry_verified && <UnverifiedBadge />}
             </CardTitle>
             <CardDescription>
-              The most recent packet-filter entries, newest first. Refreshes every 30 seconds. Filters apply to the
+              The most recent packet-filter entries, newest first. Refreshes every 30 seconds, or every few seconds with Live on. Filters apply to the
               entries loaded here only.
             </CardDescription>
           </CardHeader>
@@ -158,6 +186,15 @@ export function LogsPage() {
                 value={text}
                 onChange={(e) => setText(e.target.value)}
               />
+              <Button
+                size="sm"
+                variant={live ? "default" : "outline"}
+                aria-pressed={live}
+                disabled={q.data?.cursor == null}
+                onClick={() => setLive((v) => !v)}
+              >
+                {live ? "Live: on" : "Live"}
+              </Button>
               <Button size="sm" variant="ghost" onClick={() => void q.refetch()} disabled={q.isFetching}>
                 Refresh
               </Button>
@@ -166,14 +203,19 @@ export function LogsPage() {
               <p role="status" className="text-sm text-muted-foreground">Loading…</p>
             ) : q.isError ? (
               <ErrorState error={q.error} onRetry={() => void q.refetch()} />
-            ) : q.data.entries.length === 0 ? (
+            ) : all.length === 0 ? (
               <p className="text-sm text-muted-foreground">The firewall returned no log entries.</p>
             ) : shown.length === 0 ? (
               <p className="text-sm text-muted-foreground">No loaded entries match the filter.</p>
             ) : (
               <>
-                {q.data.truncated && (
-                  <p className="text-sm text-muted-foreground">Only the newest {q.data.entries.length} entries are shown.</p>
+                {liveQ.isError && (
+                  <p role="alert" className="text-sm text-destructive">
+                    Live updates failed; showing the last loaded entries. Retrying.
+                  </p>
+                )}
+                {(q.data.truncated || all.length >= MAX_SHOWN) && (
+                  <p className="text-sm text-muted-foreground">Only the newest {all.length} entries are shown.</p>
                 )}
                 <Table>
                   <TableHeader>

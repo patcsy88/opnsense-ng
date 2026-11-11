@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { App } from "@/App";
@@ -39,7 +39,7 @@ function logs(user: object, entries: unknown[], summary = SUMMARY) {
     http.get("/api/v1/auth/me", () => HttpResponse.json(user)),
     http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
     http.get(`/api/v1/firewalls/${FW.id}/firewall/logs`, () =>
-      HttpResponse.json({ firewall_id: FW.id, entries, summary, truncated: false, registry_verified: false }),
+      HttpResponse.json({ firewall_id: FW.id, entries, summary, cursor: "a".repeat(32), truncated: false, registry_verified: false }),
     ),
   );
 }
@@ -91,5 +91,29 @@ describe("Logs page", () => {
     logs(ADMIN, [entry({ action: "pass" })], { ...SUMMARY, blocked: 0, passed: 40 });
     renderApp(<App />, "/logs");
     expect(await screen.findByText(/no blocked traffic in these records/i)).toBeInTheDocument();
+  });
+
+  it("live mode merges new entries and sends the cursor", async () => {
+    logs(ADMIN, [entry()]);
+    let since = "";
+    server.use(
+      http.get(`/api/v1/firewalls/${FW.id}/firewall/logs/new`, ({ request }) => {
+        since = new URL(request.url).searchParams.get("since") ?? "";
+        return HttpResponse.json({
+          firewall_id: FW.id,
+          entries: [entry({ source: "198.51.100.77" })],
+          cursor: "b".repeat(32),
+          truncated: false,
+        });
+      }),
+    );
+    renderApp(<App />, "/logs");
+    await screen.findByText("203.0.113.9:51515");
+    const btn = await screen.findByRole("button", { name: "Live" });
+    await waitFor(() => expect(btn).toBeEnabled());
+    fireEvent.click(btn);
+    expect(await screen.findByText("198.51.100.77:51515")).toBeInTheDocument();
+    expect(screen.getByText("203.0.113.9:51515")).toBeInTheDocument();
+    expect(since).toBe("a".repeat(32));
   });
 });
