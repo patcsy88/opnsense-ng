@@ -315,3 +315,52 @@ async def test_firewall_options_requires_login_and_detailed_list_stays_admin_onl
     await login_as(app_client, Role.read_only)
     assert (await app_client.get("/api/v1/firewalls/options")).status_code == 200
     assert (await app_client.get("/api/v1/firewalls")).status_code == 403
+
+
+async def test_interfaces_any_role_normalised_and_audited(app_client: httpx.AsyncClient) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+    await login_as(app_client, Role.read_only)
+    url = "https://fw.example.test/api/interfaces/overview/interfacesInfo"
+    with respx.mock() as router:
+        router.get(url).respond(
+            200,
+            json={
+                "rows": [
+                    {
+                        "identifier": "wan",
+                        "description": "WAN",
+                        "device": "vtnet0",
+                        "status": "up",
+                        "ipv4": [{"ipaddr": "10.0.0.2/24"}],
+                        "macaddr": "aa:bb:cc:dd:ee:ff",
+                        "secret_extra": "raw",
+                    }
+                ]
+            },
+        )
+        r = await app_client.get(f"/api/v1/firewalls/{fid}/interfaces")
+    assert r.status_code == 200
+    body = r.json()
+    assert body["interfaces"][0]["ipv4"] == ["10.0.0.2/24"]
+    assert "aa:bb" not in r.text and "secret_extra" not in r.text
+    actions = [(a.action, a.outcome) for a in await audit_rows(app_client)]
+    assert ("firewall.interfaces.overview", "success") in actions
+
+
+async def test_interfaces_errors_are_collapsed_for_non_admins(
+    app_client: httpx.AsyncClient,
+) -> None:
+    await login_as(app_client, Role.admin)
+    fid = await create_fw(app_client)
+    url = "https://fw.example.test/api/interfaces/overview/interfacesInfo"
+    with respx.mock() as router:
+        router.get(url).respond(403)
+        admin = await app_client.get(f"/api/v1/firewalls/{fid}/interfaces")
+        await app_client.post("/api/v1/auth/logout", headers=csrf_headers(app_client))
+        await login_as(app_client, Role.read_only)
+        other = await app_client.get(f"/api/v1/firewalls/{fid}/interfaces")
+    assert admin.status_code == 502 and admin.json()["detail"]["status"] == "forbidden"
+    assert other.status_code == 502 and other.json()["detail"]["status"] != "forbidden"
+    assert (await app_client.get(f"/api/v1/firewalls/{uuid.uuid4()}/interfaces")).status_code == 404

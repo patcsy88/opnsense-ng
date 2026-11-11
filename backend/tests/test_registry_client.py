@@ -4,7 +4,11 @@ import respx
 
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.errors import ConnectionStatus, FirewallError
-from app.opnsense.normalise import normalise_cpu_events, normalise_system_status
+from app.opnsense.normalise import (
+    normalise_cpu_events,
+    normalise_interfaces,
+    normalise_system_status,
+)
 from app.opnsense.registry import (
     REGISTRY,
     Operation,
@@ -330,3 +334,37 @@ def test_normalise_disk_uses_root_filesystem() -> None:
 def test_normalise_disk_rejects_bad_shapes(disk: object) -> None:
     status = normalise_system_status({}, None, None, None, disk)
     assert status.disk_total_bytes is None and status.disk_used_percent is None
+
+
+def test_normalise_interfaces_maps_rows_and_drops_extras() -> None:
+    raw = {
+        "total": 2,
+        "rows": [
+            {
+                "identifier": "lan",
+                "description": "LAN",
+                "device": "vtnet1",
+                "status": "up",
+                "enabled": True,
+                "link_type": "static",
+                "ipv4": [{"ipaddr": "192.168.1.1/24"}],
+                "ipv6": [{"ipaddr": "fe80::1/64", "vhid": "1"}],
+                "gateways": ["LAN_GW"],
+                "vlan_tag": "20",
+                "macaddr": "aa:bb:cc:dd:ee:ff",
+            },
+            "junk",
+            {"identifier": "", "ipv4": "x", "vlan_tag": True, "enabled": "yes"},
+        ],
+    }
+    lan, odd = normalise_interfaces(raw)
+    assert lan.identifier == "lan" and lan.ipv4 == ["192.168.1.1/24"] and lan.vlan_tag == 20
+    assert lan.ipv6 == ["fe80::1/64"] and lan.gateways == ["LAN_GW"]
+    assert "aa:bb" not in lan.model_dump_json()
+    assert odd.identifier is None and odd.ipv4 == [] and odd.vlan_tag is None
+    assert odd.enabled is None
+
+
+@pytest.mark.parametrize("raw", [None, [], {}, {"rows": "x"}, {"rows": None}])
+def test_normalise_interfaces_rejects_bad_shapes(raw: object) -> None:
+    assert normalise_interfaces(raw) == []

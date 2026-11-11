@@ -12,6 +12,7 @@ SYSTEM_TIME = "system.time"
 SYSTEM_RESOURCES = "system.resources"
 CPU_USAGE = "cpu.usage"
 SYSTEM_DISK = "system.disk"
+INTERFACES_OVERVIEW = "interfaces.overview"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -55,6 +56,15 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Filesystems with total/used bytes; the dashboard uses the root (/) mount.",
+    ),
+    Operation(
+        operation_id=INTERFACES_OVERVIEW,
+        method=HttpMethod.GET,
+        endpoint="/api/interfaces/overview/interfacesInfo",
+        required_privilege="Status: Interfaces",
+        read_only=True,
+        verified=False,
+        notes="Interface list with status and addresses. Shape from the OPNsense source.",
     ),
     Operation(
         operation_id=CPU_USAGE,

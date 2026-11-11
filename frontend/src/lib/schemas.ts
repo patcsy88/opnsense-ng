@@ -63,6 +63,26 @@ export const systemStatusResponseSchema = z.object({
   status: systemStatusSchema,
   registry_verified: z.boolean(),
 });
+export const interfaceSchema = z.object({
+  identifier: z.string().nullable(),
+  description: z.string().nullable(),
+  device: z.string().nullable(),
+  status: z.string().nullable(),
+  enabled: z.boolean().nullable(),
+  link_type: z.string().nullable(),
+  ipv4: z.array(z.string()),
+  ipv6: z.array(z.string()),
+  gateways: z.array(z.string()),
+  vlan_tag: z.number().nullable(),
+});
+export type InterfaceInfo = z.infer<typeof interfaceSchema>;
+
+export const interfacesResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  interfaces: z.array(interfaceSchema),
+  registry_verified: z.boolean(),
+});
+
 export type SystemStatusResponse = z.infer<typeof systemStatusResponseSchema>;
 
 // Request payloads (write-only secrets live only in these).

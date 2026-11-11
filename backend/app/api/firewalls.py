@@ -15,6 +15,7 @@ from app.api.schemas import (
     FirewallOption,
     FirewallOut,
     FirewallUpdate,
+    InterfacesOut,
     SystemStatusOut,
 )
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
@@ -27,11 +28,16 @@ from app.opnsense.client import OPNsenseClient
 from app.opnsense.cpu_sampler import sample_cpu
 from app.opnsense.errors import ConnectionStatus, FirewallError, public_status
 from app.opnsense.netpolicy import TargetPolicy, split_host
-from app.opnsense.normalise import normalise_cpu_events, normalise_system_status
+from app.opnsense.normalise import (
+    normalise_cpu_events,
+    normalise_interfaces,
+    normalise_system_status,
+)
 from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
+    INTERFACES_OVERVIEW,
     SYSTEM_DISK,
     SYSTEM_RESOURCES,
     SYSTEM_STATUS,
@@ -523,4 +529,38 @@ def system_status(
             get_operation(op).verified
             for op in (SYSTEM_STATUS, SYSTEM_TIME, SYSTEM_RESOURCES, CPU_USAGE, SYSTEM_DISK)
         ),
+    )
+
+
+@router.get("/{firewall_id}/interfaces", response_model=InterfacesOut)
+def interfaces(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> InterfacesOut:
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=INTERFACES_OVERVIEW,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        if user.role is not Role.admin:
+            raise HTTPException(
+                status.HTTP_502_BAD_GATEWAY,
+                {"status": public_status(exc.status), "message": "Firewall is unreachable"},
+            ) from None
+        raise HTTPException(
+            _HTTP_FOR_STATUS.get(exc.status, status.HTTP_502_BAD_GATEWAY),
+            {"status": exc.status.value, "message": exc.message},
+        ) from None
+    return InterfacesOut(
+        firewall_id=firewall_id,
+        interfaces=normalise_interfaces(raw),
+        registry_verified=get_operation(INTERFACES_OVERVIEW).verified,
     )

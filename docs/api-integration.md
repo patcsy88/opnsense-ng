@@ -1,6 +1,6 @@
 # OPNsense API Integration
 
-Status: six read-only operations verified. New endpoints must be verified against a lab OPNsense before `verified=True`.
+Status: six read-only operations verified; `interfaces.overview` awaits lab verification. New endpoints must be verified against a lab OPNsense before `verified=True`.
 
 ## Rules
 
@@ -24,6 +24,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `system.resources` | GET | `/api/diagnostics/system/system_resources` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `cpu.usage` (SSE) | GET | `/api/diagnostics/cpu_usage/stream` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
 | `system.disk` | GET | `/api/diagnostics/system/system_disk` | Lobby: Dashboard | yes | no | 26.7.8_2 | yes |
+| `interfaces.overview` | GET | `/api/interfaces/overview/interfacesInfo` | Status: Interfaces | yes | no | - | no |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -40,3 +41,7 @@ Operations with `response_kind=sse` are never run through `execute()`. `OPNsense
 Observed CPU event fields on 26.7.8_2: `total`, `user`, `nice`, `sys`, `intr`, `idle`, all integers. `total` is the used percentage (an idle firewall reported total 0, idle 100). Only an idle reading has been observed so far.
 
 Observed `system_disk` response: `devices` list; the dashboard uses the entry with `mountpoint` `/` and its `total_bytes` and `used_bytes`. Figures are shown in binary units (GiB), so a decimal-unit UI may show a slightly larger total.
+
+## Interfaces
+
+`interfaces.overview` needs the **Status: Interfaces** privilege in addition to Lobby: Dashboard. It returns a search-style result (`rows`). The backend keeps identifier, description, device, status, enabled, link type, IPv4/IPv6 addresses, gateways and VLAN tag, and drops MAC addresses, counters and other fields. Verify the row field names on the lab before `verified=True`.

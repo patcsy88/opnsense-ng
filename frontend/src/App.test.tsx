@@ -150,4 +150,27 @@ describe("role-based rendering", () => {
     expect(await screen.findByRole("heading", { name: "VPN" })).toBeInTheDocument();
     expect(screen.getByText("This section is not implemented yet.")).toBeInTheDocument();
   });
+
+  it("network page lists interfaces for a read-only user", async () => {
+    mockSession(READER);
+    server.use(
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: "edge-1" }])),
+      http.get("/api/v1/firewalls/:id/interfaces", () =>
+        HttpResponse.json({
+          firewall_id: FW.id,
+          registry_verified: false,
+          interfaces: [
+            { identifier: "wan", description: "WAN", device: "vtnet0", status: "up", enabled: true, link_type: "dhcp", ipv4: ["10.0.0.2/24"], ipv6: [], gateways: ["WAN_GW"], vlan_tag: null },
+            { identifier: "opt1", description: "Guest", device: "vtnet2", status: "no carrier", enabled: true, link_type: "static", ipv4: [], ipv6: [], gateways: [], vlan_tag: 20 },
+          ],
+        }),
+      ),
+    );
+    renderApp(<App />, "/network");
+    expect(await screen.findByText("WAN")).toBeInTheDocument();
+    expect(screen.getByText("10.0.0.2/24")).toBeInTheDocument();
+    expect(screen.getByText("Up")).toBeInTheDocument();
+    expect(screen.getByText("no carrier")).toBeInTheDocument();
+    expect(screen.getByText("Unverified API mapping")).toBeInTheDocument();
+  });
 });
