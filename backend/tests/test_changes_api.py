@@ -66,6 +66,9 @@ async def switch(client: httpx.AsyncClient, role: Role, name: str) -> None:
         ({"type": "port", "content": ["9000:8000"]}, False),
         ({"type": "geoip", "content": ["NL"]}, False),
         ({"description": "bad\nline"}, False),
+        ({"name": "web", "content": ["web"]}, False),
+        ({"name": "web", "content": ["WEB"]}, False),
+        ({"name": "web", "content": ["web.example.com"]}, True),
     ],
 )
 def test_alias_validation(kw: dict[str, Any], ok: bool) -> None:

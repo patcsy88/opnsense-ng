@@ -108,6 +108,8 @@ class AliasProposal(BaseModel):
                 raise ValueError("Content entries must be 1-253 characters")
             if not check(item):
                 raise ValueError(f"Entry is not a valid {self.type} value")
+            if self.type == "host" and item.lower() == self.name.lower():
+                raise ValueError("An alias cannot contain its own name (it would reference itself)")
             if item not in cleaned:
                 cleaned.append(item)
         self.content = cleaned
