@@ -32,8 +32,8 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.aliases.update` | POST | `/api/firewall/alias/setItem/{uuid}` | Firewall: Alias: Edit | no | yes | 26.7.8_2 | yes |
 | `firewall.aliases.delete` | POST | `/api/firewall/alias/delItem/{uuid}` | Firewall: Alias: Edit | no | yes | 26.7.8_2 | yes |
 | `firewall.rules.add` | POST | `/api/firewall/filter/addRule` | Firewall: Rules [new] | no | yes | 26.7.8_2 | yes |
-| `firewall.rules.update` | POST | `/api/firewall/filter/setRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
-| `firewall.rules.delete` | POST | `/api/firewall/filter/delRule/{uuid}` | Firewall: Rules [new] | no | yes | - | **no** |
+| `firewall.rules.update` | POST | `/api/firewall/filter/setRule/{uuid}` | Firewall: Rules [new] | no | yes | 26.7.8_2 | yes |
+| `firewall.rules.delete` | POST | `/api/firewall/filter/delRule/{uuid}` | Firewall: Rules [new] | no | yes | 26.7.8_2 | yes |
 | `firewall.rules.toggle` | POST | `/api/firewall/filter/toggleRule/{uuid}` | Firewall: Rules [new] | no | yes | 26.7.8_2 | yes |
 | `firewall.rules.apply` | POST | `/api/firewall/filter/apply` | Firewall: Rules [new] | no | no | 26.7.8_2 | yes |
 
@@ -86,3 +86,5 @@ because the alias is in use is still unverified on the wire.
 `firewall.rules.toggle` and `firewall.rules.apply` (`filter/apply`, activates saved rule changes) were verified on the lab (26.7.8_2) on 2026-11-12 through the full staged flow: disable, then enable, a user rule. Apply compares the rule's normalised state with the state recorded at staging and refuses (`stale`) on any difference. Add, update and delete remain unverified. There is no savepoint/revert on master, so undo is a new reviewed request.
 
 `firewall.rules.add` (`addRule`) is called only from the reviewed apply for rule creation. Body `{rule: {...}}` with the narrow field set (enabled, sequence, action, quick=1, interface, direction, ipprotocol, protocol, source_net, source_port, destination_net, destination_port, log, description). The new rule gets a sequence one above the highest existing sequence; it is never left to the firewall default (1, which would put it first). Create has no before-state, so apply re-checks that the description is still unused and that every named alias still exists as the right kind (port alias for ports, otherwise not). Verified on the lab (26.7.8_2) on 2026-11-12: the rule was created through the full staged flow and appeared on the firewall as proposed.
+
+`firewall.rules.update` (`setRule/{uuid}`) and `firewall.rules.delete` (`delRule/{uuid}`) are called only from the reviewed apply. Update keeps the rule's interface, description and sequence; delete is always high risk. Both were verified on the lab (26.7.8_2) on 2026-11-12 through the full staged flow.

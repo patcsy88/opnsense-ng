@@ -166,8 +166,10 @@ _ENTRIES = (
         required_privilege="Firewall: Rules [new]",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Saves changes to an existing rule. setRule is an upsert, so apply confirms the "
-        "rule exists first. Reviewed apply only. Unverified.",
+        "rule exists first. Reviewed apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_DELETE,
@@ -177,7 +179,9 @@ _ENTRIES = (
         required_privilege="Firewall: Rules [new]",
         read_only=False,
         apply_required=True,
-        notes="Deletes a rule. Always high risk. Reviewed apply only. Unverified.",
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Deletes a rule. Always high risk. Reviewed apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_TOGGLE,
