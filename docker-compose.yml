@@ -34,6 +34,9 @@ services:
       TRUSTED_PROXIES: ${TRUSTED_PROXIES:-172.30.0.0/24}
       ALLOWED_FIREWALL_NETWORKS: ${ALLOWED_FIREWALL_NETWORKS:-}
       ALLOW_INSECURE_TLS: ${ALLOW_INSECURE_TLS:-false}
+      GEOIP_DB_PATH: /geoip/GeoLite2-Country.mmdb
+    volumes:
+      - ./geoip:/geoip:ro
     networks:
       - internal
 

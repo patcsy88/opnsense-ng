@@ -2,6 +2,7 @@
 .env.*
 !.env.example
 secrets/
+geoip/
 docker-compose.override.yml
 node_modules/
 dist/

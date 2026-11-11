@@ -85,3 +85,19 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 - The dashboard shows hostname, versions, updates, uptime, load average, CPU, memory and the root filesystem's disk usage.
 - Every role can list firewall names (`GET /api/v1/firewalls/options`, id and name only) to pick one on the dashboard. URLs, TLS settings and certificates stay admin-only.
 - Deleting a connection (Administration > Firewall Connections) removes its stored credentials. Audit records are kept.
+
+## Optional: country labels on the Logs page (GeoLite2)
+
+The Logs page can label blocked source addresses with a country. It uses the MaxMind GeoLite2-Country database, read offline by the backend. No address is sent anywhere, and only public addresses are looked up (private, loopback, link-local, multicast and documentation ranges are skipped). Labels are approximate and are for display only.
+
+1. Create a free MaxMind account and a licence key (you accept MaxMind's GeoLite2 licence terms; do not redistribute the database).
+2. On the host, in the repository directory:
+
+   ```
+   MAXMIND_ACCOUNT_ID=<id> MAXMIND_LICENSE_KEY=<key> ./scripts/update-geoip.sh
+   ```
+
+   This writes `geoip/GeoLite2-Country.mmdb` (git-ignored). The compose file mounts `./geoip` read-only into the backend and sets `GEOIP_DB_PATH`.
+3. Refresh the file regularly (MaxMind updates GeoLite2 twice a week; their terms require you to keep it reasonably current), for example with a weekly cron job running the same command. The backend notices a replaced file and reopens it; no restart is needed.
+
+Without the file the feature is off and the Logs page works as before. The key and account id are only used by the script and are never passed to the backend or committed.

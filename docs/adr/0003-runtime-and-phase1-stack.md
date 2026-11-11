@@ -21,6 +21,7 @@ The backend is a thin, network-bound layer: it proxies calls to the OPNsense API
 **Phase 1 dependencies (approved)**
 - Backend: fastapi, uvicorn, pydantic, pydantic-settings, sqlalchemy, alembic, psycopg, httpx, argon2-cffi, cryptography, itsdangerous, slowapi, structlog. Dev: pytest, pytest-asyncio, pytest-cov, respx, ruff, mypy, pip-audit.
 - Frontend: react, react-dom, react-router-dom, @tanstack/react-query, tailwindcss, shadcn/ui (radix-ui, class-variance-authority, clsx, tailwind-merge, lucide-react), recharts, zod, vite, @vitejs/plugin-react, vite-plugin-pwa, typescript. Dev: vitest, @testing-library/react, @testing-library/jest-dom, jsdom, msw, @playwright/test, eslint, typescript-eslint, eslint-plugin-react-hooks.
+- Added 2026-11-12 (approved by project owner): `maxminddb` 3.2.0 (Apache-2.0, offline reader for the MaxMind GeoLite2-Country database). Wheels for Python 3.15 exist for macOS and Linux (manylinux and musllinux, x86_64 and aarch64). Used only for display labels on blocked source addresses; the database file is mounted read-only and downloaded on the host, so the licence key never reaches the backend.
 - Excluded for now: Redis, Celery, Redux/Zustand, any OPNsense SDK.
 
 ## Consequences

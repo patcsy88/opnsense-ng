@@ -34,7 +34,7 @@ function matches(e: LogEntry, action: string, text: string): boolean {
   return haystack.includes(text.toLowerCase());
 }
 
-function TopList({ title, items }: { title: string; items: { label: string; count: number }[] }) {
+function TopList({ title, items }: { title: string; items: { label: string; count: number; country: string | null }[] }) {
   return (
     <div>
       <h3 className="mb-1 text-sm font-medium">{title}</h3>
@@ -44,7 +44,10 @@ function TopList({ title, items }: { title: string; items: { label: string; coun
         <ol className="space-y-0.5 text-xs">
           {items.map((i) => (
             <li key={i.label} className="flex justify-between gap-3">
-              <span className="break-all font-mono">{i.label}</span>
+              <span className="break-all font-mono">
+                {i.label}
+                {i.country && <span className="ml-1 text-muted-foreground">({i.country})</span>}
+              </span>
               <span className="tabular-nums text-muted-foreground">{i.count}</span>
             </li>
           ))}
@@ -54,7 +57,7 @@ function TopList({ title, items }: { title: string; items: { label: string; coun
   );
 }
 
-function SummaryCard({ summary }: { summary: LogSummary }) {
+function SummaryCard({ summary, geoip }: { summary: LogSummary; geoip: boolean }) {
   return (
     <Card>
       <CardHeader>
@@ -75,7 +78,13 @@ function SummaryCard({ summary }: { summary: LogSummary }) {
             <TopList title="Top blocked ports" items={summary.top_blocked_ports} />
             <TopList title="Blocked by interface" items={summary.blocked_by_interface} />
             <TopList title="Blocked by rule" items={summary.blocked_by_rule} />
+            {geoip && <TopList title="Blocked sources by country" items={summary.blocked_by_country} />}
           </div>
+        )}
+        {geoip && (
+          <p className="mt-3 text-xs text-muted-foreground">
+            Country labels are approximate. Includes GeoLite2 data created by MaxMind (maxmind.com).
+          </p>
         )}
       </CardContent>
     </Card>
@@ -168,7 +177,7 @@ export function LogsPage() {
         </Card>
       )}
 
-      {q.data && <SummaryCard summary={q.data.summary} />}
+      {q.data && <SummaryCard summary={q.data.summary} geoip={q.data.geoip_enabled} />}
       {selected && (
         <Card>
           <CardHeader>
@@ -252,7 +261,9 @@ export function LogsPage() {
                         <TableCell>{e.interface ?? "—"}</TableCell>
                         <TableCell>{e.direction ?? "—"}</TableCell>
                         <TableCell>{e.protocol ?? "—"}</TableCell>
-                        <TableCell className="font-mono text-xs">{endpoint(e.source, e.source_port)}</TableCell>
+                        <TableCell className="font-mono text-xs">{endpoint(e.source, e.source_port)}
+                          {e.source_country && <span className="ml-1 text-muted-foreground">({e.source_country})</span>}
+                        </TableCell>
                         <TableCell className="font-mono text-xs">{endpoint(e.destination, e.destination_port)}</TableCell>
                         <TableCell className="text-xs">{e.rule ?? "—"}</TableCell>
                       </TableRow>

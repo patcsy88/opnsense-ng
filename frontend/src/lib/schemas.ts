@@ -117,6 +117,7 @@ export const logEntrySchema = z.object({
   ip_version: z.number().nullable(),
   protocol: z.string().nullable(),
   source: z.string().nullable(),
+  source_country: z.string().nullable(),
   source_port: z.number().nullable(),
   destination: z.string().nullable(),
   destination_port: z.number().nullable(),
@@ -125,7 +126,7 @@ export const logEntrySchema = z.object({
 });
 export type LogEntry = z.infer<typeof logEntrySchema>;
 
-export const topItemSchema = z.object({ label: z.string(), count: z.number() });
+export const topItemSchema = z.object({ label: z.string(), count: z.number(), country: z.string().nullable() });
 export const logSummarySchema = z.object({
   records: z.number(),
   blocked: z.number(),
@@ -137,6 +138,7 @@ export const logSummarySchema = z.object({
   top_blocked_ports: z.array(topItemSchema),
   blocked_by_interface: z.array(topItemSchema),
   blocked_by_rule: z.array(topItemSchema),
+  blocked_by_country: z.array(topItemSchema),
 });
 export type LogSummary = z.infer<typeof logSummarySchema>;
 
@@ -144,6 +146,7 @@ export const logsResponseSchema = z.object({
   firewall_id: z.uuid(),
   entries: z.array(logEntrySchema),
   summary: logSummarySchema,
+  geoip_enabled: z.boolean(),
   cursor: z.string().nullable(),
   truncated: z.boolean(),
   registry_verified: z.boolean(),

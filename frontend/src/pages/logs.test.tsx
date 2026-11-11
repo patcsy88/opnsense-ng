@@ -13,6 +13,7 @@ const entry = (over: Record<string, unknown> = {}) => ({
   ip_version: 4,
   protocol: "tcp",
   source: "203.0.113.9",
+  source_country: null,
   source_port: 51515,
   destination: "10.0.0.5",
   destination_port: 23,
@@ -21,17 +22,18 @@ const entry = (over: Record<string, unknown> = {}) => ({
   ...over,
 });
 
-const SUMMARY = {
+const SUMMARY: Record<string, unknown> & { blocked: number } = {
   records: 40,
   blocked: 12,
   passed: 28,
   newest: "2026-11-12T10:00:00",
   oldest: "2026-11-12T09:00:00",
-  top_blocked_sources: [{ label: "203.0.113.9", count: 7 }],
-  top_blocked_destinations: [{ label: "10.0.0.5", count: 9 }],
-  top_blocked_ports: [{ label: "23/tcp", count: 6 }],
-  blocked_by_interface: [{ label: "igb0", count: 12 }],
-  blocked_by_rule: [{ label: "Default deny", count: 12 }],
+  top_blocked_sources: [{ label: "203.0.113.9", count: 7, country: null }],
+  top_blocked_destinations: [{ label: "10.0.0.5", count: 9, country: null }],
+  top_blocked_ports: [{ label: "23/tcp", count: 6, country: null }],
+  blocked_by_interface: [{ label: "igb0", count: 12, country: null }],
+  blocked_by_rule: [{ label: "Default deny", count: 12, country: null }],
+  blocked_by_country: [],
 };
 
 function logs(user: object, entries: unknown[], summary = SUMMARY) {
@@ -39,7 +41,7 @@ function logs(user: object, entries: unknown[], summary = SUMMARY) {
     http.get("/api/v1/auth/me", () => HttpResponse.json(user)),
     http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
     http.get(`/api/v1/firewalls/${FW.id}/firewall/logs`, () =>
-      HttpResponse.json({ firewall_id: FW.id, entries, summary, cursor: "a".repeat(32), truncated: false, registry_verified: false }),
+      HttpResponse.json({ firewall_id: FW.id, entries, summary, geoip_enabled: false, cursor: "a".repeat(32), truncated: false, registry_verified: false }),
     ),
   );
 }
@@ -115,5 +117,37 @@ describe("Logs page", () => {
     expect(await screen.findByText("198.51.100.77:51515")).toBeInTheDocument();
     expect(screen.getByText("203.0.113.9:51515")).toBeInTheDocument();
     expect(since).toBe("a".repeat(32));
+  });
+
+  it("shows country labels and the country list only when geoIP is enabled", async () => {
+    const withGeo = {
+      ...SUMMARY,
+      top_blocked_sources: [{ label: "8.8.8.8", count: 7, country: "US" }],
+      blocked_by_country: [{ label: "US", count: 7, country: null }],
+    };
+    logs(ADMIN, [entry({ source: "8.8.8.8", source_country: "US" })], withGeo);
+    server.use(
+      http.get(`/api/v1/firewalls/${FW.id}/firewall/logs`, () =>
+        HttpResponse.json({
+          firewall_id: FW.id,
+          entries: [entry({ source: "8.8.8.8", source_country: "US" })],
+          summary: withGeo,
+          geoip_enabled: true,
+          cursor: "a".repeat(32),
+          truncated: false,
+          registry_verified: true,
+        }),
+      ),
+    );
+    renderApp(<App />, "/logs");
+    expect(await screen.findByText("Blocked sources by country")).toBeInTheDocument();
+    expect((await screen.findAllByText("(US)")).length).toBeGreaterThan(1);
+  });
+
+  it("hides the country list when geoIP is off", async () => {
+    logs(ADMIN, [entry()]);
+    renderApp(<App />, "/logs");
+    await screen.findByText("Blocked traffic");
+    expect(screen.queryByText("Blocked sources by country")).not.toBeInTheDocument();
   });
 });
