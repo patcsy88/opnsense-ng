@@ -11,6 +11,7 @@ from app.opnsense.normalise.logs import (
 )
 from app.opnsense.normalise.nat import NatResult, NatRule, normalise_nat
 from app.opnsense.normalise.rules import RuleInfo, RulesResult, normalise_rules
+from app.opnsense.normalise.services import ServiceInfo, ServicesResult, normalise_services
 from app.opnsense.normalise.system import (
     SystemStatus,
     normalise_cpu_events,
@@ -29,6 +30,8 @@ __all__ = [
     "NatRule",
     "RuleInfo",
     "RulesResult",
+    "ServiceInfo",
+    "ServicesResult",
     "SystemStatus",
     "TopItem",
     "TrafficInterface",
@@ -40,6 +43,7 @@ __all__ = [
     "normalise_log",
     "normalise_nat",
     "normalise_rules",
+    "normalise_services",
     "normalise_system_status",
     "normalise_traffic",
     "summarise_log",

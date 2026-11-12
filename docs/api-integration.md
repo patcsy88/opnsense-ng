@@ -39,6 +39,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.log` | GET | `/api/diagnostics/firewall/log` | Diagnostics: Logs: Firewall: Live View | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.list` | GET | `/api/firewall/d_nat/searchRule` | Firewall: NAT: Destination NAT | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.outbound.list` | GET | `/api/firewall/source_nat/searchRule` | Firewall: NAT: Source NAT | yes | no | 26.7.8_2 | yes |
+| `services.list` | GET | `/api/core/service/search` | Status: Services | yes | no | - | **no** |
 | `traffic.interfaces` | GET | `/api/diagnostics/traffic/interface` | Reporting: Traffic | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.add` | POST | `/api/firewall/d_nat/addRule` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.update` | POST | `/api/firewall/d_nat/setRule/{uuid}` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
@@ -108,3 +109,5 @@ NAT is read-only for now. Port forwards come from `d_nat/searchRule` (dotted fie
 Port forward changes (ADR-0006) use the `firewall.nat.port_forwards.*` write operations, called only from the reviewed apply procedure for `nat_forward` requests. Apply re-reads the forwards (stale check by fingerprint), saves with `addRule` or `setRule/{uuid}`, activates with `d_nat/apply`, then reads back. `pass` is always sent blank (Manual) on create so no filter rule is registered, and pool options, NAT reflection and `nordr` are fixed to defaults; update omits those fields. Toggle uses the explicit `toggleRule/{uuid}/0` (enable) or `/1` (disable) forms, never the flip default. All six operations were verified on 26.7.8_2: create, edit, disable, enable and delete behaved as described, and a created forward has no filter rule association.
 
 Traffic (ADR-0007) uses only the plain `traffic/interface` snapshot: cumulative byte and packet counters per interface, keyed by interface identifier with a friendly `name`. The backend normalises it to in/out bytes and packets, caches it for 2 s per firewall, and stores nothing. The browser works out rates from consecutive polls. Verified on the lab (26.7.8_2) with the privilege Reporting: Traffic. Limited to admin, network_admin and security_admin.
+
+Services lists service status only (`services.list`): id, name, description, running and locked flags, capped at 500 rows. The same OPNsense controller has start, restart and stop; they are deliberately not in the registry, and a service control feature needs its own ADR. Viewing is open to every signed-in role. The privilege name comes from the OPNsense ACL on master and is unverified on the lab.

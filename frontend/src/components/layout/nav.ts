@@ -32,6 +32,6 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/logs", label: "Logs", icon: ScrollText, implemented: true, roles: ["admin", "network_admin", "security_admin"] },
   { to: "/traffic", label: "Traffic", icon: Activity, implemented: true, roles: ["admin", "network_admin", "security_admin"] },
   { to: "/vpn", label: "VPN", icon: ShieldCheck, implemented: false },
-  { to: "/services", label: "Services", icon: Server, implemented: false },
+  { to: "/services", label: "Services", icon: Server, implemented: true },
   { to: "/administration", label: "Administration", icon: Settings, implemented: true },
 ];

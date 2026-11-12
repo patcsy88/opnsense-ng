@@ -21,6 +21,7 @@ from app.api.schemas import (
     LogsOut,
     NatOut,
     RulesOut,
+    ServicesOut,
     SystemStatusOut,
     TrafficOut,
 )
@@ -43,6 +44,7 @@ from app.opnsense.normalise import (
     normalise_log,
     normalise_nat,
     normalise_rules,
+    normalise_services,
     normalise_system_status,
     normalise_traffic,
     summarise_log,
@@ -59,6 +61,7 @@ from app.opnsense.registry.entries import (
     FIREWALL_NAT_PORT_FORWARDS,
     FIREWALL_RULES_LIST,
     INTERFACES_OVERVIEW,
+    SERVICES_LIST,
     SYSTEM_DISK,
     SYSTEM_RESOURCES,
     SYSTEM_STATUS,
@@ -763,6 +766,35 @@ def firewall_logs_new(
         entries=result.entries,
         cursor=log_cursor(raw) or since,
         truncated=result.truncated,
+    )
+
+
+@router.get("/{firewall_id}/services", response_model=ServicesOut)
+def services(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ServicesOut:
+    """Service status only. Start, stop and restart are deliberately not offered."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=SERVICES_LIST,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_services(raw)
+    return ServicesOut(
+        firewall_id=firewall_id,
+        services=result.services,
+        truncated=result.truncated,
+        registry_verified=get_operation(SERVICES_LIST).verified,
     )
 
 

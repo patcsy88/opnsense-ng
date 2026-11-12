@@ -14,6 +14,7 @@ CPU_USAGE = "cpu.usage"
 SYSTEM_DISK = "system.disk"
 INTERFACES_OVERVIEW = "interfaces.overview"
 TRAFFIC_INTERFACES = "traffic.interfaces"
+SERVICES_LIST = "services.list"
 FIREWALL_RULES_LIST = "firewall.rules.list"
 FIREWALL_ALIASES_LIST = "firewall.aliases.list"
 FIREWALL_ALIASES_ADD = "firewall.aliases.add"
@@ -97,6 +98,15 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Cumulative byte and packet counters per interface (ADR-0007). Verified on the lab.",
+    ),
+    Operation(
+        operation_id=SERVICES_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/core/service/search",
+        required_privilege="Status: Services",
+        read_only=True,
+        notes="Service list with a running flag. The same controller has start, restart and "
+        "stop; this app only reads. Unverified.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,

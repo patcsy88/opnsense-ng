@@ -186,6 +186,22 @@ export const logsNewResponseSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const serviceSchema = z.object({
+  id: z.string(),
+  name: z.string(),
+  description: z.string().nullable(),
+  running: z.boolean(),
+  locked: z.boolean(),
+});
+export type ServiceInfo = z.infer<typeof serviceSchema>;
+
+export const servicesResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  services: z.array(serviceSchema),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export const trafficInterfaceSchema = z.object({
   interface: z.string(),
   name: z.string().nullable(),
