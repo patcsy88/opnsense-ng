@@ -5,6 +5,7 @@ import {
   GitPullRequest,
   LayoutDashboard,
   Network,
+  Shuffle,
   ScrollText,
   Server,
   Settings,
@@ -25,6 +26,7 @@ export interface NavItem {
 export const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, implemented: true },
   { to: "/firewall", label: "Firewall", icon: Flame, implemented: true },
+  { to: "/nat", label: "NAT", icon: Shuffle, implemented: true },
   { to: "/changes", label: "Changes", icon: GitPullRequest, implemented: true },
   { to: "/network", label: "Network", icon: Network, implemented: true },
   { to: "/logs", label: "Logs", icon: ScrollText, implemented: true, roles: ["admin", "network_admin", "security_admin"] },

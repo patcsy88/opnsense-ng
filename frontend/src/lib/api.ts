@@ -13,6 +13,7 @@ import {
   changeListSchema,
   rulesResponseSchema,
   logsResponseSchema,
+  natResponseSchema,
   logsNewResponseSchema,
   systemStatusResponseSchema,
   userSchema,
@@ -216,6 +217,10 @@ export const api = {
   firewallRules: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/firewall/rules`, {
       schema: rulesResponseSchema,
+    }),
+  natRules: (id: string, kind: "port-forwards" | "outbound") =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/firewall/nat/${kind}`, {
+      schema: natResponseSchema,
     }),
   firewallLogs: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/firewall/logs`, {

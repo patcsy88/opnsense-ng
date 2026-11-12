@@ -109,6 +109,33 @@ export const rulesResponseSchema = z.object({
   registry_verified: z.boolean(),
 });
 
+export const natRuleSchema = z.object({
+  uuid: z.string().nullable(),
+  enabled: z.boolean().nullable(),
+  excluded: z.boolean().nullable(),
+  interface: z.string().nullable(),
+  ip_protocol: z.string().nullable(),
+  protocol: z.string().nullable(),
+  source: z.string().nullable(),
+  source_port: z.string().nullable(),
+  destination: z.string().nullable(),
+  destination_port: z.string().nullable(),
+  target: z.string().nullable(),
+  target_port: z.string().nullable(),
+  description: z.string().nullable(),
+  log: z.boolean().nullable(),
+  sequence: z.number().nullable(),
+  automatic: z.boolean(),
+});
+export type NatRule = z.infer<typeof natRuleSchema>;
+
+export const natResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  rules: z.array(natRuleSchema),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export const logEntrySchema = z.object({
   time: z.string().nullable(),
   action: z.string().nullable(),
