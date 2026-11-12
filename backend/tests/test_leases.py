@@ -78,7 +78,7 @@ async def test_leases_endpoint_roles_audit_and_no_macs(app_client: httpx.AsyncCl
         await switch(app_client, Role.read_only, "ro")
         denied = await app_client.get(f"/api/v1/firewalls/{fid}/dhcp/leases")
     assert r.status_code == 200 and len(r.json()["leases"]) == 2
-    assert "aa:bb:cc" not in r.text and r.json()["registry_verified"] is False
+    assert "aa:bb:cc" not in r.text and r.json()["registry_verified"] is True
     assert denied.status_code == 403
     with app_client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
         actions = [a.action for a in db.scalars(select(AuditLog))]

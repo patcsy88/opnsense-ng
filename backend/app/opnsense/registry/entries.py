@@ -117,8 +117,10 @@ _ENTRIES = (
         endpoint="/api/dnsmasq/leases/search",
         required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Dnsmasq DHCP leases (ADR-0008). The privilege also covers Dnsmasq settings "
-        "writes; no write operation is registered. Unverified.",
+        "writes; no write operation is registered. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,
