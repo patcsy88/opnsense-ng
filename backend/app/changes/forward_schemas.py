@@ -114,13 +114,13 @@ class ForwardProposal(BaseModel):
         """Names that must exist as aliases on the firewall."""
         found: set[str] = set()
         for value in (self.source, self.destination, self.target):
-            if (
-                value != "any"
-                and value != self.interface_keyword
-                and "/" not in value
-                and not _is_ip(value)
-            ):
+            if value != "any" and "/" not in value and not _is_ip(value):
                 found.add(value)
+        if self.destination == self.interface_keyword and self.destination not in (
+            self.source,
+            self.target,
+        ):
+            found.discard(self.destination)
         for value in (self.source_port, self.destination_port, self.target_port):
             if value and not _valid_port(value):
                 found.add(value)
