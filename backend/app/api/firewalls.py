@@ -19,6 +19,7 @@ from app.api.schemas import (
     InterfacesOut,
     LogsNewOut,
     LogsOut,
+    NatOut,
     RulesOut,
     SystemStatusOut,
 )
@@ -39,16 +40,20 @@ from app.opnsense.normalise import (
     normalise_cpu_events,
     normalise_interfaces,
     normalise_log,
+    normalise_nat,
     normalise_rules,
     normalise_system_status,
     summarise_log,
 )
+from app.opnsense.normalise.nat import NatKind
 from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
     FIREWALL_ALIASES_LIST,
     FIREWALL_LOG,
+    FIREWALL_NAT_OUTBOUND,
+    FIREWALL_NAT_PORT_FORWARDS,
     FIREWALL_RULES_LIST,
     INTERFACES_OVERVIEW,
     SYSTEM_DISK,
@@ -754,3 +759,56 @@ def firewall_logs_new(
         cursor=log_cursor(raw) or since,
         truncated=result.truncated,
     )
+
+
+def _nat_list(
+    kind: NatKind,
+    operation_id: str,
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+) -> NatOut:
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=operation_id,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_nat(raw, kind)
+    return NatOut(
+        firewall_id=firewall_id,
+        rules=result.rules,
+        truncated=result.truncated,
+        registry_verified=get_operation(operation_id).verified,
+    )
+
+
+@router.get("/{firewall_id}/firewall/nat/port-forwards", response_model=NatOut)
+def nat_port_forwards(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> NatOut:
+    return _nat_list(
+        "port_forward", FIREWALL_NAT_PORT_FORWARDS, request, firewall_id, user, db, settings
+    )
+
+
+@router.get("/{firewall_id}/firewall/nat/outbound", response_model=NatOut)
+def nat_outbound(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> NatOut:
+    return _nat_list("outbound", FIREWALL_NAT_OUTBOUND, request, firewall_id, user, db, settings)

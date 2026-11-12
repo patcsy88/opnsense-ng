@@ -25,6 +25,8 @@ FIREWALL_RULES_DELETE = "firewall.rules.delete"
 FIREWALL_RULES_TOGGLE = "firewall.rules.toggle"
 FIREWALL_RULES_APPLY = "firewall.rules.apply"
 FIREWALL_LOG = "firewall.log"
+FIREWALL_NAT_PORT_FORWARDS = "firewall.nat.port_forwards.list"
+FIREWALL_NAT_OUTBOUND = "firewall.nat.outbound.list"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -219,6 +221,25 @@ _ENTRIES = (
         verified=True,
         notes="Recent packet-filter log records, newest first (default 1000, capped when "
         "normalised). Verified on the lab.",
+    ),
+    Operation(
+        operation_id=FIREWALL_NAT_PORT_FORWARDS,
+        method=HttpMethod.GET,
+        endpoint="/api/firewall/d_nat/searchRule",
+        required_privilege="Firewall: NAT: Destination NAT",
+        read_only=True,
+        notes="Lists port forward (destination NAT) rules. The privilege also covers the write "
+        "endpoints under /api/firewall/d_nat/*; this app only reads. Unverified.",
+    ),
+    Operation(
+        operation_id=FIREWALL_NAT_OUTBOUND,
+        method=HttpMethod.GET,
+        endpoint="/api/firewall/source_nat/searchRule",
+        required_privilege="Firewall: NAT: Source NAT",
+        read_only=True,
+        notes="Lists outbound (source NAT) rules, including automatic ones depending on the "
+        "outbound mode. The privilege also covers the write endpoints under "
+        "/api/firewall/source_nat/*; this app only reads. Unverified.",
     ),
     Operation(
         operation_id=CPU_USAGE,

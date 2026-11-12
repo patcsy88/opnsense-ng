@@ -9,6 +9,7 @@ from app.opnsense.normalise.logs import (
     normalise_log,
     summarise_log,
 )
+from app.opnsense.normalise.nat import NatResult, NatRule, normalise_nat
 from app.opnsense.normalise.rules import RuleInfo, RulesResult, normalise_rules
 from app.opnsense.normalise.system import (
     SystemStatus,
@@ -23,6 +24,8 @@ __all__ = [
     "LogEntry",
     "LogResult",
     "LogSummary",
+    "NatResult",
+    "NatRule",
     "RuleInfo",
     "RulesResult",
     "SystemStatus",
@@ -32,6 +35,7 @@ __all__ = [
     "normalise_cpu_events",
     "normalise_interfaces",
     "normalise_log",
+    "normalise_nat",
     "normalise_rules",
     "normalise_system_status",
     "summarise_log",

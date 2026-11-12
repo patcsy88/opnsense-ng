@@ -11,6 +11,7 @@ from app.opnsense.normalise import (
     InterfaceInfo,
     LogEntry,
     LogSummary,
+    NatRule,
     RuleInfo,
     SystemStatus,
 )
@@ -116,6 +117,13 @@ class AliasesOut(BaseModel):
 class RulesOut(BaseModel):
     firewall_id: uuid.UUID
     rules: list[RuleInfo]
+    truncated: bool
+    registry_verified: bool
+
+
+class NatOut(BaseModel):
+    firewall_id: uuid.UUID
+    rules: list[NatRule]
     truncated: bool
     registry_verified: bool
 
