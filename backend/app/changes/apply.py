@@ -31,7 +31,7 @@ from app.core.logging import get_logger
 from app.db.models import ChangeRequest, Firewall
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.errors import ConnectionStatus, FirewallError
-from app.opnsense.normalise import normalise_aliases, normalise_rules
+from app.opnsense.normalise import NatRule, normalise_aliases, normalise_nat, normalise_rules
 from app.opnsense.normalise.aliases import AliasInfo
 from app.opnsense.normalise.rules import RuleInfo
 from app.opnsense.registry.entries import (
@@ -40,6 +40,7 @@ from app.opnsense.registry.entries import (
     FIREWALL_ALIASES_LIST,
     FIREWALL_ALIASES_RECONFIGURE,
     FIREWALL_ALIASES_UPDATE,
+    FIREWALL_NAT_PORT_FORWARDS,
     FIREWALL_RULES_ADD,
     FIREWALL_RULES_APPLY,
     FIREWALL_RULES_DELETE,
@@ -313,6 +314,25 @@ def read_rules(
     return list(normalise_rules(raw).rules)
 
 
+def read_forwards(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[NatRule]:
+    """Read-only: the port forwards currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, FIREWALL_NAT_PORT_FORWARDS, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_nat(raw, "port_forward").rules)
+
+
 def rule_payload(proposed: dict[str, Any], sequence: int) -> dict[str, Any]:
     return {
         "rule": {
@@ -345,7 +365,11 @@ def alias_problem(
 ) -> str | None:
     """Every alias a rule names must exist, as the right kind (ports vs addresses)."""
     by_name = {a.name: a for a in aliases if a.name}
-    port_names = {proposed.get("source_port", ""), proposed.get("destination_port", "")}
+    port_names = {
+        proposed.get("source_port", ""),
+        proposed.get("destination_port", ""),
+        proposed.get("target_port", ""),
+    }
     for name in sorted(references):
         alias = by_name.get(name)
         if alias is None:

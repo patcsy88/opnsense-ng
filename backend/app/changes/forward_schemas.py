@@ -21,7 +21,19 @@ Protocol = Literal["TCP", "UDP", "TCP/UDP"]
 
 
 def _is_range(value: str) -> bool:
-    return ":" in value
+    return ":" in value or "-" in value
+
+
+def forward_risk(
+    interface: str | None, source: str | None, destination_port: str | None
+) -> list[str]:
+    """ADR-0006 risk rules. Also used on forwards read back from the firewall."""
+    reasons: list[str] = []
+    if interface == "wan":
+        reasons.append("exposes a host on the WAN interface")
+    if source in (None, "any") and (not destination_port or _is_range(destination_port)):
+        reasons.append("accepts any source on an empty or ranged destination port")
+    return reasons
 
 
 class ForwardProposal(BaseModel):
@@ -128,9 +140,4 @@ class ForwardProposal(BaseModel):
 
     def risk_reasons(self) -> list[str]:
         """Why this forward needs an admin approver and a typed confirmation."""
-        reasons: list[str] = []
-        if self.interface == "wan":
-            reasons.append("exposes a host on the WAN interface")
-        if self.source == "any" and (not self.destination_port or _is_range(self.destination_port)):
-            reasons.append("accepts any source on an empty or ranged destination port")
-        return reasons
+        return forward_risk(self.interface, self.source, self.destination_port)

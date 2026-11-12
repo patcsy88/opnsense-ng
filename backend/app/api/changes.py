@@ -13,6 +13,7 @@ from app import audit
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
 from app.changes import apply as apply_changes
 from app.changes import service
+from app.changes.forward_schemas import ForwardProposal, forward_risk
 from app.changes.rule_schemas import RuleProposal
 from app.changes.schemas import AliasProposal
 from app.changes.states import Status
@@ -21,6 +22,7 @@ from app.core.crypto import CredentialDecryptionError
 from app.db.models import ChangeRequest, Firewall, Role
 from app.opnsense.errors import FirewallError
 from app.opnsense.normalise.aliases import AliasInfo
+from app.opnsense.normalise.nat import NatRule
 from app.opnsense.normalise.rules import RuleInfo
 
 router = APIRouter(prefix="/api/v1/changes", tags=["changes"])
@@ -765,6 +767,267 @@ def stage_rule_delete(
     return _stage_rule_edit(request, target, body.firewall_id, None, user, db, settings)
 
 
+class ForwardCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    forward: ForwardProposal
+
+
+class ForwardToggleCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    enabled: bool
+
+
+class ForwardDeleteCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+
+
+def _forward_label(fwd: NatRule) -> str:
+    return (fwd.description or str(fwd.uuid)[:8])[:64]
+
+
+def _stage_forward(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+    *,
+    action: str,
+    target: str | None,
+    proposal: ForwardProposal | None = None,
+    enabled: bool | None = None,
+) -> ChangeDetailOut:
+    """Shared staging for create, update, toggle and delete of a port forward (ADR-0006). Reads the
+    forwards (and aliases when named) read-only; nothing is written to the firewall."""
+    audit_action = f"change.stage_forward_{action}"
+    if target is not None and not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid forward id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_forwards(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+        aliases = (
+            apply_changes.read_aliases(
+                db, firewall=fw, user=user, settings=settings, request=request
+            )
+            if proposal is not None and proposal.alias_references()
+            else []
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the port forwards from the firewall") from None
+
+    current = next((r for r in rows if r.uuid == target), None) if target else None
+    if target is not None and current is None:
+        raise refuse("That port forward was not found on the firewall")
+    if current is not None:
+        if current.automatic or current.sequence is None:
+            raise refuse("Automatic forwards cannot be changed here")
+        if current.excluded:
+            raise refuse("'No redirect' exception forwards cannot be changed here")
+
+    reasons: list[str] = []
+    proposed: dict[str, Any]
+    if action == "create" and proposal is not None:
+        if any(r.description == proposal.description for r in rows):
+            raise refuse("A port forward with this description already exists on the firewall")
+        label = proposal.description
+        reasons = proposal.risk_reasons()
+        proposed = {**proposal.model_dump(), "label": label, "risk": reasons}
+    elif action == "update" and proposal is not None and current is not None:
+        if not current.description:
+            raise refuse("Only forwards with a description can be edited here")
+        if proposal.interface != current.interface or proposal.description != current.description:
+            raise refuse("The interface and description of a forward cannot be changed")
+        reasons = proposal.risk_reasons()
+        for reason in forward_risk(current.interface, current.source, current.destination_port):
+            if reason not in reasons:
+                reasons.append(f"existing forward: {reason}")
+        proposed = {**proposal.model_dump(), "label": _forward_label(current), "risk": reasons}
+    elif action == "toggle" and current is not None:
+        if (current.enabled is not False) == enabled:
+            raise refuse("The forward is already " + ("enabled" if enabled else "disabled"))
+        reasons = forward_risk(current.interface, current.source, current.destination_port)
+        proposed = {
+            "label": _forward_label(current),
+            "enabled": enabled,
+            "description": current.description or "",
+            "risk": reasons,
+        }
+    elif action == "delete" and current is not None:
+        reasons = ["deletes a port forward"]
+        proposed = {
+            "label": _forward_label(current),
+            "description": current.description or "",
+            "risk": reasons,
+        }
+    else:
+        raise refuse("Unsupported request")
+
+    if proposal is not None:
+        problem = apply_changes.alias_problem(
+            proposal.alias_references(), aliases, proposal.model_dump()
+        )
+        if problem:
+            raise refuse(problem)
+
+    if action == "create":
+        clash = ChangeRequest.proposed["description"].astext == proposed["description"]
+        duplicate = db.scalar(
+            select(ChangeRequest.id).where(
+                ChangeRequest.firewall_id == firewall_id,
+                ChangeRequest.kind == "nat_forward",
+                ChangeRequest.action == "create",
+                clash,
+                ChangeRequest.status.in_(OPEN_STATES),
+            )
+        )
+    else:
+        duplicate = db.scalar(
+            select(ChangeRequest.id).where(
+                ChangeRequest.firewall_id == firewall_id,
+                ChangeRequest.kind == "nat_forward",
+                ChangeRequest.target_uuid == target,
+                ChangeRequest.status.in_(OPEN_STATES),
+            )
+        )
+    if duplicate is not None:
+        raise refuse("An open request already changes this port forward", duplicate)
+
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="nat_forward",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump() if current is not None else None,
+            high_risk=bool(reasons),
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post("/forwards", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED)
+def stage_forward_create(
+    request: Request,
+    body: ForwardCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new port forward. High risk on WAN and for wide-open sources."""
+    return _stage_forward(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="create",
+        target=None,
+        proposal=body.forward,
+    )
+
+
+@router.post(
+    "/forwards/{target}/update", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED
+)
+def stage_forward_update(
+    request: Request,
+    target: str,
+    body: ForwardCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing a port forward. Interface and description stay fixed."""
+    return _stage_forward(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="update",
+        target=target,
+        proposal=body.forward,
+    )
+
+
+@router.post(
+    "/forwards/{target}/toggle", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED
+)
+def stage_forward_toggle(
+    request: Request,
+    target: str,
+    body: ForwardToggleCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage enabling or disabling a port forward."""
+    return _stage_forward(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="toggle",
+        target=target,
+        enabled=body.enabled,
+    )
+
+
+@router.post(
+    "/forwards/{target}/delete", response_model=ChangeDetailOut, status_code=status.HTTP_201_CREATED
+)
+def stage_forward_delete(
+    request: Request,
+    target: str,
+    body: ForwardDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting a port forward. Always high risk."""
+    return _stage_forward(
+        request, body.firewall_id, user, db, settings, action="delete", target=target
+    )
+
+
 @router.get("", response_model=list[ChangeOut])
 def list_changes(
     firewall_id: uuid.UUID | None = None,
@@ -890,6 +1153,16 @@ def apply_change(
     automatic rollback."""
     cr = _get(db, change_id)
     firewall_id = cr.firewall_id
+    if cr.kind == "nat_forward":
+        raise _refuse(
+            db,
+            service.ChangeError("Applying port forward changes is not available yet"),
+            action="change.apply",
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
     try:
         run = (
             apply_changes.apply_rule_change
