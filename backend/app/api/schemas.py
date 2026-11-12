@@ -16,6 +16,7 @@ from app.opnsense.normalise import (
     RuleInfo,
     ServiceInfo,
     SystemStatus,
+    TopDomain,
     TrafficInterface,
     WireguardRecord,
 )
@@ -122,6 +123,24 @@ class RulesOut(BaseModel):
     firewall_id: uuid.UUID
     rules: list[RuleInfo]
     truncated: bool
+    registry_verified: bool
+
+
+class DnsOut(BaseModel):
+    firewall_id: uuid.UUID
+    stats_available: bool
+    totals_available: bool
+    queries: int | None
+    cache_hits: int | None
+    cache_misses: int | None
+    hit_rate: float | None
+    uptime_seconds: int | None
+    logged_queries: int | None
+    blocked: int | None
+    blocked_percent: float | None
+    blocklist_size: int | None
+    top_queried: list[TopDomain]
+    top_blocked: list[TopDomain]
     registry_verified: bool
 
 

@@ -12,6 +12,7 @@ from app import audit
 from app.api.schemas import (
     AliasesOut,
     ConnectivityOut,
+    DnsOut,
     FirewallCreate,
     FirewallOption,
     FirewallOut,
@@ -42,6 +43,7 @@ from app.opnsense.normalise import (
     log_cursor,
     normalise_aliases,
     normalise_cpu_events,
+    normalise_dns,
     normalise_interfaces,
     normalise_leases,
     normalise_log,
@@ -60,6 +62,8 @@ from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
     DHCP_LEASES,
+    DNS_STATS,
+    DNS_TOTALS,
     FIREWALL_ALIASES_LIST,
     FIREWALL_LOG,
     FIREWALL_NAT_OUTBOUND,
@@ -772,6 +776,42 @@ def firewall_logs_new(
         entries=result.entries,
         cursor=log_cursor(raw) or since,
         truncated=result.truncated,
+    )
+
+
+@router.get("/{firewall_id}/dns", response_model=DnsOut)
+def dns_overview(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> DnsOut:
+    """Unbound counters and top domains, never per-client data (ADR-0010). Not for read_only."""
+    try:
+        stats_raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=DNS_STATS,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+        totals_raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=DNS_TOTALS,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_dns(stats_raw, totals_raw)
+    return DnsOut(
+        firewall_id=firewall_id,
+        **result.model_dump(),
+        registry_verified=get_operation(DNS_STATS).verified and get_operation(DNS_TOTALS).verified,
     )
 
 

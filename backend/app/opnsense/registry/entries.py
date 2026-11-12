@@ -17,6 +17,8 @@ TRAFFIC_INTERFACES = "traffic.interfaces"
 SERVICES_LIST = "services.list"
 DHCP_LEASES = "dhcp.leases"
 WIREGUARD_STATUS = "wireguard.status"
+DNS_STATS = "dns.stats"
+DNS_TOTALS = "dns.totals"
 FIREWALL_RULES_LIST = "firewall.rules.list"
 FIREWALL_ALIASES_LIST = "firewall.aliases.list"
 FIREWALL_ALIASES_ADD = "firewall.aliases.add"
@@ -133,6 +135,24 @@ _ENTRIES = (
         verified=True,
         notes="WireGuard tunnel and peer status (ADR-0009). The privilege also covers service "
         "control; no write operation is registered. Verified on the lab.",
+    ),
+    Operation(
+        operation_id=DNS_STATS,
+        method=HttpMethod.GET,
+        endpoint="/api/unbound/diagnostics/stats",
+        required_privilege="Services: Unbound",
+        read_only=True,
+        notes="Unbound resolver counters (ADR-0010). The privilege also covers Unbound settings "
+        "writes, the statistics reset and service control; none is registered. Unverified.",
+    ),
+    Operation(
+        operation_id=DNS_TOTALS,
+        method=HttpMethod.GET,
+        endpoint="/api/unbound/overview/totals/10",
+        required_privilege="Services: Unbound",
+        read_only=True,
+        notes="Top queried and top blocked domains, fixed at 10 (ADR-0010). Needs extended "
+        "statistics. Per-client query search is deliberately not registered. Unverified.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,

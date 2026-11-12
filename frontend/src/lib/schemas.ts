@@ -186,6 +186,31 @@ export const logsNewResponseSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const topDomainSchema = z.object({
+  domain: z.string(),
+  count: z.number(),
+  blocklist: z.string().nullable(),
+});
+export type TopDomain = z.infer<typeof topDomainSchema>;
+
+export const dnsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  stats_available: z.boolean(),
+  totals_available: z.boolean(),
+  queries: z.number().nullable(),
+  cache_hits: z.number().nullable(),
+  cache_misses: z.number().nullable(),
+  hit_rate: z.number().nullable(),
+  uptime_seconds: z.number().nullable(),
+  logged_queries: z.number().nullable(),
+  blocked: z.number().nullable(),
+  blocked_percent: z.number().nullable(),
+  blocklist_size: z.number().nullable(),
+  top_queried: z.array(topDomainSchema),
+  top_blocked: z.array(topDomainSchema),
+  registry_verified: z.boolean(),
+});
+
 export const wireguardRecordSchema = z.object({
   interface: z.string(),
   type: z.string(),

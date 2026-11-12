@@ -13,6 +13,7 @@ import {
   changeListSchema,
   rulesResponseSchema,
   logsResponseSchema,
+  dnsResponseSchema,
   leasesResponseSchema,
   wireguardResponseSchema,
   servicesResponseSchema,
@@ -237,6 +238,10 @@ export const api = {
       `${base}/firewalls/${encodeURIComponent(id)}/firewall/logs/new?since=${encodeURIComponent(since)}`,
       { schema: logsNewResponseSchema },
     ),
+  dns: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dns`, {
+      schema: dnsResponseSchema,
+    }),
   wireguard: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/vpn/wireguard`, {
       schema: wireguardResponseSchema,

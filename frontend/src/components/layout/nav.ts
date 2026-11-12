@@ -2,6 +2,7 @@ import type { Role } from "@/lib/schemas";
 import {
   Activity,
   Flame,
+  Globe,
   GitPullRequest,
   LayoutDashboard,
   Network,
@@ -33,6 +34,7 @@ export const NAV_ITEMS: NavItem[] = [
   { to: "/logs", label: "Logs", icon: ScrollText, implemented: true, roles: ["admin", "network_admin", "security_admin"] },
   { to: "/traffic", label: "Traffic", icon: Activity, implemented: true, roles: ["admin", "network_admin", "security_admin"] },
   { to: "/dhcp", label: "DHCP", icon: Router, implemented: true, roles: ["admin", "network_admin", "security_admin"] },
+  { to: "/dns", label: "DNS", icon: Globe, implemented: true, roles: ["admin", "network_admin", "security_admin"] },
   { to: "/vpn", label: "VPN", icon: ShieldCheck, implemented: true, roles: ["admin", "network_admin", "security_admin"] },
   { to: "/services", label: "Services", icon: Server, implemented: true },
   { to: "/administration", label: "Administration", icon: Settings, implemented: true },

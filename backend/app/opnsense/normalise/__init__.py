@@ -1,4 +1,5 @@
 from app.opnsense.normalise.aliases import AliasesResult, AliasInfo, normalise_aliases
+from app.opnsense.normalise.dns import DnsResult, TopDomain, normalise_dns
 from app.opnsense.normalise.interfaces import InterfaceInfo, normalise_interfaces
 from app.opnsense.normalise.leases import LeaseInfo, LeasesResult, normalise_leases
 from app.opnsense.normalise.logs import (
@@ -24,6 +25,7 @@ from app.opnsense.normalise.wireguard import WireguardRecord, WireguardResult, n
 __all__ = [
     "AliasInfo",
     "AliasesResult",
+    "DnsResult",
     "InterfaceInfo",
     "LeaseInfo",
     "LeasesResult",
@@ -37,6 +39,7 @@ __all__ = [
     "ServiceInfo",
     "ServicesResult",
     "SystemStatus",
+    "TopDomain",
     "TopItem",
     "TrafficInterface",
     "TrafficResult",
@@ -45,6 +48,7 @@ __all__ = [
     "log_cursor",
     "normalise_aliases",
     "normalise_cpu_events",
+    "normalise_dns",
     "normalise_interfaces",
     "normalise_leases",
     "normalise_log",
