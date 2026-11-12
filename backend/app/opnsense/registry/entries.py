@@ -223,8 +223,10 @@ _ENTRIES = (
         required_privilege="Firewall: NAT: Destination NAT",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Saves a new port forward without activating it. Reviewed apply only "
-        "(ADR-0006). Body: {rule: {...}}. Unverified.",
+        "(ADR-0006). Body: {rule: {...}}. Verified on the lab.",
     ),
     Operation(
         operation_id=FORWARDS_UPDATE,
@@ -234,8 +236,10 @@ _ENTRIES = (
         required_privilege="Firewall: NAT: Destination NAT",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Saves changes to a port forward. setRule is an upsert, so apply confirms the "
-        "forward exists first. Reviewed apply only. Unverified.",
+        "forward exists first. Reviewed apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=FORWARDS_DELETE,
@@ -245,7 +249,9 @@ _ENTRIES = (
         required_privilege="Firewall: NAT: Destination NAT",
         read_only=False,
         apply_required=True,
-        notes="Deletes a port forward. Always high risk. Reviewed apply only. Unverified.",
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Deletes a port forward. Always high risk. Reviewed apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=FORWARDS_ENABLE,
@@ -255,8 +261,10 @@ _ENTRIES = (
         required_privilege="Firewall: NAT: Destination NAT",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Enables a port forward with an explicit disabled=0, never the flip default. "
-        "Reviewed apply only. Unverified.",
+        "Reviewed apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=FORWARDS_DISABLE,
@@ -266,8 +274,10 @@ _ENTRIES = (
         required_privilege="Firewall: NAT: Destination NAT",
         read_only=False,
         apply_required=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Disables a port forward with an explicit disabled=1, never the flip default. "
-        "Reviewed apply only. Unverified.",
+        "Reviewed apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=FORWARDS_APPLY,
@@ -275,8 +285,10 @@ _ENTRIES = (
         endpoint="/api/firewall/d_nat/apply",
         required_privilege="Firewall: NAT: Destination NAT",
         read_only=False,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Activates saved port forward changes (filter reload, skip alias). Only called "
-        "from the reviewed apply procedure. Unverified.",
+        "from the reviewed apply procedure. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_LOG,

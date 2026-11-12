@@ -39,12 +39,12 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.log` | GET | `/api/diagnostics/firewall/log` | Diagnostics: Logs: Firewall: Live View | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.list` | GET | `/api/firewall/d_nat/searchRule` | Firewall: NAT: Destination NAT | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.outbound.list` | GET | `/api/firewall/source_nat/searchRule` | Firewall: NAT: Source NAT | yes | no | 26.7.8_2 | yes |
-| `firewall.nat.port_forwards.add` | POST | `/api/firewall/d_nat/addRule` | Firewall: NAT: Destination NAT | no | yes | - | **no** |
-| `firewall.nat.port_forwards.update` | POST | `/api/firewall/d_nat/setRule/{uuid}` | Firewall: NAT: Destination NAT | no | yes | - | **no** |
-| `firewall.nat.port_forwards.delete` | POST | `/api/firewall/d_nat/delRule/{uuid}` | Firewall: NAT: Destination NAT | no | yes | - | **no** |
-| `firewall.nat.port_forwards.enable` | POST | `/api/firewall/d_nat/toggleRule/{uuid}/0` | Firewall: NAT: Destination NAT | no | yes | - | **no** |
-| `firewall.nat.port_forwards.disable` | POST | `/api/firewall/d_nat/toggleRule/{uuid}/1` | Firewall: NAT: Destination NAT | no | yes | - | **no** |
-| `firewall.nat.port_forwards.apply` | POST | `/api/firewall/d_nat/apply` | Firewall: NAT: Destination NAT | no | no | - | **no** |
+| `firewall.nat.port_forwards.add` | POST | `/api/firewall/d_nat/addRule` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
+| `firewall.nat.port_forwards.update` | POST | `/api/firewall/d_nat/setRule/{uuid}` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
+| `firewall.nat.port_forwards.delete` | POST | `/api/firewall/d_nat/delRule/{uuid}` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
+| `firewall.nat.port_forwards.enable` | POST | `/api/firewall/d_nat/toggleRule/{uuid}/0` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
+| `firewall.nat.port_forwards.disable` | POST | `/api/firewall/d_nat/toggleRule/{uuid}/1` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
+| `firewall.nat.port_forwards.apply` | POST | `/api/firewall/d_nat/apply` | Firewall: NAT: Destination NAT | no | no | 26.7.8_2 | yes |
 
 Observed response fields (non-secret):
 - `system_information`: `name` (hostname), `versions` (list of strings), `updates` (text).
@@ -104,4 +104,4 @@ Live view: the Logs page's Live toggle polls `GET /api/v1/firewalls/{id}/firewal
 
 NAT is read-only for now. Port forwards come from `d_nat/searchRule` (dotted field names such as `destination.network` and `local-port`, a `disabled` flag, `nordr` for "no redirect"); outbound rules come from `source_nat/searchRule` (`source_net`, `target`, `enabled`, `nonat` for "do not NAT"). Outbound results also include automatic rules (`is_automatic`) depending on the firewall's outbound mode. The backend keeps only the display fields, caps the list at 2000, and drops categories and audit metadata. Both privileges also cover the matching write endpoints (`/api/firewall/d_nat/*`, `/api/firewall/source_nat/*`), so grant them only to a lab or trusted API user; this app does not write NAT. Both operations were verified on the lab (26.7.8_2) on 2026-11-12: port forward and outbound lists matched the firewall's own NAT pages.
 
-Port forward changes (ADR-0006) use the `firewall.nat.port_forwards.*` write operations, called only from the reviewed apply procedure for `nat_forward` requests. Apply re-reads the forwards (stale check by fingerprint), saves with `addRule` or `setRule/{uuid}`, activates with `d_nat/apply`, then reads back. `pass` is always sent blank (Manual) on create so no filter rule is registered, and pool options, NAT reflection and `nordr` are fixed to defaults; update omits those fields. Toggle uses the explicit `toggleRule/{uuid}/0` (enable) or `/1` (disable) forms, never the flip default. All of this comes from the OPNsense source and stays unverified until the lab test.
+Port forward changes (ADR-0006) use the `firewall.nat.port_forwards.*` write operations, called only from the reviewed apply procedure for `nat_forward` requests. Apply re-reads the forwards (stale check by fingerprint), saves with `addRule` or `setRule/{uuid}`, activates with `d_nat/apply`, then reads back. `pass` is always sent blank (Manual) on create so no filter rule is registered, and pool options, NAT reflection and `nordr` are fixed to defaults; update omits those fields. Toggle uses the explicit `toggleRule/{uuid}/0` (enable) or `/1` (disable) forms, never the flip default. All six operations were verified on 26.7.8_2: create, edit, disable, enable and delete behaved as described, and a created forward has no filter rule association.
