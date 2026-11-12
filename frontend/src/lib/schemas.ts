@@ -295,6 +295,21 @@ export interface RuleProposalInput {
   description: string;
 }
 
+export interface ForwardProposalInput {
+  enabled: boolean;
+  interface: string;
+  ip_protocol: "inet" | "inet6";
+  protocol: "TCP" | "UDP" | "TCP/UDP";
+  source: string;
+  source_port: string;
+  destination: string;
+  destination_port: string;
+  target: string;
+  target_port: string;
+  log: boolean;
+  description: string;
+}
+
 export const ALIAS_TYPES = ["host", "network", "port"] as const;
 export interface AliasProposalInput {
   name: string;

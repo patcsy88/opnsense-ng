@@ -32,12 +32,17 @@ export function ChangeStatusBadge({ status }: { status: string }) {
 }
 
 export function targetName(c: ChangeRequest): string | undefined {
-  const key = c.kind === "rule" ? "label" : "name";
+  const key = c.kind === "rule" || c.kind === "nat_forward" ? "label" : "name";
   const value = c.proposed?.[key];
   return typeof value === "string" ? value : undefined;
 }
 
 export function describeChange(c: ChangeRequest): string {
+  if (c.kind === "nat_forward") {
+    const name = targetName(c) ?? "?";
+    if (c.action === "toggle") return `${c.proposed?.enabled === false ? "disable" : "enable"} port forward ${name}`;
+    return `${c.action} port forward ${name}`;
+  }
   if (c.kind === "rule" && c.action === "create") return `create rule ${targetName(c) ?? "?"}`;
   if (c.kind === "rule" && (c.action === "update" || c.action === "delete")) {
     return `${c.action} rule ${targetName(c) ?? "?"}`;
@@ -50,6 +55,14 @@ export function describeChange(c: ChangeRequest): string {
 
 export function describeEffect(c: ChangeRequest, firewall: string): string {
   const name = targetName(c) ?? "?";
+  if (c.kind === "nat_forward") {
+    const tail = "and reloads the firewall rules immediately. It does not add a pass rule.";
+    if (c.action === "create") return `This creates the port forward "${name}" on ${firewall} ${tail}`;
+    if (c.action === "update") return `This changes the port forward "${name}" on ${firewall} ${tail}`;
+    if (c.action === "delete") return `This permanently deletes the port forward "${name}" from ${firewall} ${tail}`;
+    const verb = c.proposed?.enabled === false ? "disables" : "enables";
+    return `This ${verb} the port forward "${name}" on ${firewall} ${tail}`;
+  }
   if (c.kind === "rule" && c.action === "create") {
     return `This creates the rule "${name}" on ${firewall} after the last existing rule and reloads the firewall rules immediately.`;
   }

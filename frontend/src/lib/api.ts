@@ -18,6 +18,7 @@ import {
   systemStatusResponseSchema,
   userSchema,
   type AliasProposalInput,
+  type ForwardProposalInput,
   type RuleProposalInput,
   type FirewallCreateInput,
   type FirewallUpdateInput,
@@ -278,6 +279,26 @@ export const api = {
   stageRuleToggle: (firewallId: string, uuid: string, enabled: boolean) =>
     request("POST", `${base}/changes/rules/${encodeURIComponent(uuid)}/toggle`, {
       body: { firewall_id: firewallId, enabled },
+      schema: changeDetailSchema,
+    }),
+  stageForward: (firewallId: string, forward: ForwardProposalInput) =>
+    request("POST", `${base}/changes/forwards`, {
+      body: { firewall_id: firewallId, forward },
+      schema: changeDetailSchema,
+    }),
+  stageForwardUpdate: (firewallId: string, uuid: string, forward: ForwardProposalInput) =>
+    request("POST", `${base}/changes/forwards/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, forward },
+      schema: changeDetailSchema,
+    }),
+  stageForwardToggle: (firewallId: string, uuid: string, enabled: boolean) =>
+    request("POST", `${base}/changes/forwards/${encodeURIComponent(uuid)}/toggle`, {
+      body: { firewall_id: firewallId, enabled },
+      schema: changeDetailSchema,
+    }),
+  stageForwardDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/forwards/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
       schema: changeDetailSchema,
     }),
   moveChange: (id: string, verb: "submit" | "approve" | "reject" | "cancel", note?: string) =>

@@ -34,8 +34,48 @@ function ruleRows(snapshot: Record<string, unknown>): [string, string][] {
   return rows;
 }
 
+const risk = (p: Record<string, unknown>): [string, string][] =>
+  Array.isArray(p.risk) && p.risk.length > 0 ? [["High risk because", p.risk.map(String).join("; ")]] : [];
+
+function forwardRows(p: Record<string, unknown>): [string, string][] {
+  if (p.interface === undefined) {
+    if (p.enabled === undefined) return [["Port forward", String(p.label ?? "—")], ...risk(p)];
+    return [
+      ["Port forward", String(p.label ?? "—")],
+      ["New state", p.enabled === false ? "Disabled" : "Enabled"],
+      ...risk(p),
+    ];
+  }
+  const ports = (v: unknown) => (v ? `:${String(v)}` : "");
+  return [
+    ["Description", String(p.description ?? "—")],
+    ["Interface", `${String(p.interface)} (${p.ip_protocol === "inet6" ? "IPv6" : "IPv4"})`],
+    ["Protocol", String(p.protocol)],
+    ["Source", `${String(p.source)}${ports(p.source_port)}`],
+    ["Destination", `${String(p.destination)}${ports(p.destination_port)}`],
+    ["Redirect to", `${String(p.target)}${ports(p.target_port)}`],
+    ["Log", p.log ? "Yes" : "No"],
+    ["Enabled", p.enabled === false ? "No" : "Yes"],
+    ...risk(p),
+  ];
+}
+
+function currentForwardRows(s: Record<string, unknown>): [string, string][] {
+  const ports = (v: unknown) => (v ? `:${String(v)}` : "");
+  return [
+    ["Interface", String(s.interface ?? "—")],
+    ["Protocol", String(s.protocol ?? "—")],
+    ["Source", `${String(s.source ?? "any")}${ports(s.source_port)}`],
+    ["Destination", `${String(s.destination ?? "—")}${ports(s.destination_port)}`],
+    ["Redirect to", `${String(s.target ?? "—")}${ports(s.target_port)}`],
+    ["Sequence", String(s.sequence ?? "—")],
+    ["Enabled", s.enabled === false ? "No" : "Yes"],
+  ];
+}
+
 function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
+  if (kind === "nat_forward") return forwardRows(p);
   if (kind === "rule" && p.action !== undefined) {
     const ports = (v: unknown) => (v ? `:${String(v)}` : "");
     return [
@@ -140,7 +180,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : "Alias"} to delete` : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -160,7 +200,9 @@ export function ChangeDetailPage() {
             <p className="mt-3 text-sm font-medium text-destructive">
               {c.kind === "rule"
                 ? "This rule will be deleted. See the current rule below."
-                : "This alias will be deleted. The values above are what it holds now."}
+                : c.kind === "nat_forward"
+                  ? "This port forward will be deleted. See the current forward below."
+                  : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
         </CardContent>
@@ -227,6 +269,27 @@ export function ChangeDetailPage() {
           <CardContent>
             <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
               {ruleRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "nat_forward" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current port forward</CardTitle>
+            <CardDescription>
+              The forward as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {currentForwardRows(c.base_snapshot).map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
