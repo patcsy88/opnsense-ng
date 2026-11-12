@@ -186,6 +186,24 @@ export const logsNewResponseSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const leaseSchema = z.object({
+  address: z.string(),
+  ip_version: z.number(),
+  hostname: z.string().nullable(),
+  interface: z.string().nullable(),
+  lease_type: z.string().nullable(),
+  vendor: z.string().nullable(),
+  expires: z.string().nullable(),
+});
+export type LeaseInfo = z.infer<typeof leaseSchema>;
+
+export const leasesResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  leases: z.array(leaseSchema),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export const serviceSchema = z.object({
   id: z.string(),
   name: z.string(),

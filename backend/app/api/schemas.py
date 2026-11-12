@@ -9,6 +9,7 @@ from app.opnsense.netpolicy import InvalidBaseUrlError, parse_base_url
 from app.opnsense.normalise import (
     AliasInfo,
     InterfaceInfo,
+    LeaseInfo,
     LogEntry,
     LogSummary,
     NatRule,
@@ -119,6 +120,13 @@ class AliasesOut(BaseModel):
 class RulesOut(BaseModel):
     firewall_id: uuid.UUID
     rules: list[RuleInfo]
+    truncated: bool
+    registry_verified: bool
+
+
+class LeasesOut(BaseModel):
+    firewall_id: uuid.UUID
+    leases: list[LeaseInfo]
     truncated: bool
     registry_verified: bool
 

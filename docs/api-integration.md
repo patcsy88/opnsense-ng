@@ -39,6 +39,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.log` | GET | `/api/diagnostics/firewall/log` | Diagnostics: Logs: Firewall: Live View | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.list` | GET | `/api/firewall/d_nat/searchRule` | Firewall: NAT: Destination NAT | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.outbound.list` | GET | `/api/firewall/source_nat/searchRule` | Firewall: NAT: Source NAT | yes | no | 26.7.8_2 | yes |
+| `dhcp.leases` | GET | `/api/dnsmasq/leases/search` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | - | **no** |
 | `services.list` | GET | `/api/core/service/search` | Status: Services | yes | no | 26.7.8_2 | yes |
 | `traffic.interfaces` | GET | `/api/diagnostics/traffic/interface` | Reporting: Traffic | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.add` | POST | `/api/firewall/d_nat/addRule` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
@@ -111,3 +112,5 @@ Port forward changes (ADR-0006) use the `firewall.nat.port_forwards.*` write ope
 Traffic (ADR-0007) uses only the plain `traffic/interface` snapshot: cumulative byte and packet counters per interface, keyed by interface identifier with a friendly `name`. The backend normalises it to in/out bytes and packets, caches it for 2 s per firewall, and stores nothing. The browser works out rates from consecutive polls. Verified on the lab (26.7.8_2) with the privilege Reporting: Traffic. Limited to admin, network_admin and security_admin.
 
 Services lists service status only (`services.list`): id, name, description, running and locked flags, capped at 500 rows. The same OPNsense controller has start, restart and stop; they are deliberately not in the registry, and a service control feature needs its own ADR. Viewing is open to every signed-in role. Verified on the lab (26.7.8_2) with the privilege Status: Services.
+
+DHCP leases (`dhcp.leases`, ADR-0008) lists Dnsmasq leases: address, hostname, interface, lease type, vendor and expiry, capped at 1000 rows. MAC addresses, client ids and IAIDs are dropped in the backend. Access is admin, network_admin and security_admin. The privilege also covers Dnsmasq settings writes in OPNsense, but no Dnsmasq write operation is registered. Unverified until the lab test.

@@ -8,6 +8,7 @@ import { ChangesPage } from "@/pages/changes";
 import { DashboardPage } from "@/pages/dashboard";
 import { FirewallConnectionsPage } from "@/pages/firewall-connections";
 import { NatPage } from "@/pages/nat";
+import { DhcpPage } from "@/pages/dhcp";
 import { LogsPage } from "@/pages/logs";
 import { ServicesPage } from "@/pages/services";
 import { TrafficPage } from "@/pages/traffic";
@@ -34,6 +35,7 @@ export function App() {
           <Route element={<ProtectedRoute roles={["admin", "network_admin", "security_admin"]} />}>
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/traffic" element={<TrafficPage />} />
+            <Route path="/dhcp" element={<DhcpPage />} />
           </Route>
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/administration" element={<AdministrationPage />} />

@@ -15,6 +15,7 @@ SYSTEM_DISK = "system.disk"
 INTERFACES_OVERVIEW = "interfaces.overview"
 TRAFFIC_INTERFACES = "traffic.interfaces"
 SERVICES_LIST = "services.list"
+DHCP_LEASES = "dhcp.leases"
 FIREWALL_RULES_LIST = "firewall.rules.list"
 FIREWALL_ALIASES_LIST = "firewall.aliases.list"
 FIREWALL_ALIASES_ADD = "firewall.aliases.add"
@@ -109,6 +110,15 @@ _ENTRIES = (
         verified=True,
         notes="Service list with a running flag. The same controller has start, restart and "
         "stop; this app only reads. Verified on the lab.",
+    ),
+    Operation(
+        operation_id=DHCP_LEASES,
+        method=HttpMethod.GET,
+        endpoint="/api/dnsmasq/leases/search",
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=True,
+        notes="Dnsmasq DHCP leases (ADR-0008). The privilege also covers Dnsmasq settings "
+        "writes; no write operation is registered. Unverified.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,

@@ -1,5 +1,6 @@
 from app.opnsense.normalise.aliases import AliasesResult, AliasInfo, normalise_aliases
 from app.opnsense.normalise.interfaces import InterfaceInfo, normalise_interfaces
+from app.opnsense.normalise.leases import LeaseInfo, LeasesResult, normalise_leases
 from app.opnsense.normalise.logs import (
     LogEntry,
     LogResult,
@@ -23,6 +24,8 @@ __all__ = [
     "AliasInfo",
     "AliasesResult",
     "InterfaceInfo",
+    "LeaseInfo",
+    "LeasesResult",
     "LogEntry",
     "LogResult",
     "LogSummary",
@@ -40,6 +43,7 @@ __all__ = [
     "normalise_aliases",
     "normalise_cpu_events",
     "normalise_interfaces",
+    "normalise_leases",
     "normalise_log",
     "normalise_nat",
     "normalise_rules",

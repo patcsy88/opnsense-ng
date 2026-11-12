@@ -17,6 +17,7 @@ from app.api.schemas import (
     FirewallOut,
     FirewallUpdate,
     InterfacesOut,
+    LeasesOut,
     LogsNewOut,
     LogsOut,
     NatOut,
@@ -41,6 +42,7 @@ from app.opnsense.normalise import (
     normalise_aliases,
     normalise_cpu_events,
     normalise_interfaces,
+    normalise_leases,
     normalise_log,
     normalise_nat,
     normalise_rules,
@@ -55,6 +57,7 @@ from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
     CPU_USAGE,
+    DHCP_LEASES,
     FIREWALL_ALIASES_LIST,
     FIREWALL_LOG,
     FIREWALL_NAT_OUTBOUND,
@@ -766,6 +769,35 @@ def firewall_logs_new(
         entries=result.entries,
         cursor=log_cursor(raw) or since,
         truncated=result.truncated,
+    )
+
+
+@router.get("/{firewall_id}/dhcp/leases", response_model=LeasesOut)
+def dhcp_leases(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> LeasesOut:
+    """DHCP leases without MAC addresses (ADR-0008). Not for read_only: it is a device inventory."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=DHCP_LEASES,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_leases(raw)
+    return LeasesOut(
+        firewall_id=firewall_id,
+        leases=result.leases,
+        truncated=result.truncated,
+        registry_verified=get_operation(DHCP_LEASES).verified,
     )
 
 
