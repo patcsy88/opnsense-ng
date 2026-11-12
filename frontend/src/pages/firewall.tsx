@@ -62,7 +62,7 @@ function AliasesCard({ firewallId }: { firewallId: string }) {
         <CardTitle className="flex flex-wrap items-center gap-2">
           Aliases {q.data && !q.data.registry_verified && <UnverifiedBadge />}
         </CardTitle>
-        <CardDescription>Read-only list of aliases</CardDescription>
+        <CardDescription>List of aliases. Changes go through a reviewed request.</CardDescription>
       </CardHeader>
       <CardContent>
         {q.isPending ? (
@@ -255,7 +255,7 @@ export function FirewallPage() {
             <CardTitle className="flex flex-wrap items-center gap-2">
               Rules {q.data && !q.data.registry_verified && <UnverifiedBadge />}
             </CardTitle>
-            <CardDescription>Read-only list of filter rules</CardDescription>
+            <CardDescription>List of filter rules. Changes go through a reviewed request.</CardDescription>
           </CardHeader>
           <CardContent>
             {q.isPending ? (
