@@ -186,6 +186,29 @@ export const logsNewResponseSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const wireguardRecordSchema = z.object({
+  interface: z.string(),
+  type: z.string(),
+  tunnel_name: z.string().nullable(),
+  name: z.string().nullable(),
+  status: z.string().nullable(),
+  endpoint: z.string().nullable(),
+  listen_port: z.number().nullable(),
+  allowed_ips: z.array(z.string()),
+  latest_handshake: z.string().nullable(),
+  rx_bytes: z.number().nullable(),
+  tx_bytes: z.number().nullable(),
+  keepalive: z.number().nullable(),
+});
+export type WireguardRecord = z.infer<typeof wireguardRecordSchema>;
+
+export const wireguardResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  records: z.array(wireguardRecordSchema),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export const leaseSchema = z.object({
   address: z.string(),
   ip_version: z.number(),

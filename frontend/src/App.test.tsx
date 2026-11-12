@@ -144,13 +144,6 @@ describe("role-based rendering", () => {
     expect(screen.queryByRole("button", { name: /add firewall/i })).not.toBeInTheDocument();
   });
 
-  it("unimplemented sections render the Planned placeholder", async () => {
-    mockSession(ADMIN);
-    renderApp(<App />, "/vpn");
-    expect(await screen.findByRole("heading", { name: "VPN" })).toBeInTheDocument();
-    expect(screen.getByText("This section is not implemented yet.")).toBeInTheDocument();
-  });
-
   it("network page lists interfaces for a read-only user", async () => {
     mockSession(READER);
     server.use(

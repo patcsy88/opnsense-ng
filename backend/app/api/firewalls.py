@@ -25,6 +25,7 @@ from app.api.schemas import (
     ServicesOut,
     SystemStatusOut,
     TrafficOut,
+    WireguardOut,
 )
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
 from app.core.config import Settings, get_settings
@@ -49,6 +50,7 @@ from app.opnsense.normalise import (
     normalise_services,
     normalise_system_status,
     normalise_traffic,
+    normalise_wireguard,
     summarise_log,
 )
 from app.opnsense.normalise.nat import NatKind
@@ -70,6 +72,7 @@ from app.opnsense.registry.entries import (
     SYSTEM_STATUS,
     SYSTEM_TIME,
     TRAFFIC_INTERFACES,
+    WIREGUARD_STATUS,
 )
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["firewalls"])
@@ -769,6 +772,35 @@ def firewall_logs_new(
         entries=result.entries,
         cursor=log_cursor(raw) or since,
         truncated=result.truncated,
+    )
+
+
+@router.get("/{firewall_id}/vpn/wireguard", response_model=WireguardOut)
+def wireguard_status(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> WireguardOut:
+    """WireGuard status without key material (ADR-0009). Not for read_only: lists endpoints."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=WIREGUARD_STATUS,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_wireguard(raw)
+    return WireguardOut(
+        firewall_id=firewall_id,
+        records=result.records,
+        truncated=result.truncated,
+        registry_verified=get_operation(WIREGUARD_STATUS).verified,
     )
 
 

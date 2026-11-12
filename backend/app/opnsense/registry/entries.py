@@ -16,6 +16,7 @@ INTERFACES_OVERVIEW = "interfaces.overview"
 TRAFFIC_INTERFACES = "traffic.interfaces"
 SERVICES_LIST = "services.list"
 DHCP_LEASES = "dhcp.leases"
+WIREGUARD_STATUS = "wireguard.status"
 FIREWALL_RULES_LIST = "firewall.rules.list"
 FIREWALL_ALIASES_LIST = "firewall.aliases.list"
 FIREWALL_ALIASES_ADD = "firewall.aliases.add"
@@ -121,6 +122,15 @@ _ENTRIES = (
         verified=True,
         notes="Dnsmasq DHCP leases (ADR-0008). The privilege also covers Dnsmasq settings "
         "writes; no write operation is registered. Verified on the lab.",
+    ),
+    Operation(
+        operation_id=WIREGUARD_STATUS,
+        method=HttpMethod.GET,
+        endpoint="/api/wireguard/service/show",
+        required_privilege="VPN: WireGuard: Status",
+        read_only=True,
+        notes="WireGuard tunnel and peer status (ADR-0009). The privilege also covers service "
+        "control; no write operation is registered. Unverified.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,

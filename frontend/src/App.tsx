@@ -12,6 +12,7 @@ import { DhcpPage } from "@/pages/dhcp";
 import { LogsPage } from "@/pages/logs";
 import { ServicesPage } from "@/pages/services";
 import { TrafficPage } from "@/pages/traffic";
+import { VpnPage } from "@/pages/vpn";
 import { LoginPage } from "@/pages/login";
 import { FirewallPage } from "@/pages/firewall";
 import { NetworkPage } from "@/pages/network";
@@ -36,6 +37,7 @@ export function App() {
             <Route path="/logs" element={<LogsPage />} />
             <Route path="/traffic" element={<TrafficPage />} />
             <Route path="/dhcp" element={<DhcpPage />} />
+            <Route path="/vpn" element={<VpnPage />} />
           </Route>
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/administration" element={<AdministrationPage />} />

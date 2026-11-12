@@ -14,6 +14,7 @@ import {
   rulesResponseSchema,
   logsResponseSchema,
   leasesResponseSchema,
+  wireguardResponseSchema,
   servicesResponseSchema,
   trafficResponseSchema,
   natResponseSchema,
@@ -236,6 +237,10 @@ export const api = {
       `${base}/firewalls/${encodeURIComponent(id)}/firewall/logs/new?since=${encodeURIComponent(since)}`,
       { schema: logsNewResponseSchema },
     ),
+  wireguard: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/vpn/wireguard`, {
+      schema: wireguardResponseSchema,
+    }),
   dhcpLeases: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dhcp/leases`, {
       schema: leasesResponseSchema,

@@ -19,6 +19,7 @@ from app.opnsense.normalise.system import (
     normalise_system_status,
 )
 from app.opnsense.normalise.traffic import TrafficInterface, TrafficResult, normalise_traffic
+from app.opnsense.normalise.wireguard import WireguardRecord, WireguardResult, normalise_wireguard
 
 __all__ = [
     "AliasInfo",
@@ -39,6 +40,8 @@ __all__ = [
     "TopItem",
     "TrafficInterface",
     "TrafficResult",
+    "WireguardRecord",
+    "WireguardResult",
     "log_cursor",
     "normalise_aliases",
     "normalise_cpu_events",
@@ -50,5 +53,6 @@ __all__ = [
     "normalise_services",
     "normalise_system_status",
     "normalise_traffic",
+    "normalise_wireguard",
     "summarise_log",
 ]

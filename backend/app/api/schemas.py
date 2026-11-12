@@ -17,6 +17,7 @@ from app.opnsense.normalise import (
     ServiceInfo,
     SystemStatus,
     TrafficInterface,
+    WireguardRecord,
 )
 from app.opnsense.tls import CA_BUNDLE_MAX_BYTES, InvalidCaBundleError, normalise_ca_bundle
 
@@ -120,6 +121,13 @@ class AliasesOut(BaseModel):
 class RulesOut(BaseModel):
     firewall_id: uuid.UUID
     rules: list[RuleInfo]
+    truncated: bool
+    registry_verified: bool
+
+
+class WireguardOut(BaseModel):
+    firewall_id: uuid.UUID
+    records: list[WireguardRecord]
     truncated: bool
     registry_verified: bool
 
