@@ -27,6 +27,12 @@ FIREWALL_RULES_APPLY = "firewall.rules.apply"
 FIREWALL_LOG = "firewall.log"
 FIREWALL_NAT_PORT_FORWARDS = "firewall.nat.port_forwards.list"
 FIREWALL_NAT_OUTBOUND = "firewall.nat.outbound.list"
+FORWARDS_ADD = "firewall.nat.port_forwards.add"
+FORWARDS_UPDATE = "firewall.nat.port_forwards.update"
+FORWARDS_DELETE = "firewall.nat.port_forwards.delete"
+FORWARDS_ENABLE = "firewall.nat.port_forwards.enable"
+FORWARDS_DISABLE = "firewall.nat.port_forwards.disable"
+FORWARDS_APPLY = "firewall.nat.port_forwards.apply"
 
 # Entries start unverified and are verified against a disposable lab OPNsense before verified=True.
 # The three below were verified on OPNsense 26.7.8_2 (lab, 2026-11-11) with a non-admin API user
@@ -209,6 +215,68 @@ _ENTRIES = (
         verified=True,
         notes="Activates saved rule changes (filter reload). Reply: {status: ok}. Only called "
         "from the reviewed apply procedure.",
+    ),
+    Operation(
+        operation_id=FORWARDS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/d_nat/addRule",
+        required_privilege="Firewall: NAT: Destination NAT",
+        read_only=False,
+        apply_required=True,
+        notes="Saves a new port forward without activating it. Reviewed apply only "
+        "(ADR-0006). Body: {rule: {...}}. Unverified.",
+    ),
+    Operation(
+        operation_id=FORWARDS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/d_nat/setRule/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Firewall: NAT: Destination NAT",
+        read_only=False,
+        apply_required=True,
+        notes="Saves changes to a port forward. setRule is an upsert, so apply confirms the "
+        "forward exists first. Reviewed apply only. Unverified.",
+    ),
+    Operation(
+        operation_id=FORWARDS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/d_nat/delRule/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Firewall: NAT: Destination NAT",
+        read_only=False,
+        apply_required=True,
+        notes="Deletes a port forward. Always high risk. Reviewed apply only. Unverified.",
+    ),
+    Operation(
+        operation_id=FORWARDS_ENABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/d_nat/toggleRule/{uuid}/0",
+        path_params=("uuid",),
+        required_privilege="Firewall: NAT: Destination NAT",
+        read_only=False,
+        apply_required=True,
+        notes="Enables a port forward with an explicit disabled=0, never the flip default. "
+        "Reviewed apply only. Unverified.",
+    ),
+    Operation(
+        operation_id=FORWARDS_DISABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/d_nat/toggleRule/{uuid}/1",
+        path_params=("uuid",),
+        required_privilege="Firewall: NAT: Destination NAT",
+        read_only=False,
+        apply_required=True,
+        notes="Disables a port forward with an explicit disabled=1, never the flip default. "
+        "Reviewed apply only. Unverified.",
+    ),
+    Operation(
+        operation_id=FORWARDS_APPLY,
+        method=HttpMethod.POST,
+        endpoint="/api/firewall/d_nat/apply",
+        required_privilege="Firewall: NAT: Destination NAT",
+        read_only=False,
+        notes="Activates saved port forward changes (filter reload, skip alias). Only called "
+        "from the reviewed apply procedure. Unverified.",
     ),
     Operation(
         operation_id=FIREWALL_LOG,

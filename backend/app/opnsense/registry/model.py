@@ -36,7 +36,7 @@ class Operation(BaseModel):
     operation_id: str = Field(pattern=r"^[a-z][a-z0-9_.]*$")
     method: HttpMethod
     # Fixed path, never user supplied. The only variable part is a declared trailing {uuid} slot.
-    endpoint: str = Field(pattern=r"^/api/[A-Za-z0-9_/]+(/\{uuid\})?$")
+    endpoint: str = Field(pattern=r"^/api/[A-Za-z0-9_/]+(/\{uuid\}(/[01])?)?$")
     path_params: tuple[str, ...] = ()
     # Declared query parameter names (GET only). Values are checked to be short alphanumerics.
     query_params: tuple[str, ...] = ()

@@ -1153,22 +1153,11 @@ def apply_change(
     automatic rollback."""
     cr = _get(db, change_id)
     firewall_id = cr.firewall_id
-    if cr.kind == "nat_forward":
-        raise _refuse(
-            db,
-            service.ChangeError("Applying port forward changes is not available yet"),
-            action="change.apply",
-            user=user,
-            request=request,
-            firewall_id=firewall_id,
-            change_id=change_id,
-        )
     try:
-        run = (
-            apply_changes.apply_rule_change
-            if cr.kind == "rule"
-            else apply_changes.apply_alias_change
-        )
+        run = {
+            "rule": apply_changes.apply_rule_change,
+            "nat_forward": apply_changes.apply_forward_change,
+        }.get(cr.kind, apply_changes.apply_alias_change)
         cr = run(
             db,
             change_id=change_id,

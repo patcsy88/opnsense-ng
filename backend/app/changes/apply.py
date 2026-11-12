@@ -23,6 +23,7 @@ from app import audit
 from app.auth.deps import CurrentUser
 from app.changes import service
 from app.changes.fingerprint import fingerprint
+from app.changes.forward_schemas import ForwardProposal
 from app.changes.rule_schemas import RuleProposal
 from app.changes.states import Status
 from app.core.config import Settings
@@ -47,6 +48,12 @@ from app.opnsense.registry.entries import (
     FIREWALL_RULES_LIST,
     FIREWALL_RULES_TOGGLE,
     FIREWALL_RULES_UPDATE,
+    FORWARDS_ADD,
+    FORWARDS_APPLY,
+    FORWARDS_DELETE,
+    FORWARDS_DISABLE,
+    FORWARDS_ENABLE,
+    FORWARDS_UPDATE,
 )
 
 log = get_logger("changes.apply")
@@ -544,6 +551,232 @@ def apply_rule_change(
                 (
                     r
                     for r in normalise_rules(after).rules
+                    if (
+                        r.uuid == target if target else r.description == proposed.get("description")
+                    )
+                ),
+                None,
+            )
+            snapshot = match.model_dump() if match else None
+        except FirewallError:
+            snapshot = None
+        return _finish(db, cr, Status.applied, user, request, None, snapshot)
+    except Exception:
+        log.exception("apply_crashed", change_request=str(cr.id), firewall_id=str(firewall_id))
+        db.rollback()
+        db.refresh(cr)
+        state = (
+            "saved on the firewall, activation unknown"
+            if saved
+            else "the firewall state is unknown"
+        )
+        return _finish(
+            db, cr, Status.failed, user, request, f"Unexpected error; {state}. Check the firewall."
+        )
+    finally:
+        if client is not None:
+            anyio.from_thread.run(client.aclose)
+
+
+def forward_payload(
+    proposed: dict[str, Any], sequence: int | None, *, fixed_defaults: bool
+) -> dict[str, Any]:
+    """Body for addRule/setRule. `pass` is left blank (Manual) so no filter rule is registered.
+    On update the fixed fields are omitted so whatever the firewall holds stays untouched."""
+    rule: dict[str, Any] = {
+        "disabled": "0" if proposed.get("enabled", True) else "1",
+        "interface": proposed["interface"],
+        "ipprotocol": proposed["ip_protocol"],
+        "protocol": proposed["protocol"],
+        "source": {
+            "network": proposed["source"],
+            "port": proposed.get("source_port", ""),
+            "not": "0",
+        },
+        "destination": {
+            "network": proposed["destination"],
+            "port": proposed.get("destination_port", ""),
+            "not": "0",
+        },
+        "target": proposed["target"],
+        "local-port": proposed.get("target_port", ""),
+        "log": "1" if proposed.get("log") else "0",
+        "descr": proposed["description"],
+    }
+    if sequence is not None:
+        rule["sequence"] = str(sequence)
+    if fixed_defaults:
+        rule.update({"nordr": "0", "poolopts": "", "natreflection": "", "pass": ""})
+    return {"rule": rule}
+
+
+def apply_forward_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    """Port forward counterpart of apply_rule_change (ADR-0006): stale check, save, `d_nat/apply`,
+    read back. No automatic rollback."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    cr, fw = begin_apply(
+        db,
+        change_id=change_id,
+        user=user,
+        request=request,
+        kind="nat_forward",
+        actions=("toggle", "create", "update", "delete"),
+        confirm_name=confirm_name,
+        confirm_key="label",
+    )
+    firewall_id = fw.id
+    action = cr.action
+    target = cr.target_uuid
+    proposed = dict(cr.proposed or {})
+    params = {"uuid": target} if action != "create" and target else None
+    client: OPNsenseClient | None = None
+    saved = False
+    try:
+        try:
+            client = open_client(fw, settings)
+        except CredentialDecryptionError:
+            return _finish(
+                db, cr, Status.failed, user, request, "Stored credentials could not be decrypted"
+            )
+
+        try:
+            listing = _call(db, client, FIREWALL_NAT_PORT_FORWARDS, None, user, fw.id, request)
+        except FirewallError as exc:
+            return _finish(db, cr, Status.failed, user, request, f"Check failed: {exc.message}")
+        forwards = normalise_nat(listing, "port_forward").rules
+        sequence: int | None = None
+        if action != "create":
+            current = next((r for r in forwards if r.uuid == target), None)
+            if current is None:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The port forward no longer exists on the firewall; nothing was changed",
+                )
+            if fingerprint(current.model_dump()) != cr.base_fingerprint:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The port forward was changed on the firewall after this request was made; "
+                    "nothing was changed. Create a new request.",
+                )
+            sequence = current.sequence
+        if action == "create" and any(r.description == proposed["description"] for r in forwards):
+            return _finish(
+                db,
+                cr,
+                Status.stale,
+                user,
+                request,
+                "A port forward with this description now exists on the firewall; "
+                "nothing was changed",
+            )
+        if action in ("create", "update"):
+            references = ForwardProposal.model_validate(
+                {k: v for k, v in proposed.items() if k not in ("label", "risk")}
+            ).alias_references()
+            if references:
+                try:
+                    aliases = normalise_aliases(
+                        _call(db, client, FIREWALL_ALIASES_LIST, None, user, fw.id, request)
+                    ).aliases
+                except FirewallError as exc:
+                    return _finish(
+                        db, cr, Status.failed, user, request, f"Check failed: {exc.message}"
+                    )
+                problem = alias_problem(references, list(aliases), proposed)
+                if problem:
+                    return _finish(
+                        db, cr, Status.stale, user, request, f"{problem}; nothing was changed"
+                    )
+            if action == "create":
+                used = [r.sequence for r in forwards if r.sequence is not None]
+                sequence = min((max(used) + 1) if used else 1, 999999)
+
+        try:
+            if action == "toggle":
+                enabling = bool(proposed.get("enabled"))
+                reply = _call(
+                    db,
+                    client,
+                    FORWARDS_ENABLE if enabling else FORWARDS_DISABLE,
+                    {},
+                    user,
+                    fw.id,
+                    request,
+                    params,
+                )
+                want = "Enabled" if enabling else "Disabled"
+            elif action == "delete":
+                reply = _call(db, client, FORWARDS_DELETE, {}, user, fw.id, request, params)
+                want = "deleted"
+            else:
+                reply = _call(
+                    db,
+                    client,
+                    FORWARDS_UPDATE if action == "update" else FORWARDS_ADD,
+                    forward_payload(proposed, sequence, fixed_defaults=action == "create"),
+                    user,
+                    fw.id,
+                    request,
+                    params,
+                )
+                want = "saved"
+        except FirewallError as exc:
+            return _finish(db, cr, Status.failed, user, request, f"Not saved: {exc.message}")
+        if not isinstance(reply, dict) or reply.get("result") != want:
+            return _finish(db, cr, Status.failed, user, request, _validation_message(reply))
+        saved = True
+        if action == "create":
+            new_id = reply.get("uuid")
+            target = new_id if isinstance(new_id, str) else None
+
+        try:
+            result = _call(db, client, FORWARDS_APPLY, {}, user, fw.id, request)
+        except FirewallError as exc:
+            return _finish(
+                db,
+                cr,
+                Status.failed,
+                user,
+                request,
+                f"The change is saved on the firewall but NOT active: {exc.message}",
+            )
+        status_text = result.get("status") if isinstance(result, dict) else None
+        if not isinstance(status_text, str) or status_text.strip().lower() != "ok":
+            return _finish(
+                db,
+                cr,
+                Status.failed,
+                user,
+                request,
+                "The change is saved on the firewall but NOT active: activation was not confirmed",
+            )
+
+        if action == "delete":
+            return _finish(db, cr, Status.applied, user, request, None, None)
+        snapshot: dict[str, Any] | None
+        try:
+            after = _call(db, client, FIREWALL_NAT_PORT_FORWARDS, None, user, fw.id, request)
+            match = next(
+                (
+                    r
+                    for r in normalise_nat(after, "port_forward").rules
                     if (
                         r.uuid == target if target else r.description == proposed.get("description")
                     )

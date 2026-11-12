@@ -9,7 +9,7 @@ from sqlalchemy import select
 from app.db.models import AuditLog, ChangeRequest, Role
 from tests.conftest import csrf_headers
 from tests.test_changes_api import act, switch
-from tests.test_changes_rule_create import ALIASES, CHANGES, apply, setup
+from tests.test_changes_rule_create import ALIASES, CHANGES, setup
 
 DNAT = "https://fw.example.test/api/firewall/d_nat/searchRule"
 TARGET = "0b3a6c1e-1d2f-4a5b-8c7d-9e0f1a2b3c4d"
@@ -197,20 +197,17 @@ async def test_automatic_exception_and_bad_ids_are_refused(app_client: httpx.Asy
     assert bad.status_code == 422
 
 
-async def test_only_managers_can_stage_and_apply_is_not_available(
-    app_client: httpx.AsyncClient,
-) -> None:
+async def test_only_managers_can_stage(app_client: httpx.AsyncClient) -> None:
     fid = await setup(app_client)
     ok = await stage(app_client, fid, [], forward=forward(description="Fresh"))
-    cid = ok.json()["id"]
+    assert ok.status_code == 201
     await switch(app_client, Role.security_admin, "sec")
     denied = await stage(app_client, fid, [], forward=forward(description="Other"))
     assert denied.status_code == 403
     await switch(app_client, Role.admin, "adm")
+    cid = ok.json()["id"]
     assert (await act(app_client, cid, "submit")).status_code == 200
     assert (await act(app_client, cid, "approve")).status_code == 200
-    res = await apply(app_client, cid, confirm_name="Fresh")
-    assert res.status_code in (400, 409) and "not available" in res.text
     with app_client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
         cr = db.scalar(select(ChangeRequest).where(ChangeRequest.kind == "nat_forward"))
         actions = {a.action for a in db.scalars(select(AuditLog))}
