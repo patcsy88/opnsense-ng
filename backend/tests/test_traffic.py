@@ -74,7 +74,7 @@ async def test_traffic_endpoint_roles_audit_and_cache(app_client: httpx.AsyncCli
         second = await app_client.get(f"/api/v1/firewalls/{fid}/traffic")
     assert first.status_code == 200 and second.status_code == 200
     body = first.json()
-    assert body["registry_verified"] is False and body["time"] == 1762950000.5
+    assert body["registry_verified"] is True and body["time"] == 1762950000.5
     assert body["interfaces"][0]["in_bytes"] == 1000
     assert route.call_count == 1  # the second answer came from the cache
     with app_client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
