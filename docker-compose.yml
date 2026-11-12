@@ -35,6 +35,7 @@ services:
       ALLOWED_FIREWALL_NETWORKS: ${ALLOWED_FIREWALL_NETWORKS:-}
       ALLOW_INSECURE_TLS: ${ALLOW_INSECURE_TLS:-false}
       GEOIP_DB_PATH: /geoip/GeoLite2-Country.mmdb
+      AUDIT_RETENTION_DAYS: ${AUDIT_RETENTION_DAYS:-365}
     volumes:
       - ./geoip:/geoip:ro
     networks:

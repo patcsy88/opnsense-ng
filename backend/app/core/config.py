@@ -49,6 +49,8 @@ class Settings(BaseSettings):
     session_ttl_minutes: int = Field(gt=0, le=60 * 24 * 30)
     session_idle_timeout_minutes: int = Field(default=30, gt=0)
     max_sessions_per_user: int = Field(default=5, ge=1, le=100)
+    # Audit records older than this may be purged by an admin (ADR-0011). Never automatic.
+    audit_retention_days: int = Field(default=365, ge=90, le=3650)
 
     cookie_secure: bool = True
     # Explicit development switch; the only way to run with COOKIE_SECURE=false.

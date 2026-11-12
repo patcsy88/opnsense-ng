@@ -25,16 +25,29 @@ export function AdministrationPage() {
             )}
           </CardContent>
         </Card>
-        {["Users", "Audit log"].map((t) => (
-          <Card key={t}>
-            <CardHeader>
-              <CardTitle>{t}</CardTitle>
-            </CardHeader>
-            <CardContent>
-              <Badge>Planned</Badge>
-            </CardContent>
-          </Card>
-        ))}
+        <Card>
+          <CardHeader>
+            <CardTitle>Audit log</CardTitle>
+            <CardDescription>Who did what, when and from where. Records can be purged after the retention period.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {admin || hasRole("security_admin") ? (
+              <Link className="text-sm text-primary underline" to="/administration/audit">
+                Open
+              </Link>
+            ) : (
+              <Badge>Administrators and security administrators only</Badge>
+            )}
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
+            <CardTitle>Users</CardTitle>
+          </CardHeader>
+          <CardContent>
+            <Badge>Planned</Badge>
+          </CardContent>
+        </Card>
       </div>
     </div>
   );

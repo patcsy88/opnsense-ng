@@ -3,6 +3,7 @@ import { AppLayout } from "@/components/layout/app-layout";
 import { NAV_ITEMS } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/protected-route";
 import { AdministrationPage } from "@/pages/administration";
+import { AuditPage } from "@/pages/audit";
 import { ChangeDetailPage } from "@/pages/change-detail";
 import { ChangesPage } from "@/pages/changes";
 import { DashboardPage } from "@/pages/dashboard";
@@ -43,6 +44,9 @@ export function App() {
           </Route>
           <Route path="/services" element={<ServicesPage />} />
           <Route path="/administration" element={<AdministrationPage />} />
+          <Route element={<ProtectedRoute roles={["admin", "security_admin"]} />}>
+            <Route path="/administration/audit" element={<AuditPage />} />
+          </Route>
           <Route element={<ProtectedRoute roles={["admin"]} />}>
             <Route path="/administration/firewalls" element={<FirewallConnectionsPage />} />
           </Route>

@@ -13,6 +13,8 @@ import {
   changeListSchema,
   rulesResponseSchema,
   logsResponseSchema,
+  auditPageSchema,
+  auditPurgeSchema,
   dnsResponseSchema,
   leasesResponseSchema,
   wireguardResponseSchema,
@@ -238,6 +240,27 @@ export const api = {
       `${base}/firewalls/${encodeURIComponent(id)}/firewall/logs/new?since=${encodeURIComponent(since)}`,
       { schema: logsNewResponseSchema },
     ),
+  listAudit: (params: {
+    username?: string;
+    action?: string;
+    firewallId?: string;
+    outcome?: string;
+    since?: string;
+    until?: string;
+    page?: number;
+  }) => {
+    const q = new URLSearchParams();
+    if (params.username) q.set("username", params.username);
+    if (params.action) q.set("action", params.action);
+    if (params.firewallId) q.set("firewall_id", params.firewallId);
+    if (params.outcome) q.set("outcome", params.outcome);
+    if (params.since) q.set("since", params.since);
+    if (params.until) q.set("until", params.until);
+    q.set("page", String(params.page ?? 1));
+    return request("GET", `${base}/audit?${q.toString()}`, { schema: auditPageSchema });
+  },
+  purgeAudit: () =>
+    request("POST", `${base}/audit/purge`, { body: { confirm: "PURGE" }, schema: auditPurgeSchema }),
   dns: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dns`, {
       schema: dnsResponseSchema,

@@ -36,6 +36,7 @@ Back up `CREDENTIAL_ENCRYPTION_KEY` separately from the database. Without it, st
 | `TRUSTED_PROXIES` | no | Proxy addresses trusted for `X-Forwarded-For` (defaults to the compose subnet) |
 | `ALLOWED_FIREWALL_NETWORKS` | no | Replaces the default private-only target policy |
 | `ALLOW_INSECURE_TLS` | no | Permit `verify_tls=false` on firewalls (default false) |
+| `AUDIT_RETENTION_DAYS` | no | Audit records older than this can be purged by an admin (default 365, minimum 90). Nothing is deleted automatically |
 | `SESSION_TTL_MINUTES` | no | Absolute session lifetime (default 60) |
 
 More tuning variables (idle timeout, session cap, rate limits, lockout, timeouts) are listed in `backend/README.md`.
@@ -77,6 +78,7 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 - Remove expired sessions: `docker compose exec backend python -m app.auth.cli cleanup-sessions`
 - Migrate only: `docker compose run --rm --entrypoint alembic backend upgrade head`
 - Database backup: `docker compose exec postgres pg_dump -U opnsense_mgr opnsense_mgr > backup.sql`
+- Audit log: admins and security admins view it under Administration, Audit log. Only an admin can purge, and only records older than `AUDIT_RETENTION_DAYS`. Take a backup first if you need to keep them
 
 ## Known limitations
 

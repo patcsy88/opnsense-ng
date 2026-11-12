@@ -186,6 +186,30 @@ export const logsNewResponseSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const auditEntrySchema = z.object({
+  id: z.uuid(),
+  timestamp: z.string(),
+  username: z.string().nullable(),
+  action: z.string(),
+  firewall_id: z.uuid().nullable(),
+  outcome: z.string(),
+  source_ip: z.string().nullable(),
+  user_agent: z.string().nullable(),
+  detail: z.record(z.string(), z.union([z.string(), z.number(), z.boolean(), z.null()])),
+});
+export type AuditEntry = z.infer<typeof auditEntrySchema>;
+
+export const auditPageSchema = z.object({
+  items: z.array(auditEntrySchema),
+  total: z.number(),
+  page: z.number(),
+  page_size: z.number(),
+  retention_days: z.number(),
+  purgeable: z.number(),
+});
+
+export const auditPurgeSchema = z.object({ removed: z.number(), cutoff: z.string() });
+
 export const topDomainSchema = z.object({
   domain: z.string(),
   count: z.number(),
