@@ -105,8 +105,10 @@ _ENTRIES = (
         endpoint="/api/core/service/search",
         required_privilege="Status: Services",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Service list with a running flag. The same controller has start, restart and "
-        "stop; this app only reads. Unverified.",
+        "stop; this app only reads. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,

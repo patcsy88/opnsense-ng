@@ -66,7 +66,7 @@ async def test_services_endpoint_is_read_only_audited_for_every_role(
         ro = await app_client.get(f"/api/v1/firewalls/{fid}/services")
         post = await app_client.post(f"/api/v1/firewalls/{fid}/services")
     assert r.status_code == 200 and ro.status_code == 200
-    assert r.json()["registry_verified"] is False and len(r.json()["services"]) == 2
+    assert r.json()["registry_verified"] is True and len(r.json()["services"]) == 2
     assert route.call_count == 2 and post.status_code in (404, 405)
     with app_client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
         actions = [a.action for a in db.scalars(select(AuditLog))]
