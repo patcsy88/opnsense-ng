@@ -81,7 +81,7 @@ async def test_nat_endpoints_are_read_only_audited_and_hide_internals(
         a = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/nat/port-forwards")
         b = await app_client.get(f"/api/v1/firewalls/{fid}/firewall/nat/outbound")
     assert a.status_code == 200 and b.status_code == 200
-    assert a.json()["rules"][0]["target"] == "10.0.0.5" and a.json()["registry_verified"] is False
+    assert a.json()["rules"][0]["target"] == "10.0.0.5" and a.json()["registry_verified"] is True
     assert b.json()["rules"][0]["description"] == "LAN out"
     assert pf.calls.last.request.method == "GET" and ob.calls.last.request.method == "GET"
     assert "secret-cat" not in a.text and "hidden" not in a.text + b.text

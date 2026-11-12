@@ -228,8 +228,10 @@ _ENTRIES = (
         endpoint="/api/firewall/d_nat/searchRule",
         required_privilege="Firewall: NAT: Destination NAT",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Lists port forward (destination NAT) rules. The privilege also covers the write "
-        "endpoints under /api/firewall/d_nat/*; this app only reads. Unverified.",
+        "endpoints under /api/firewall/d_nat/*; this app only reads. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_NAT_OUTBOUND,
@@ -237,9 +239,11 @@ _ENTRIES = (
         endpoint="/api/firewall/source_nat/searchRule",
         required_privilege="Firewall: NAT: Source NAT",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Lists outbound (source NAT) rules, including automatic ones depending on the "
         "outbound mode. The privilege also covers the write endpoints under "
-        "/api/firewall/source_nat/*; this app only reads. Unverified.",
+        "/api/firewall/source_nat/*; this app only reads. Verified on the lab.",
     ),
     Operation(
         operation_id=CPU_USAGE,
