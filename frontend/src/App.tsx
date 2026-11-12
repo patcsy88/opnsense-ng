@@ -9,6 +9,7 @@ import { DashboardPage } from "@/pages/dashboard";
 import { FirewallConnectionsPage } from "@/pages/firewall-connections";
 import { NatPage } from "@/pages/nat";
 import { LogsPage } from "@/pages/logs";
+import { TrafficPage } from "@/pages/traffic";
 import { LoginPage } from "@/pages/login";
 import { FirewallPage } from "@/pages/firewall";
 import { NetworkPage } from "@/pages/network";
@@ -31,6 +32,7 @@ export function App() {
           <Route path="/network" element={<NetworkPage />} />
           <Route element={<ProtectedRoute roles={["admin", "network_admin", "security_admin"]} />}>
             <Route path="/logs" element={<LogsPage />} />
+            <Route path="/traffic" element={<TrafficPage />} />
           </Route>
           <Route path="/administration" element={<AdministrationPage />} />
           <Route element={<ProtectedRoute roles={["admin"]} />}>

@@ -14,6 +14,7 @@ from app.opnsense.normalise import (
     NatRule,
     RuleInfo,
     SystemStatus,
+    TrafficInterface,
 )
 from app.opnsense.tls import CA_BUNDLE_MAX_BYTES, InvalidCaBundleError, normalise_ca_bundle
 
@@ -118,6 +119,13 @@ class RulesOut(BaseModel):
     firewall_id: uuid.UUID
     rules: list[RuleInfo]
     truncated: bool
+    registry_verified: bool
+
+
+class TrafficOut(BaseModel):
+    firewall_id: uuid.UUID
+    time: float | None
+    interfaces: list[TrafficInterface]
     registry_verified: bool
 
 

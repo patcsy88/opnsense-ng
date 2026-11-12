@@ -16,6 +16,7 @@ from app.opnsense.normalise.system import (
     normalise_cpu_events,
     normalise_system_status,
 )
+from app.opnsense.normalise.traffic import TrafficInterface, TrafficResult, normalise_traffic
 
 __all__ = [
     "AliasInfo",
@@ -30,6 +31,8 @@ __all__ = [
     "RulesResult",
     "SystemStatus",
     "TopItem",
+    "TrafficInterface",
+    "TrafficResult",
     "log_cursor",
     "normalise_aliases",
     "normalise_cpu_events",
@@ -38,5 +41,6 @@ __all__ = [
     "normalise_nat",
     "normalise_rules",
     "normalise_system_status",
+    "normalise_traffic",
     "summarise_log",
 ]

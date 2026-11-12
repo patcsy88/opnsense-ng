@@ -22,6 +22,7 @@ from app.api.schemas import (
     NatOut,
     RulesOut,
     SystemStatusOut,
+    TrafficOut,
 )
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
 from app.core.config import Settings, get_settings
@@ -29,7 +30,7 @@ from app.core.crypto import CredentialCipher, CredentialDecryptionError
 from app.core.logging import get_logger, register_secret
 from app.db.models import Firewall, Role
 from app.geoip import GeoIP, geoip_for
-from app.opnsense import cpu_sampler
+from app.opnsense import cpu_sampler, traffic_cache
 from app.opnsense.client import OPNsenseClient
 from app.opnsense.cpu_sampler import sample_cpu
 from app.opnsense.errors import ConnectionStatus, FirewallError, public_status
@@ -43,9 +44,11 @@ from app.opnsense.normalise import (
     normalise_nat,
     normalise_rules,
     normalise_system_status,
+    normalise_traffic,
     summarise_log,
 )
 from app.opnsense.normalise.nat import NatKind
+from app.opnsense.normalise.traffic import TrafficResult
 from app.opnsense.registry import ResponseKind, get_operation
 from app.opnsense.registry.entries import (
     CONNECTIVITY_CHECK,
@@ -60,6 +63,7 @@ from app.opnsense.registry.entries import (
     SYSTEM_RESOURCES,
     SYSTEM_STATUS,
     SYSTEM_TIME,
+    TRAFFIC_INTERFACES,
 )
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["firewalls"])
@@ -287,6 +291,7 @@ def delete_firewall(
     db.delete(fw)
     db.commit()
     cpu_sampler.forget(firewall_id)
+    traffic_cache.forget(firewall_id)
 
 
 @router.get("/options", response_model=list[FirewallOption])
@@ -758,6 +763,41 @@ def firewall_logs_new(
         entries=result.entries,
         cursor=log_cursor(raw) or since,
         truncated=result.truncated,
+    )
+
+
+@router.get("/{firewall_id}/traffic", response_model=TrafficOut)
+def traffic(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> TrafficOut:
+    """Cumulative interface counters (ADR-0007). Not for read_only: usage patterns are sensitive.
+    Answers within the 2 s cache are served without a firewall call, so they are not audited."""
+
+    def fetch() -> TrafficResult:
+        return normalise_traffic(
+            _run_operation(
+                firewall_id=firewall_id,
+                operation_id=TRAFFIC_INTERFACES,
+                user=user,
+                db=db,
+                settings=settings,
+                request=request,
+            )
+        )
+
+    try:
+        result = traffic_cache.cached_traffic(firewall_id, fetch)
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    return TrafficOut(
+        firewall_id=firewall_id,
+        time=result.time,
+        interfaces=result.interfaces,
+        registry_verified=get_operation(TRAFFIC_INTERFACES).verified,
     )
 
 

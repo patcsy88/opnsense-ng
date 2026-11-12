@@ -13,6 +13,7 @@ import {
   changeListSchema,
   rulesResponseSchema,
   logsResponseSchema,
+  trafficResponseSchema,
   natResponseSchema,
   logsNewResponseSchema,
   systemStatusResponseSchema,
@@ -233,6 +234,10 @@ export const api = {
       `${base}/firewalls/${encodeURIComponent(id)}/firewall/logs/new?since=${encodeURIComponent(since)}`,
       { schema: logsNewResponseSchema },
     ),
+  traffic: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/traffic`, {
+      schema: trafficResponseSchema,
+    }),
   interfaces: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/interfaces`, {
       schema: interfacesResponseSchema,

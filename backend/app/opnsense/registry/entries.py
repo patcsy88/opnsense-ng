@@ -13,6 +13,7 @@ SYSTEM_RESOURCES = "system.resources"
 CPU_USAGE = "cpu.usage"
 SYSTEM_DISK = "system.disk"
 INTERFACES_OVERVIEW = "interfaces.overview"
+TRAFFIC_INTERFACES = "traffic.interfaces"
 FIREWALL_RULES_LIST = "firewall.rules.list"
 FIREWALL_ALIASES_LIST = "firewall.aliases.list"
 FIREWALL_ALIASES_ADD = "firewall.aliases.add"
@@ -86,6 +87,14 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Interface list with status and addresses; needs Status: Interfaces as well.",
+    ),
+    Operation(
+        operation_id=TRAFFIC_INTERFACES,
+        method=HttpMethod.GET,
+        endpoint="/api/diagnostics/traffic/interface",
+        required_privilege="Reporting: Traffic",
+        read_only=True,
+        notes="Cumulative byte and packet counters per interface (ADR-0007). Unverified.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,

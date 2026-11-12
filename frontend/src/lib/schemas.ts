@@ -186,6 +186,24 @@ export const logsNewResponseSchema = z.object({
   truncated: z.boolean(),
 });
 
+export const trafficInterfaceSchema = z.object({
+  interface: z.string(),
+  name: z.string().nullable(),
+  in_bytes: z.number(),
+  out_bytes: z.number(),
+  in_packets: z.number(),
+  out_packets: z.number(),
+});
+export type TrafficInterface = z.infer<typeof trafficInterfaceSchema>;
+
+export const trafficResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  time: z.number().nullable(),
+  interfaces: z.array(trafficInterfaceSchema),
+  registry_verified: z.boolean(),
+});
+export type TrafficResponse = z.infer<typeof trafficResponseSchema>;
+
 export const aliasSchema = z.object({
   uuid: z.string().nullable(),
   name: z.string().nullable(),
