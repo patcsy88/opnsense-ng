@@ -103,7 +103,7 @@ async def test_endpoint_roles_audit_and_no_keys(app_client: httpx.AsyncClient) -
         denied = await app_client.get(path)
         post = await app_client.post(path)
     assert r.status_code == 200 and len(r.json()["records"]) == 3
-    assert r.json()["registry_verified"] is False and denied.status_code == 403
+    assert r.json()["registry_verified"] is True and denied.status_code == 403
     assert post.status_code in (404, 405)
     for secret in ("PUBKEY", "PRIVATEKEY", "PSKSECRET"):
         assert secret not in r.text

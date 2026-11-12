@@ -39,7 +39,7 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `firewall.log` | GET | `/api/diagnostics/firewall/log` | Diagnostics: Logs: Firewall: Live View | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.list` | GET | `/api/firewall/d_nat/searchRule` | Firewall: NAT: Destination NAT | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.outbound.list` | GET | `/api/firewall/source_nat/searchRule` | Firewall: NAT: Source NAT | yes | no | 26.7.8_2 | yes |
-| `wireguard.status` | GET | `/api/wireguard/service/show` | VPN: WireGuard: Status | yes | no | - | **no** |
+| `wireguard.status` | GET | `/api/wireguard/service/show` | VPN: WireGuard: Status | yes | no | 26.7.8_2 | yes |
 | `dhcp.leases` | GET | `/api/dnsmasq/leases/search` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | 26.7.8_2 | yes |
 | `services.list` | GET | `/api/core/service/search` | Status: Services | yes | no | 26.7.8_2 | yes |
 | `traffic.interfaces` | GET | `/api/diagnostics/traffic/interface` | Reporting: Traffic | yes | no | 26.7.8_2 | yes |
@@ -116,4 +116,4 @@ Services lists service status only (`services.list`): id, name, description, run
 
 DHCP leases (`dhcp.leases`, ADR-0008) lists Dnsmasq leases: address, hostname, interface, lease type, vendor and expiry, capped at 1000 rows. MAC addresses, client ids and IAIDs are dropped in the backend. Access is admin, network_admin and security_admin. The privilege also covers Dnsmasq settings writes in OPNsense, but no Dnsmasq write operation is registered. Verified on the lab (26.7.8_2).
 
-WireGuard status (`wireguard.status`, ADR-0009) lists tunnels and their peers: name, status (online within 300 s of a handshake, stale, offline), endpoint, allowed IPs, last handshake and transfer counters, capped at 500 rows. Fields are copied from a whitelist, so private, preshared and public keys never leave the backend. Access is admin, network_admin and security_admin. The privilege also allows service control in OPNsense, but no write operation is registered. Unverified until the lab test.
+WireGuard status (`wireguard.status`, ADR-0009) lists tunnels and their peers: name, status (online within 300 s of a handshake, stale, offline), endpoint, allowed IPs, last handshake and transfer counters, capped at 500 rows. Fields are copied from a whitelist, so private, preshared and public keys never leave the backend. Access is admin, network_admin and security_admin. The privilege also allows service control in OPNsense, but no write operation is registered. Verified on the lab (26.7.8_2).

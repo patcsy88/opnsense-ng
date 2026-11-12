@@ -129,8 +129,10 @@ _ENTRIES = (
         endpoint="/api/wireguard/service/show",
         required_privilege="VPN: WireGuard: Status",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="WireGuard tunnel and peer status (ADR-0009). The privilege also covers service "
-        "control; no write operation is registered. Unverified.",
+        "control; no write operation is registered. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,
