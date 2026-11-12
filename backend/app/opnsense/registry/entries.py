@@ -94,7 +94,9 @@ _ENTRIES = (
         endpoint="/api/diagnostics/traffic/interface",
         required_privilege="Reporting: Traffic",
         read_only=True,
-        notes="Cumulative byte and packet counters per interface (ADR-0007). Unverified.",
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Cumulative byte and packet counters per interface (ADR-0007). Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,
