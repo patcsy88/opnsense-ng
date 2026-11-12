@@ -142,8 +142,10 @@ _ENTRIES = (
         endpoint="/api/unbound/diagnostics/stats",
         required_privilege="Services: Unbound",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Unbound resolver counters (ADR-0010). The privilege also covers Unbound settings "
-        "writes, the statistics reset and service control; none is registered. Unverified.",
+        "writes, the statistics reset and service control; none is registered. Verified.",
     ),
     Operation(
         operation_id=DNS_TOTALS,
@@ -151,8 +153,10 @@ _ENTRIES = (
         endpoint="/api/unbound/overview/totals/10",
         required_privilege="Services: Unbound",
         read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
         notes="Top queried and top blocked domains, fixed at 10 (ADR-0010). Needs extended "
-        "statistics. Per-client query search is deliberately not registered. Unverified.",
+        "statistics. Per-client query search is deliberately not registered. Verified on the lab.",
     ),
     Operation(
         operation_id=FIREWALL_RULES_LIST,

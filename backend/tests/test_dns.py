@@ -90,7 +90,7 @@ async def test_endpoint_roles_audit_and_no_query_search(app_client: httpx.AsyncC
         post = await app_client.post(path)
     body = r.json()
     assert r.status_code == 200 and body["hit_rate"] == 75.0 and len(body["top_queried"]) == 2
-    assert body["registry_verified"] is False and denied.status_code == 403
+    assert body["registry_verified"] is True and denied.status_code == 403
     assert post.status_code in (404, 405) and search.call_count == 0
     assert "latest_policy_uuid" not in r.text
     with app_client.app.state.sessionmaker() as db:  # type: ignore[attr-defined]
