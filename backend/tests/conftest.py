@@ -24,6 +24,7 @@ os.environ["SESSION_TTL_MINUTES"] = "30"
 os.environ["OPNSENSE_BACKOFF_BASE_S"] = "0"
 os.environ["LOGIN_RATE_LIMIT"] = "5/minute"
 os.environ["ALLOWED_HOSTS"] = "test,localhost"
+os.environ["MFA_REQUIRED_ROLES"] = ""  # MFA tests opt in per test
 os.environ["LOGIN_LOCKOUT_THRESHOLD"] = "50"  # per-IP limiter is what most tests exercise
 
 from app.auth.security import hash_password  # noqa: E402
@@ -64,6 +65,7 @@ async def db(migrated_db: None) -> AsyncIterator[None]:
         conn.execute(
             text(
                 "TRUNCATE audit_log, change_request_events, change_requests, sessions, "
+                "mfa_challenges, mfa_recovery_codes, "
                 "firewalls, users, login_throttle "
                 "RESTART IDENTITY CASCADE"
             )

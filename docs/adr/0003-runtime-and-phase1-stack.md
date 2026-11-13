@@ -27,6 +27,7 @@ The backend is a thin, network-bound layer: it proxies calls to the OPNsense API
 ## Consequences
 
 - Matches the stack in the project brief and `AGENTS.md`; no changes to agent configuration are needed.
+- Added 2026-11-13 (approved by project owner, ADR-0012): `segno` 1.6.6 (BSD-3-Clause, pure-Python wheel, no runtime dependencies on Python 3.15). Used only to build the QR code matrix for TOTP enrolment; the frontend draws it as inline SVG.
 - Python 3.15 wheel check (2026-11-10, `uv --only-binary`): all backend runtime and dev dependencies resolve with prebuilt wheels, including psycopg-binary, argon2-cffi, cryptography and pydantic-core. Exception: `uvicorn[standard]` is not installable because its extras (pyyaml, httptools) have no 3.15 wheels. Use plain `uvicorn` (no `[standard]` extra) until they do; this was the only deviation from the list above.
 - Node 24 is in maintenance LTS. Node 26 is the newer LTS, so a move can be considered later; the frontend toolchain should be verified on Node 24 first.
 - Exact versions are pinned at install time, followed by `pip-audit` and `npm audit`.

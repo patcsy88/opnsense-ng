@@ -6,6 +6,9 @@ import {
   firewallOptionListSchema,
   firewallSchema,
   loginResponseSchema,
+  mfaEnrolStartSchema,
+  mfaStatusSchema,
+  recoveryCodesSchema,
   logoutAllResponseSchema,
   interfacesResponseSchema,
   aliasesResponseSchema,
@@ -192,6 +195,36 @@ export const api = {
     request("POST", `${base}/auth/login`, {
       body: { username, password },
       schema: loginResponseSchema,
+      skipUnauthorizedHandler: true,
+    }),
+  loginMfa: (challenge: string, code: string) =>
+    request("POST", `${base}/auth/login/mfa`, {
+      body: { challenge, code },
+      schema: loginResponseSchema,
+      skipUnauthorizedHandler: true,
+    }),
+  mfaStatus: () => request("GET", `${base}/auth/mfa`, { schema: mfaStatusSchema }),
+  mfaEnrolStart: (password: string) =>
+    request("POST", `${base}/auth/mfa/enrol/start`, {
+      body: { password },
+      schema: mfaEnrolStartSchema,
+      skipUnauthorizedHandler: true,
+    }),
+  mfaEnrolConfirm: (code: string) =>
+    request("POST", `${base}/auth/mfa/enrol/confirm`, {
+      body: { code },
+      schema: recoveryCodesSchema,
+      skipUnauthorizedHandler: true,
+    }),
+  mfaDisable: (password: string, code: string) =>
+    request("POST", `${base}/auth/mfa/disable`, {
+      body: { password, code },
+      skipUnauthorizedHandler: true,
+    }),
+  mfaRegenerateCodes: (password: string, code: string) =>
+    request("POST", `${base}/auth/mfa/recovery-codes`, {
+      body: { password, code },
+      schema: recoveryCodesSchema,
       skipUnauthorizedHandler: true,
     }),
   logout: () => request("POST", `${base}/auth/logout`, { skipUnauthorizedHandler: true }),

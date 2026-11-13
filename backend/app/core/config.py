@@ -51,6 +51,8 @@ class Settings(BaseSettings):
     max_sessions_per_user: int = Field(default=5, ge=1, le=100)
     # Audit records older than this may be purged by an admin (ADR-0011). Never automatic.
     audit_retention_days: int = Field(default=365, ge=90, le=3650)
+    # Roles that must use TOTP (ADR-0012). Empty makes MFA optional for everyone.
+    mfa_required_roles: CsvList = ["admin", "network_admin", "security_admin", "read_only"]
 
     cookie_secure: bool = True
     # Explicit development switch; the only way to run with COOKIE_SECURE=false.
@@ -91,6 +93,7 @@ class Settings(BaseSettings):
         "allowed_origins",
         "allowed_firewall_networks",
         "denied_firewall_networks",
+        "mfa_required_roles",
         mode="before",
     )
     @classmethod
@@ -113,6 +116,16 @@ class Settings(BaseSettings):
     @classmethod
     def _valid_denied_nets(cls, value: list[str]) -> list[str]:
         return _networks(value, "DENIED_FIREWALL_NETWORKS")
+
+    @field_validator("mfa_required_roles")
+    @classmethod
+    def _valid_mfa_roles(cls, value: list[str]) -> list[str]:
+        known = {"admin", "network_admin", "security_admin", "read_only"}
+        roles = [r.strip().lower() for r in value]
+        unknown = [r for r in roles if r not in known]
+        if unknown:
+            raise ValueError("MFA_REQUIRED_ROLES: unknown role")
+        return roles
 
     @field_validator("allowed_hosts")
     @classmethod

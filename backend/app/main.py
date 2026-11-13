@@ -11,6 +11,7 @@ from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
 from app.api import audit_log, changes, firewalls, health
+from app.auth import account as mfa_account
 from app.auth import router as auth_router
 from app.core.config import get_settings
 from app.core.http import SecurityHeadersMiddleware
@@ -62,4 +63,5 @@ def create_app() -> FastAPI:
     app.include_router(firewalls.router)
     app.include_router(changes.router)
     app.include_router(audit_log.router)
+    app.include_router(mfa_account.router)
     return app

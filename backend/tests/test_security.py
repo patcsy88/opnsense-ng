@@ -609,7 +609,11 @@ async def test_every_route_is_public_allowlisted_or_rbac_protected(
     app_client: httpx.AsyncClient,
 ) -> None:
     settings = get_settings()
-    public = {("/health", "GET"), ("/api/v1/auth/login", "POST")}
+    public = {
+        ("/health", "GET"),
+        ("/api/v1/auth/login", "POST"),
+        ("/api/v1/auth/login/mfa", "POST"),
+    }
     docs = {"/docs", "/openapi.json", "/docs/oauth2-redirect"}
     unprotected: list[str] = []
     seen = 0
@@ -717,6 +721,6 @@ async def test_route_walk_detects_unprotected_route(app_client: httpx.AsyncClien
         for r in _flatten_routes(app.routes)
         if getattr(r, "dependant", None) is not None
         and not (_dependant_calls(r.dependant) & RBAC_DEPENDENCIES)
-        and r.path not in {"/health", "/api/v1/auth/login"}
+        and r.path not in {"/health", "/api/v1/auth/login", "/api/v1/auth/login/mfa"}
     ]
     assert flagged == ["/api/v1/oops"]

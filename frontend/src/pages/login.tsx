@@ -8,7 +8,7 @@ import { Label } from "@/components/ui/label";
 import { useAuth } from "@/features/auth/auth";
 import { api, ApiError } from "@/lib/api";
 import { describeError } from "@/lib/errors";
-import { loginFormSchema } from "@/lib/schemas";
+import { loginFormSchema, mfaCodeFormSchema, type User } from "@/lib/schemas";
 
 export function LoginPage() {
   const { user, setUser } = useAuth();
@@ -16,9 +16,37 @@ export function LoginPage() {
   const location = useLocation();
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
+  const [challenge, setChallenge] = useState<string | null>(null);
   const from = (location.state as { from?: string } | null)?.from ?? "/";
 
   if (user) return <Navigate to={from} replace />;
+
+  const finish = (signedIn: User) => {
+    setUser(signedIn);
+    navigate(signedIn.mfa_enrolment_required ? "/account" : from, { replace: true });
+  };
+
+  const onSubmitCode = async (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    const formEl = e.currentTarget;
+    const parsed = mfaCodeFormSchema.safeParse({ code: new FormData(formEl).get("code") });
+    if (!parsed.success || challenge === null) {
+      setError(parsed.success ? "Start again" : (parsed.error.issues[0]?.message ?? "Invalid input"));
+      return;
+    }
+    setPending(true);
+    try {
+      const res = await api.loginMfa(challenge, parsed.data.code);
+      if (res.user) finish(res.user);
+    } catch (err) {
+      setError(err instanceof ApiError && err.kind === "unauthorized" ? err.message : describeError(err).message);
+      const field = formEl.elements.namedItem("code");
+      if (field instanceof HTMLInputElement) field.value = "";
+    } finally {
+      setPending(false);
+    }
+  };
 
   const onSubmit = async (e: FormEvent<HTMLFormElement>) => {
     e.preventDefault();
@@ -36,8 +64,8 @@ export function LoginPage() {
     setPending(true);
     try {
       const res = await api.login(parsed.data.username, parsed.data.password);
-      setUser(res.user);
-      navigate(from, { replace: true });
+      if (res.mfa_required && res.challenge) setChallenge(res.challenge);
+      else if (res.user) finish(res.user);
     } catch (err) {
       setError(err instanceof ApiError && err.kind === "unauthorized" ? err.message : describeError(err).message);
       const pw = formEl.elements.namedItem("password");
@@ -58,6 +86,45 @@ export function LoginPage() {
           <CardDescription>OPNsense Firewall Manager</CardDescription>
         </CardHeader>
         <CardContent>
+          {challenge !== null ? (
+            <form onSubmit={(e) => void onSubmitCode(e)} className="space-y-4" noValidate>
+              <div className="space-y-1">
+                <Label htmlFor="code">Authentication code</Label>
+                <Input
+                  id="code"
+                  name="code"
+                  inputMode="text"
+                  autoComplete="one-time-code"
+                  autoCapitalize="none"
+                  autoFocus
+                  required
+                />
+                <p className="text-xs text-muted-foreground">
+                  Enter the 6-digit code from your authenticator app, or a recovery code.
+                </p>
+              </div>
+              {error && (
+                <p role="alert" className="text-sm text-destructive">
+                  {error}
+                </p>
+              )}
+              <Button type="submit" className="w-full" disabled={pending}>
+                {pending ? "Verifying…" : "Verify"}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                className="w-full"
+                onClick={() => {
+                  setChallenge(null);
+                  setError(null);
+                }}
+              >
+                Back
+              </Button>
+            </form>
+          ) : (
+            <>
           <form onSubmit={(e) => void onSubmit(e)} className="space-y-4" noValidate>
             <div className="space-y-1">
               <Label htmlFor="username">Username</Label>
@@ -76,6 +143,8 @@ export function LoginPage() {
               {pending ? "Signing in…" : "Sign in"}
             </Button>
           </form>
+            </>
+          )}
         </CardContent>
       </Card>
     </div>

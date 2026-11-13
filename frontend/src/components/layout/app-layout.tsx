@@ -1,6 +1,6 @@
 import { LogOut, LogOutIcon, Menu, UserRound } from "lucide-react";
 import { useState } from "react";
-import { NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -70,6 +70,11 @@ function UserMenu() {
           {user.username} · {user.role}
         </DropdownMenuLabel>
         <DropdownMenuSeparator />
+        <DropdownMenuItem asChild>
+          <Link to="/account">
+            <UserRound className="h-4 w-4" /> Account and MFA
+          </Link>
+        </DropdownMenuItem>
         <DropdownMenuItem onSelect={() => void end(api.logout)}>
           <LogOut className="h-4 w-4" /> Sign out
         </DropdownMenuItem>

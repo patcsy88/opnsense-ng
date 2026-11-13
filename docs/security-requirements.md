@@ -5,6 +5,7 @@
 | API credentials | Backend only, encrypted at rest |
 | Transport | HTTPS/TLS to the app and to OPNsense (certificate verification on by default) |
 | Authentication | Secure login, session cookies (HttpOnly, Secure, SameSite), expiry, logout |
+| Multi-factor | TOTP (RFC 6238) required for every role by default (`MFA_REQUIRED_ROLES`). Two-step login with no session after the password step; challenge is single use, 5 minutes, 5 attempts. Secret encrypted at rest, codes single use, recovery codes hashed. Users who have not enrolled get a restricted session (ADR-0012) |
 | Authorisation | RBAC: admin, network_admin, security_admin, read_only. Default deny |
 | API permissions | Least-privilege OPNsense API keys |
 | Input validation | Pydantic schemas on every request |

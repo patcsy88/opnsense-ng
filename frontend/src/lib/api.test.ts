@@ -49,7 +49,7 @@ describe("api client", () => {
     const res = await api.login("alice", "pw");
     expect(ct).toBe("application/json");
     expect(body).toEqual({ username: "alice", password: "pw" });
-    expect(res.user.role).toBe("admin");
+    expect(res.user?.role).toBe("admin");
   });
 
   it.each([

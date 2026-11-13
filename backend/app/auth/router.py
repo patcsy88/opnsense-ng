@@ -6,7 +6,7 @@ from sqlalchemy import delete, select
 from sqlalchemy.orm import Session
 
 from app import audit
-from app.auth import sessions, throttle
+from app.auth import mfa, sessions, throttle
 from app.auth.deps import (
     ALL_ROLES,
     CurrentUser,
@@ -14,7 +14,13 @@ from app.auth.deps import (
     get_db,
     require_roles,
 )
-from app.auth.schemas import LoginRequest, LoginResponse, LogoutAllResponse, UserOut
+from app.auth.schemas import (
+    LoginRequest,
+    LoginResponse,
+    LogoutAllResponse,
+    MfaLoginRequest,
+    UserOut,
+)
 from app.auth.security import (
     bind_csrf,
     hash_password,
@@ -25,12 +31,23 @@ from app.auth.security import (
 )
 from app.core.config import Settings, get_settings
 from app.core.ratelimit import limiter, login_limit
+from app.db.models import MfaChallenge, User, utcnow
 from app.db.models import Session as UserSession
-from app.db.models import User, utcnow
 
 router = APIRouter(prefix="/api/v1/auth", tags=["auth"])
 
 _INVALID = "Invalid username or password"
+_MFA_INVALID = "Invalid or expired code"
+
+
+def user_out(user: User, settings: Settings) -> UserOut:
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        role=user.role,
+        mfa_enabled=user.mfa_enabled,
+        mfa_enrolment_required=mfa.is_required(settings, user.role.value) and not user.mfa_enabled,
+    )
 
 
 def _set_cookies(response: Response, settings: Settings, session_token: str, csrf: str) -> None:
@@ -120,8 +137,34 @@ def login(
 
     if needs_rehash(user.password_hash):
         user.password_hash = hash_password(body.password)
-    throttle.clear(db, username)
 
+    if user.mfa_enabled:
+        # No session yet. The throttle is cleared only after the second step succeeds, so
+        # repeating the password step cannot reset the count of wrong codes.
+        token = mfa.create_challenge(db, user)
+        audit.add(
+            db,
+            action="auth.mfa_challenge",
+            outcome=audit.OUTCOME_SUCCESS,
+            user_id=user.id,
+            username=user.username,
+            request=request,
+        )
+        db.commit()
+        return LoginResponse(mfa_required=True, challenge=token)
+
+    throttle.clear(db, username)
+    return _start_session(db, settings, request, response, user)
+
+
+def _start_session(
+    db: Session,
+    settings: Settings,
+    request: Request,
+    response: Response,
+    user: User,
+    detail: dict[str, str | int] | None = None,
+) -> LoginResponse:
     token, csrf = new_token(), new_token()
     now = utcnow()
     db.add(
@@ -137,27 +180,105 @@ def login(
     db.flush()
     sessions.cleanup_expired(db, settings, now)
     evicted = sessions.enforce_session_cap(db, user.id, settings.max_sessions_per_user)
+    info: dict[str, str | int] = dict(detail or {})
+    if evicted:
+        info["sessions_evicted"] = evicted
     audit.add(
         db,
         action="auth.login",
         outcome=audit.OUTCOME_SUCCESS,
         user_id=user.id,
         username=user.username,
-        detail={"sessions_evicted": evicted} if evicted else None,
+        detail=info or None,
         request=request,
     )
     db.commit()
     _set_cookies(response, settings, token, csrf)
-    return LoginResponse(
-        user=UserOut(id=user.id, username=user.username, role=user.role), csrf_token=csrf
-    )
+    return LoginResponse(user=user_out(user, settings), csrf_token=csrf)
+
+
+@router.post("/login/mfa", response_model=LoginResponse, dependencies=[Depends(login_guard)])
+@limiter.limit(login_limit)
+def login_mfa(
+    request: Request,
+    body: MfaLoginRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> LoginResponse:
+    """Second login step: a challenge from the password step plus a TOTP or recovery code."""
+    challenge = db.execute(
+        select(MfaChallenge).where(MfaChallenge.token_hash == hash_token(body.challenge))
+    ).scalar_one_or_none()
+    now = utcnow()
+    if challenge is None or challenge.expires_at <= now:
+        if challenge is not None:
+            db.delete(challenge)
+        audit.record(
+            db,
+            action="auth.mfa_login",
+            outcome=audit.OUTCOME_FAILURE,
+            detail={"reason": "invalid_challenge"},
+            request=request,
+        )
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, _MFA_INVALID)
+    user = db.get(User, challenge.user_id)
+    if user is None or not user.is_active or not user.mfa_enabled:
+        db.delete(challenge)
+        db.commit()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, _MFA_INVALID)
+
+    remaining = throttle.locked_seconds(db, user.username)
+    if remaining:
+        audit.record(
+            db,
+            action="auth.mfa_login",
+            outcome=audit.OUTCOME_DENIED,
+            user_id=user.id,
+            username=user.username,
+            detail={"reason": "throttled"},
+            request=request,
+        )
+        raise HTTPException(
+            status.HTTP_429_TOO_MANY_REQUESTS,
+            "Too many failed attempts. Try again later.",
+            headers={"Retry-After": str(remaining)},
+        )
+
+    method = mfa.check_code(db, settings, user, body.code)
+    if method is None:
+        challenge.attempts += 1
+        exhausted = challenge.attempts >= mfa.CHALLENGE_MAX_ATTEMPTS
+        if exhausted:
+            db.delete(challenge)
+        audit.add(
+            db,
+            action="auth.mfa_login",
+            outcome=audit.OUTCOME_FAILURE,
+            user_id=user.id,
+            username=user.username,
+            detail={"reason": "invalid_code", "challenge_exhausted": exhausted},
+            request=request,
+        )
+        throttle.register_failure(db, settings, user.username)
+        db.commit()
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, _MFA_INVALID)
+
+    if not mfa.consume_challenge(db, challenge.id):
+        db.rollback()  # lost a race with a parallel use of the same challenge
+        raise HTTPException(status.HTTP_401_UNAUTHORIZED, _MFA_INVALID)
+    throttle.clear(db, user.username)
+    detail: dict[str, str | int] = {"mfa": method}
+    if method == "recovery":
+        detail["recovery_codes_left"] = mfa.recovery_remaining(db, user.id)
+    return _start_session(db, settings, request, response, user, detail)
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT)
 def logout(
     request: Request,
     response: Response,
-    user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES, allow_restricted=True)),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> None:
@@ -199,5 +320,13 @@ def logout_all(
 
 
 @router.get("/me", response_model=UserOut)
-def me(user: CurrentUser = Depends(require_roles(*ALL_ROLES))) -> UserOut:
-    return UserOut(id=user.id, username=user.username, role=user.role)
+def me(
+    user: CurrentUser = Depends(require_roles(*ALL_ROLES, allow_restricted=True)),
+) -> UserOut:
+    return UserOut(
+        id=user.id,
+        username=user.username,
+        role=user.role,
+        mfa_enabled=user.mfa_enabled,
+        mfa_enrolment_required=user.mfa_restricted,
+    )

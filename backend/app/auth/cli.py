@@ -3,6 +3,7 @@
     python -m app.auth.cli create <username> <role>   (password read from a prompt)
     python -m app.auth.cli cleanup-sessions
     python -m app.auth.cli set-password <username>    (also revokes that user's sessions)
+    python -m app.auth.cli reset-mfa <username>       (clears MFA and revokes sessions)
 
 For backwards compatibility ``python -m app.auth.cli <username> <role>`` still creates a user.
 """
@@ -12,6 +13,8 @@ import sys
 
 from sqlalchemy import select
 
+from app import audit
+from app.auth import mfa
 from app.auth.security import (
     PasswordPolicyError,
     hash_password,
@@ -60,6 +63,31 @@ def change_password(username: str, password: str) -> int:
         engine.dispose()
 
 
+def reset_mfa(username: str) -> int:
+    """Clear a user's MFA (secret, recovery codes, challenges), revoke their sessions and record
+    it in the audit log. Returns revoked sessions. This is the lost-device recovery path."""
+    engine = make_engine(get_settings().database_url)
+    try:
+        with make_sessionmaker(engine)() as db:
+            user = db.execute(select(User).where(User.username == username)).scalar_one_or_none()
+            if user is None:
+                raise LookupError("no such user")
+            mfa.clear_mfa(db, user)
+            revoked = revoke_user_sessions(db, user.id)
+            audit.add(
+                db,
+                action="mfa.cli_reset",
+                outcome=audit.OUTCOME_SUCCESS,
+                user_id=user.id,
+                username=user.username,
+                detail={"sessions_revoked": revoked},
+            )
+            db.commit()
+            return revoked
+    finally:
+        engine.dispose()
+
+
 def cleanup_sessions() -> int:
     settings = get_settings()
     engine = make_engine(settings.database_url)
@@ -84,12 +112,19 @@ def main() -> None:
             sys.exit(str(exc))
         print(f"Password updated; {revoked} session(s) revoked")
         return
+    if args[:1] == ["reset-mfa"] and len(args) == 2:
+        try:
+            revoked = reset_mfa(validate_username(args[1]))
+        except (LookupError, ValueError) as exc:
+            sys.exit(str(exc))
+        print(f"MFA cleared; {revoked} session(s) revoked. The user must enrol again at next login")
+        return
     if args[:1] == ["create"]:
         args = args[1:]
     if len(args) != 2:
         sys.exit(
             "usage: python -m app.auth.cli create <username> <role> | cleanup-sessions"
-            " | set-password <username>"
+            " | set-password <username> | reset-mfa <username>"
         )
     try:
         username = validate_username(args[0])

@@ -9,10 +9,29 @@ export const userSchema = z.object({
   id: z.uuid(),
   username: z.string(),
   role: roleSchema,
+  mfa_enabled: z.boolean().default(false),
+  mfa_enrolment_required: z.boolean().default(false),
 });
 export type User = z.infer<typeof userSchema>;
 
-export const loginResponseSchema = z.object({ user: userSchema, csrf_token: z.string() });
+export const loginResponseSchema = z.object({
+  user: userSchema.nullish(),
+  csrf_token: z.string().nullish(),
+  mfa_required: z.boolean().default(false),
+  challenge: z.string().nullish(),
+});
+
+export const mfaStatusSchema = z.object({
+  enabled: z.boolean(),
+  required: z.boolean(),
+  recovery_codes_left: z.number().int(),
+});
+export const mfaEnrolStartSchema = z.object({
+  secret: z.string(),
+  otpauth_uri: z.string(),
+  qr: z.array(z.array(z.boolean())),
+});
+export const recoveryCodesSchema = z.object({ recovery_codes: z.array(z.string()) });
 export const logoutAllResponseSchema = z.object({ revoked: z.number().int() });
 
 export const firewallSchema = z.object({
@@ -352,6 +371,10 @@ export const firewallCreateFormSchema = z.object({
     .refine((v) => /^https:\/\/[^/\s]+\/?$/i.test(v), "Use https://host[:port] with no path"),
   api_key: z.string().min(1, "API key is required").max(512),
   api_secret: z.string().min(1, "API secret is required").max(512),
+});
+
+export const mfaCodeFormSchema = z.object({
+  code: z.string().trim().min(1, "Enter a code").max(32),
 });
 
 export const loginFormSchema = z.object({
