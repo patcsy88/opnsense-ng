@@ -1,6 +1,6 @@
 # ADR-0018: Unbound host overrides and domain forwards (staged)
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-14
 - Deciders: project owner
 
@@ -156,13 +156,13 @@ it for ADR-0010), and the test confirms that the privilege allows writes.
   server can still be wrong or hostile.
 - **Show MX/TXT hosts as editable.** Rejected: unreviewed surface for the first release.
 
-## Questions for the owner
+## Owner decisions (2026-11-14)
 
-1. **Scope:** are A/AAAA hosts and `type=forward` forwards enough for the first release (no MX, TXT,
-   aliases or DNS-over-TLS)?
-2. **Risk:** is every forward high risk, as proposed? And should a host inside a forwarded domain be
-   high risk too?
-3. **Toggle:** should enable/disable be included now (it exists in Unbound, unlike Dnsmasq), and
-   should disabling a forward count as high risk?
-4. **Visibility:** are the lists admin and network_admin only, as proposed?
-5. **Order:** hosts first, lab test, then forwards, as in ADR-0017?
+All accepted as proposed: (1) first release is A/AAAA host overrides and `type=forward` forwards
+only; (2) every forward is high risk, and so is a host inside a forwarded domain; (3) enable/disable
+is included, host toggles are normal risk and any forward toggle is high risk; (4) the lists are
+visible to `admin` and `network_admin` only; (5) hosts first, then a lab test, then forwards.
+
+## Build status
+
+Not started. Step 1 (shared apply generalisation and host overrides) is next.
