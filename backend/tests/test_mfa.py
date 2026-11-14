@@ -12,10 +12,9 @@ from sqlalchemy import func, select, update
 from app.auth import cli, mfa, totp
 from app.auth.deps import RBAC_DEPENDENCIES
 from app.core.config import get_settings
-from app.core.ratelimit import limiter
 from app.db.models import AuditLog, MfaChallenge, MfaRecoveryCode, Role, User, utcnow
 from app.db.models import Session as UserSession
-from tests.conftest import PASSWORD, csrf_headers, login, make_user
+from tests.conftest import PASSWORD, csrf_headers, login, make_user, reset_limits
 from tests.test_security import _dependant_calls, _flatten_routes, db_rows, override
 
 pytestmark = pytest.mark.usefixtures("db")
@@ -54,7 +53,7 @@ def test_secret_uri_and_qr() -> None:
 def current_code(client: httpx.AsyncClient, username: str, *, fresh: bool = True) -> str:
     """A valid code for the user's stored secret. Only three time steps are accepted at a time
     and each is single use, so by default the used-step marker is wound back first."""
-    limiter.reset()
+    reset_limits()
     with client.app.state.sessionmaker() as s:  # type: ignore[attr-defined]
         user = s.execute(select(User).where(User.username == username)).scalar_one()
         secret = mfa.load_secret(get_settings(), user)
@@ -177,7 +176,7 @@ async def test_code_cannot_be_reused_and_challenge_is_single_use(
     code = current_code(app_client, "bob")
     assert (await two_step(app_client, "bob", code)).status_code == 200
     app_client.cookies.clear()
-    limiter.reset()
+    reset_limits()
     assert (await two_step(app_client, "bob", code)).status_code == 401  # same step: replay
 
     first = await login(app_client, "bob")
@@ -204,7 +203,7 @@ async def test_challenge_expiry_attempts_and_unknown(app_client: httpx.AsyncClie
     first = await login(app_client, "cy")
     token = first.json()["challenge"]
     for _ in range(mfa.CHALLENGE_MAX_ATTEMPTS):
-        limiter.reset()
+        reset_limits()
         r = await app_client.post(
             "/api/v1/auth/login/mfa", json={"challenge": token, "code": "000000"}
         )

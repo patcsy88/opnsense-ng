@@ -14,11 +14,18 @@ from app.auth.cli import change_password
 from app.auth.deps import RBAC_DEPENDENCIES
 from app.auth.security import needs_rehash
 from app.core.config import Settings, get_settings
-from app.core.ratelimit import limiter
 from app.db.models import AuditLog, Firewall, LoginThrottle, Role, User
 from app.db.models import Session as UserSession
 from app.main import create_app
-from tests.conftest import CSRF_COOKIE, PASSWORD, SESSION_COOKIE, csrf_headers, login, make_user
+from tests.conftest import (
+    CSRF_COOKIE,
+    PASSWORD,
+    SESSION_COOKIE,
+    csrf_headers,
+    login,
+    make_user,
+    reset_limits,
+)
 from tests.test_api import API_KEY, FW_BODY, audit_rows, create_fw, login_as
 
 pytestmark = pytest.mark.usefixtures("db")
@@ -357,7 +364,7 @@ async def test_username_throttle_backoff_generic_and_persistent(
     app_client: httpx.AsyncClient,
 ) -> None:
     override(app_client, login_lockout_threshold=3, login_rate_limit="100/minute")
-    limiter.reset()
+    reset_limits()
     await make_user(app_client, "alice", Role.admin)
     for _ in range(3):
         assert (await login(app_client, "alice", "wrong-password-x")).status_code == 401
@@ -366,7 +373,7 @@ async def test_username_throttle_backoff_generic_and_persistent(
     assert locked.status_code == 429 and "Retry-After" in locked.headers
     assert "alice" not in locked.text
     # same behaviour for a username that does not exist
-    limiter.reset()  # the per-IP limiter is a separate mechanism; keep it out of this test
+    reset_limits()  # the per-IP limiter is a separate mechanism; keep it out of this test
     for _ in range(3):
         await login(app_client, "ghost", "wrong-password-x")
     ghost = await login(app_client, "ghost")
@@ -381,7 +388,7 @@ async def test_username_throttle_backoff_generic_and_persistent(
 
 async def test_lock_expires_and_success_clears_counter(app_client: httpx.AsyncClient) -> None:
     s = override(app_client, login_lockout_threshold=2, login_rate_limit="100/minute")
-    limiter.reset()
+    reset_limits()
     await make_user(app_client, "alice", Role.admin)
     await login(app_client, "alice", "wrong-password-x")
     await login(app_client, "alice", "wrong-password-x")
@@ -420,7 +427,7 @@ async def test_last_seen_is_refreshed(app_client: httpx.AsyncClient) -> None:
 
 async def test_concurrent_session_cap_revokes_oldest(app_client: httpx.AsyncClient) -> None:
     override(app_client, max_sessions_per_user=2, login_rate_limit="100/minute")
-    limiter.reset()
+    reset_limits()
     await make_user(app_client, "alice", Role.admin)
     tokens = []
     for _ in range(3):
@@ -438,7 +445,7 @@ async def test_logout_all_and_password_change_revoke_sessions(
     app_client: httpx.AsyncClient,
 ) -> None:
     override(app_client, login_rate_limit="100/minute")
-    limiter.reset()
+    reset_limits()
     await make_user(app_client, "alice", Role.admin)
     other = httpx.AsyncClient(transport=app_client._transport, base_url="https://test")
     await login(other, "alice")

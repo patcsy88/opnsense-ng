@@ -8,10 +8,9 @@ from sqlalchemy import func, select, update
 
 from app.auth.deps import RBAC_DEPENDENCIES
 from app.core.config import get_settings
-from app.core.ratelimit import limiter
 from app.db.models import AuditLog, MfaRecoveryCode, Role, User
 from app.db.models import Session as UserSession
-from tests.conftest import PASSWORD, csrf_headers, login, make_user
+from tests.conftest import PASSWORD, csrf_headers, login, make_user, reset_limits
 from tests.test_mfa import current_code, enrol
 from tests.test_security import _dependant_calls, _flatten_routes, db_rows, override
 
@@ -33,7 +32,7 @@ async def post(client: httpx.AsyncClient, path: str, body: object | None = None)
 
 async def as_user(client: httpx.AsyncClient, name: str, password: str = PASSWORD) -> None:
     client.cookies.clear()
-    limiter.reset()
+    reset_limits()
     assert (await login(client, name, password)).status_code == 200
 
 
@@ -141,7 +140,7 @@ async def test_password_change_ends_other_sessions_and_needs_mfa_code(
     transport = httpx.ASGITransport(app=app_client.app)  # type: ignore[attr-defined]
     other = httpx.AsyncClient(transport=transport, base_url="https://test")
     async with other:
-        limiter.reset()
+        reset_limits()
         first = await login(other, "eve")
         code = current_code(app_client, "eve")
         done = await other.post(
@@ -198,7 +197,7 @@ async def test_role_change_and_deactivation_end_sessions(app_client: httpx.Async
     app_client.cookies.clear()
     app_client.cookies.update(ann_cookies)
     assert (await app_client.get("/api/v1/auth/me")).status_code == 401
-    limiter.reset()
+    reset_limits()
     assert (await login(app_client, "ann")).status_code == 401  # inactive: same answer as bad login
     await as_user(app_client, "boss")
     on = await post(app_client, f"{USERS}/{ann}/reactivate")
@@ -262,7 +261,7 @@ async def test_reset_password_forces_change_and_ends_sessions(
     assert r.status_code == 200 and r.json()["user"]["must_change_password"] is True
     assert r.json()["user"]["sessions"] == 0
     assert (await login(app_client, "ann", PASSWORD)).status_code == 401
-    limiter.reset()
+    reset_limits()
     await as_user(app_client, "ann", temp)
     assert (await app_client.get("/api/v1/firewalls")).json()[
         "detail"

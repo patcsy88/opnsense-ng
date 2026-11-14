@@ -14,6 +14,7 @@ from app.auth.deps import (
     get_db,
     require_roles,
 )
+from app.auth.loginlimit import login_rate_limit
 from app.auth.schemas import (
     LoginRequest,
     LoginResponse,
@@ -30,7 +31,6 @@ from app.auth.security import (
     verify_password,
 )
 from app.core.config import Settings, get_settings
-from app.core.ratelimit import limiter, login_limit
 from app.db.models import MfaChallenge, User, utcnow
 from app.db.models import Session as UserSession
 
@@ -95,8 +95,11 @@ def login_guard(request: Request, settings: Settings = Depends(get_settings)) ->
         raise HTTPException(status.HTTP_403_FORBIDDEN, "Origin not allowed")
 
 
-@router.post("/login", response_model=LoginResponse, dependencies=[Depends(login_guard)])
-@limiter.limit(login_limit)
+@router.post(
+    "/login",
+    response_model=LoginResponse,
+    dependencies=[Depends(login_guard), Depends(login_rate_limit)],
+)
 def login(
     request: Request,
     body: LoginRequest,
@@ -198,8 +201,11 @@ def _start_session(
     return LoginResponse(user=user_out(user, settings), csrf_token=csrf)
 
 
-@router.post("/login/mfa", response_model=LoginResponse, dependencies=[Depends(login_guard)])
-@limiter.limit(login_limit)
+@router.post(
+    "/login/mfa",
+    response_model=LoginResponse,
+    dependencies=[Depends(login_guard), Depends(login_rate_limit)],
+)
 def login_mfa(
     request: Request,
     body: MfaLoginRequest,

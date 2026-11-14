@@ -12,7 +12,7 @@
 | Input validation | Pydantic schemas on every request |
 | CSRF | Required for all state-changing requests |
 | Audit | User, action, firewall, timestamp, outcome, independent of OPNsense logs |
-| Rate limiting | All endpoints; stricter on login |
+| Rate limiting | All endpoints; stricter on login. The login limits (`POST /auth/login`, `POST /auth/login/mfa`, `LOGIN_RATE_LIMIT`, default 5/minute per IP) are counted in PostgreSQL, so they are exact across restarts and backend processes (ADR-0014). The general limit (`DEFAULT_RATE_LIMIT`) is in memory per process |
 | Network | Restrict to trusted networks or VPN |
 | Client | No credentials or firewall data in localStorage or service-worker caches |
 | Changes | Staged, validated, reviewed, explicitly applied; stale-revision detection; locking |

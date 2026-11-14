@@ -14,7 +14,7 @@ import sys
 from sqlalchemy import select
 
 from app import audit
-from app.auth import mfa
+from app.auth import loginlimit, mfa
 from app.auth.security import (
     PasswordPolicyError,
     hash_password,
@@ -93,7 +93,7 @@ def cleanup_sessions() -> int:
     engine = make_engine(settings.database_url)
     try:
         with make_sessionmaker(engine)() as db:
-            removed = cleanup_expired(db, settings)
+            removed = cleanup_expired(db, settings) + loginlimit.cleanup(db)
             db.commit()
             return removed
     finally:

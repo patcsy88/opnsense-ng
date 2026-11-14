@@ -10,7 +10,7 @@ import pytest_asyncio
 from alembic import command
 from alembic.config import Config
 from cryptography.fernet import Fernet
-from sqlalchemy import text
+from sqlalchemy import create_engine, text
 
 TEST_DB = os.environ.get("TEST_DATABASE_URL")
 TEST_SESSION_SECRET = "x" * 48  # test-only value
@@ -33,6 +33,18 @@ from app.db.models import Role, User  # noqa: E402
 from app.main import create_app  # noqa: E402
 
 PASSWORD = "correct-horse-battery"
+
+
+def reset_limits() -> None:
+    """Clear the per-IP limits: the in-memory general limiter and the PostgreSQL login counters
+    (ADR-0014)."""
+    limiter.reset()
+    engine = create_engine(os.environ["DATABASE_URL"])
+    with engine.begin() as conn:
+        conn.execute(text("DELETE FROM rate_limit_counters"))
+    engine.dispose()
+
+
 SESSION_COOKIE = "__Host-session"
 CSRF_COOKIE = "__Host-csrf_token"
 
@@ -66,7 +78,7 @@ async def db(migrated_db: None) -> AsyncIterator[None]:
             text(
                 "TRUNCATE audit_log, change_request_events, change_requests, sessions, "
                 "mfa_challenges, mfa_recovery_codes, "
-                "firewalls, users, login_throttle "
+                "firewalls, users, login_throttle, rate_limit_counters "
                 "RESTART IDENTITY CASCADE"
             )
         )

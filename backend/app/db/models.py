@@ -217,3 +217,15 @@ class AuditLog(Base):
         Index("ix_audit_log_firewall_id", "firewall_id"),
         Index("ix_audit_log_ip_action_ts", "source_ip", "action", "timestamp"),
     )
+
+
+class RateLimitCounter(Base):
+    """Fixed-window request counters for the login limits (ADR-0014). Holds source IPs for at
+    most about an hour; rows are removed by an opportunistic cleanup and the CLI."""
+
+    __tablename__ = "rate_limit_counters"
+    __table_args__ = (Index("ix_rate_limit_counters_window_start", "window_start"),)
+
+    key: Mapped[str] = mapped_column(String(128), primary_key=True)
+    window_start: Mapped[datetime] = mapped_column(DateTime(timezone=True), primary_key=True)
+    count: Mapped[int] = mapped_column(Integer, nullable=False, default=0)

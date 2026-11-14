@@ -76,7 +76,7 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 ## Operations
 
 - Logs: `docker compose logs -f backend`
-- Remove expired sessions: `docker compose exec backend python -m app.auth.cli cleanup-sessions`
+- Remove expired sessions and old login rate-limit counters: `docker compose exec backend python -m app.auth.cli cleanup-sessions`
 - Migrate only: `docker compose run --rm --entrypoint alembic backend upgrade head`
 - Database backup: `docker compose exec postgres pg_dump -U opnsense_mgr opnsense_mgr > backup.sql`
 - Lost authenticator or password: an admin can reset MFA or the password in Administration, Users. The CLI below is the break-glass path when no admin can sign in. Migration `0005` adds `users.must_change_password`; it runs on start
