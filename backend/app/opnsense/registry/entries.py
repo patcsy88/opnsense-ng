@@ -31,6 +31,12 @@ UNBOUND_HOSTS_DELETE = "unbound.hosts.delete"
 UNBOUND_HOSTS_ENABLE = "unbound.hosts.enable"
 UNBOUND_HOSTS_DISABLE = "unbound.hosts.disable"
 UNBOUND_RECONFIGURE = "unbound.reconfigure"
+UNBOUND_FORWARDS_LIST = "unbound.forwards.list"
+UNBOUND_FORWARDS_ADD = "unbound.forwards.add"
+UNBOUND_FORWARDS_UPDATE = "unbound.forwards.update"
+UNBOUND_FORWARDS_DELETE = "unbound.forwards.delete"
+UNBOUND_FORWARDS_ENABLE = "unbound.forwards.enable"
+UNBOUND_FORWARDS_DISABLE = "unbound.forwards.disable"
 SERVICES_START = "services.start"
 SERVICES_STOP = "services.stop"
 SERVICES_RESTART = "services.restart"
@@ -358,6 +364,70 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Restarts Unbound to activate saved changes; DNS pauses for all clients. Apply only.",
+    ),
+    Operation(
+        operation_id=UNBOUND_FORWARDS_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/unbound/settings/searchForward",
+        required_privilege="Services: Unbound",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Unbound domain forwards, DoT rows filtered out (ADR-0018).",
+    ),
+    Operation(
+        operation_id=UNBOUND_FORWARDS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/addForward",
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Saves a forward, not yet active. Reviewed apply only (ADR-0018).",
+    ),
+    Operation(
+        operation_id=UNBOUND_FORWARDS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/setForward/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Upsert, so apply confirms it exists first. Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=UNBOUND_FORWARDS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/delForward/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Deletes a forward. Reviewed apply only (ADR-0018).",
+    ),
+    Operation(
+        operation_id=UNBOUND_FORWARDS_ENABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/toggleForward/{uuid}/1",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Enables a forward with an explicit state. Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=UNBOUND_FORWARDS_DISABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/toggleForward/{uuid}/0",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Disables a forward with an explicit state. Reviewed apply only.",
     ),
     Operation(
         operation_id=DNS_STATS,

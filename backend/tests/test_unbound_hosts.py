@@ -22,6 +22,7 @@ pytestmark = pytest.mark.usefixtures("db")
 
 BASE = "https://fw.example.test/api/unbound"
 SEARCH = f"{BASE}/settings/searchHostOverride"
+FORWARDS = f"{BASE}/settings/searchForward"
 RECONFIGURE = f"{BASE}/service/reconfigure"
 TARGET = "0b3a6c1e-1d2f-4a5b-8c7d-9e0f1a2b3c4d"
 NEW_UUID = "5d6e7f80-1a2b-4c3d-8e4f-5a6b7c8d9e0f"
@@ -60,6 +61,7 @@ async def stage(
 ) -> httpx.Response:
     with respx.mock(assert_all_called=False) as router:
         router.get(SEARCH).respond(200, json={"rows": rows})
+        router.get(FORWARDS).respond(200, json={"rows": []})
         return await client.post(
             f"{CHANGES}/{path}", json={"firewall_id": fid, **body}, headers=csrf_headers(client)
         )
@@ -149,6 +151,7 @@ async def test_create_only_reads_and_is_normal_risk(app_client: httpx.AsyncClien
     fid = await setup(app_client)
     with respx.mock(assert_all_called=False) as router:
         router.get(SEARCH).respond(200, json={"rows": [live()]})
+        router.get(FORWARDS).respond(200, json={"rows": []})
         writes = router.post(url__startswith=BASE)
         r = await app_client.post(
             f"{CHANGES}/unbound-hosts",

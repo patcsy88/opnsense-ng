@@ -32,12 +32,16 @@ export function ChangeStatusBadge({ status }: { status: string }) {
 }
 
 export function targetName(c: ChangeRequest): string | undefined {
-  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" || c.kind === "dnsmasq_domain" || c.kind === "unbound_host" ? "label" : "name";
+  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" || c.kind === "dnsmasq_domain" || c.kind === "unbound_host" || c.kind === "unbound_forward" ? "label" : "name";
   const value = c.proposed?.[key];
   return typeof value === "string" ? value : undefined;
 }
 
 export function describeChange(c: ChangeRequest): string {
+  if (c.kind === "unbound_forward") {
+    if (c.action === "toggle") return `${c.proposed?.enabled === false ? "disable" : "enable"} DNS forward ${targetName(c) ?? "?"}`;
+    return `${c.action} DNS forward ${targetName(c) ?? "?"}`;
+  }
   if (c.kind === "unbound_host") {
     if (c.action === "toggle") return `${c.proposed?.enabled === false ? "disable" : "enable"} DNS host override ${targetName(c) ?? "?"}`;
     return `${c.action} DNS host override ${targetName(c) ?? "?"}`;
@@ -61,6 +65,11 @@ export function describeChange(c: ChangeRequest): string {
 
 export function describeEffect(c: ChangeRequest, firewall: string): string {
   const name = targetName(c) ?? "?";
+  if (c.kind === "unbound_forward") {
+    const verb =
+      c.action === "create" ? "creates" : c.action === "update" ? "changes" : c.action === "delete" ? "deletes" : c.proposed?.enabled === false ? "disables" : "enables";
+    return `This ${verb} the forward "${name}" on ${firewall} and restarts Unbound. It decides which DNS server answers for that whole domain, and DNS pauses for a moment for every client on the network.`;
+  }
   if (c.kind === "unbound_host") {
     const verb =
       c.action === "create" ? "creates" : c.action === "update" ? "changes" : c.action === "delete" ? "deletes" : c.proposed?.enabled === false ? "disables" : "enables";

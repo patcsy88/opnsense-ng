@@ -15,7 +15,7 @@ from app.core.crypto import CredentialDecryptionError
 from app.db.models import Firewall, Role
 from app.opnsense.errors import FirewallError
 from app.opnsense.normalise.dnsmasq import DomainInfo, HostInfo
-from app.opnsense.normalise.unbound import UnboundHostInfo
+from app.opnsense.normalise.unbound import UnboundForwardInfo, UnboundHostInfo
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["dnsmasq"])
 
@@ -120,4 +120,39 @@ def list_unbound_hosts(
         firewall_id=firewall_id,
         hosts=hosts,
         registry_verified=get_operation(UNBOUND_HOSTS_LIST).verified,
+    )
+
+
+class UnboundForwardsOut(BaseModel):
+    firewall_id: uuid.UUID
+    forwards: list[UnboundForwardInfo]
+    registry_verified: bool
+
+
+@router.get("/{firewall_id}/unbound/forwards", response_model=UnboundForwardsOut)
+def list_unbound_forwards(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(Role.admin, Role.network_admin)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> UnboundForwardsOut:
+    """Unbound domain forwards (ADR-0018). Admin and network_admin only."""
+    from app.opnsense.registry.entries import UNBOUND_FORWARDS_LIST, get_operation
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Firewall not found")
+    try:
+        forwards = apply_changes.read_unbound_forwards(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except CredentialDecryptionError:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error") from None
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    return UnboundForwardsOut(
+        firewall_id=firewall_id,
+        forwards=forwards,
+        registry_verified=get_operation(UNBOUND_FORWARDS_LIST).verified,
     )

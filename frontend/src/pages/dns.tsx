@@ -18,6 +18,7 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { UnboundForwards } from "@/features/changes/unbound-forwards";
 import { UnboundHosts } from "@/features/changes/unbound-hosts";
 import { useAuth } from "@/features/auth/auth";
 import { api } from "@/lib/api";
@@ -95,7 +96,7 @@ export function DnsPage() {
   });
   const { hasRole } = useAuth();
   const canManage = hasRole("admin") || hasRole("network_admin");
-  const [tab, setTab] = useState<"overview" | "hosts">("overview");
+  const [tab, setTab] = useState<"overview" | "hosts" | "forwards">("overview");
   const [chosen, setChosen] = useState<string | null>(null);
   const firewalls = options.data ?? [];
   const selected = chosen ?? firewalls[0]?.id ?? null;
@@ -149,6 +150,7 @@ export function DnsPage() {
             [
               ["overview", "Overview"],
               ["hosts", "Host overrides"],
+              ["forwards", "Domain forwards"],
             ] as const
           ).map(([id, text]) => (
             <Button
@@ -167,6 +169,9 @@ export function DnsPage() {
 
       {canManage && tab === "hosts" && selected && (
         <UnboundHosts firewallId={selected} />
+      )}
+      {canManage && tab === "forwards" && selected && (
+        <UnboundForwards firewallId={selected} />
       )}
       {tab === "overview" && q.isError && (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />

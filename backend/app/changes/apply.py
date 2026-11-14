@@ -45,7 +45,12 @@ from app.opnsense.normalise.dnsmasq import (
     normalise_hosts,
 )
 from app.opnsense.normalise.rules import RuleInfo
-from app.opnsense.normalise.unbound import UnboundHostInfo, normalise_unbound_hosts
+from app.opnsense.normalise.unbound import (
+    UnboundForwardInfo,
+    UnboundHostInfo,
+    normalise_unbound_forwards,
+    normalise_unbound_hosts,
+)
 from app.opnsense.registry.entries import (
     DNSMASQ_DOMAINS_ADD,
     DNSMASQ_DOMAINS_DELETE,
@@ -74,6 +79,12 @@ from app.opnsense.registry.entries import (
     FORWARDS_DISABLE,
     FORWARDS_ENABLE,
     FORWARDS_UPDATE,
+    UNBOUND_FORWARDS_ADD,
+    UNBOUND_FORWARDS_DELETE,
+    UNBOUND_FORWARDS_DISABLE,
+    UNBOUND_FORWARDS_ENABLE,
+    UNBOUND_FORWARDS_LIST,
+    UNBOUND_FORWARDS_UPDATE,
     UNBOUND_HOSTS_ADD,
     UNBOUND_HOSTS_DELETE,
     UNBOUND_HOSTS_DISABLE,
@@ -166,6 +177,7 @@ def begin_apply(
             "dnsmasq_host": "description",
             "dnsmasq_domain": "description",
             "unbound_host": "description",
+            "unbound_forward": "description",
         }.get(kind, "rule label")
         raise ApplyRefused(f"Type the {what} to confirm this high-risk change")
     fw = db.get(Firewall, cr.firewall_id)
@@ -1114,6 +1126,82 @@ def apply_unbound_host_change(
     confirm_name: str | None,
 ) -> ChangeRequest:
     return _apply_resolver(UNBOUND_HOST_SPEC, db, change_id, user, settings, request, confirm_name)
+
+
+def read_unbound_forwards(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[UnboundForwardInfo]:
+    """Read-only: the Unbound domain forwards currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, UNBOUND_FORWARDS_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_unbound_forwards(raw).forwards)
+
+
+def unbound_forward_conflict(
+    proposed: dict[str, Any], forwards: list[UnboundForwardInfo], own: str | None
+) -> str | None:
+    key = domain_key(proposed.get("domain"))
+    for f in forwards:
+        if f.uuid != own and domain_key(f.domain) == key:
+            return "A forward for this domain already exists on the firewall"
+    return None
+
+
+def unbound_forward_payload(proposed: dict[str, Any]) -> dict[str, Any]:
+    """Body for addForward/setForward. The type is always `forward`; TCP-upstream and
+    forward-first stay at their defaults."""
+    port = proposed.get("port")
+    return {
+        "dot": {
+            "enabled": "1" if proposed.get("enabled", True) else "0",
+            "type": "forward",
+            "domain": proposed["domain"],
+            "server": proposed["server"],
+            "port": str(port) if port is not None else "",
+            "description": proposed["description"],
+        }
+    }
+
+
+UNBOUND_FORWARD_SPEC = ResolverSpec(
+    kind="unbound_forward",
+    noun="forward",
+    list_op=UNBOUND_FORWARDS_LIST,
+    add_op=UNBOUND_FORWARDS_ADD,
+    update_op=UNBOUND_FORWARDS_UPDATE,
+    delete_op=UNBOUND_FORWARDS_DELETE,
+    normalise=lambda raw: list(normalise_unbound_forwards(raw).forwards),
+    conflict=unbound_forward_conflict,
+    payload=unbound_forward_payload,
+    same=lambda f, p: domain_key(f.domain) == domain_key(p.get("domain")),
+    reconfigure_op=UNBOUND_RECONFIGURE,
+    toggle_on=UNBOUND_FORWARDS_ENABLE,
+    toggle_off=UNBOUND_FORWARDS_DISABLE,
+)
+
+
+def apply_unbound_forward_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    return _apply_resolver(
+        UNBOUND_FORWARD_SPEC, db, change_id, user, settings, request, confirm_name
+    )
 
 
 def apply_host_change(

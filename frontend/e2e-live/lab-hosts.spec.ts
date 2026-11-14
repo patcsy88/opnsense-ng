@@ -263,3 +263,68 @@ test("Unbound host override: create, edit, disable, delete on the lab firewall",
   await open();
   await expect(row()).toHaveCount(0);
 });
+
+const FORWARD_DOMAIN = "zz-adr18-fwd.test";
+const FORWARD_DESCRIPTION = "ADR18 lab test forward";
+
+test("Unbound domain forward: create, edit, disable, enable, delete on the lab firewall", async () => {
+  test.skip(!USER || !PASSWORD, "run through scripts/e2e-lab-hosts.sh");
+  const options = await (await page.request.get("/api/v1/firewalls")).json();
+  const fw = options.find((f: { name: string }) => f.name === FIREWALL);
+  expect(fw?.allow_writes, `allow_writes is on for ${FIREWALL}`).toBe(true);
+
+  const row = () => page.getByRole("row", { name: new RegExp(FORWARD_DOMAIN) });
+  const open = async () => {
+    await page.goto("/dns");
+    await page.locator("select").selectOption({ label: FIREWALL });
+    await page.getByRole("tab", { name: "Domain forwards" }).click();
+  };
+  const stageDialogAction = async (name: string) => {
+    await page.getByRole("button", { name }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Create change request" })
+      .click();
+    await page.waitForURL(/\/changes\//);
+  };
+
+  await open();
+  await expect(row()).toHaveCount(0);
+
+  await page.getByRole("button", { name: "New forward" }).click();
+  await page.getByLabel("Domain", { exact: true }).fill(FORWARD_DOMAIN);
+  await page.getByLabel("DNS server IP", { exact: true }).fill("192.0.2.53");
+  await page
+    .getByLabel("Description", { exact: true })
+    .fill(FORWARD_DESCRIPTION);
+  await page.getByRole("button", { name: "Create change request" }).click();
+  await page.waitForURL(/\/changes\//);
+  await review(page, FORWARD_DESCRIPTION);
+  await open();
+  await expect(row()).toContainText("192.0.2.53");
+
+  await page
+    .getByRole("button", { name: `Edit forward ${FORWARD_DESCRIPTION}` })
+    .click();
+  await page.getByLabel("DNS server IP", { exact: true }).fill("192.0.2.54");
+  await page.getByRole("button", { name: "Create change request" }).click();
+  await page.waitForURL(/\/changes\//);
+  await review(page, FORWARD_DESCRIPTION);
+  await open();
+  await expect(row()).toContainText("192.0.2.54");
+
+  await stageDialogAction(`Disable forward ${FORWARD_DESCRIPTION}`);
+  await review(page, FORWARD_DESCRIPTION);
+  await open();
+  await expect(row()).toContainText("Disabled");
+
+  await stageDialogAction(`Enable forward ${FORWARD_DESCRIPTION}`);
+  await review(page, FORWARD_DESCRIPTION);
+  await open();
+  await expect(row()).not.toContainText("Disabled");
+
+  await stageDialogAction(`Delete forward ${FORWARD_DESCRIPTION}`);
+  await review(page, FORWARD_DESCRIPTION);
+  await open();
+  await expect(row()).toHaveCount(0);
+});

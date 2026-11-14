@@ -20,7 +20,15 @@ from app.db.models import ChangeRequest, ChangeRequestEvent, Firewall, Role
 
 MANAGE_ROLES = frozenset({Role.admin, Role.network_admin})
 KINDS = frozenset(
-    {"alias", "rule", "nat_forward", "dnsmasq_host", "dnsmasq_domain", "unbound_host"}
+    {
+        "alias",
+        "rule",
+        "nat_forward",
+        "dnsmasq_host",
+        "dnsmasq_domain",
+        "unbound_host",
+        "unbound_forward",
+    }
 )
 ACTIONS = frozenset({"create", "update", "delete", "toggle"})
 NOTE_MAX = 500

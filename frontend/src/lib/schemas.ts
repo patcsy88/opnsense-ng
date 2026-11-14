@@ -431,6 +431,30 @@ export interface UnboundHostProposalInput {
   enabled: boolean;
 }
 
+export const unboundForwardSchema = z.object({
+  uuid: z.string().nullable(),
+  enabled: z.boolean(),
+  domain: z.string().nullable(),
+  server: z.string().nullable(),
+  port: z.string().nullable(),
+  description: z.string().nullable(),
+});
+export type UnboundForward = z.infer<typeof unboundForwardSchema>;
+
+export const unboundForwardsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  forwards: z.array(unboundForwardSchema),
+  registry_verified: z.boolean(),
+});
+
+export interface UnboundForwardProposalInput {
+  domain: string;
+  server: string;
+  port: number | null;
+  description: string;
+  enabled: boolean;
+}
+
 export const servicesResponseSchema = z.object({
   firewall_id: z.uuid(),
   services: z.array(serviceSchema),

@@ -58,3 +58,47 @@ def normalise_unbound_hosts(raw: Any) -> UnboundHostsResult:
             )
         )
     return UnboundHostsResult(hosts=out, truncated=len(rows) > MAX_HOSTS)
+
+
+class UnboundForwardInfo(BaseModel):
+    uuid: str | None = None
+    enabled: bool = True
+    domain: str | None = None
+    server: str | None = None
+    port: str | None = None
+    description: str | None = None
+
+
+class UnboundForwardsResult(BaseModel):
+    forwards: list[UnboundForwardInfo] = []
+    truncated: bool = False
+
+
+def normalise_unbound_forwards(raw: Any) -> UnboundForwardsResult:
+    """Tolerant mapping of `rows`. Only `type=forward` rows are kept; DNS-over-TLS rows are not
+    ours. A row without a type is treated as a forward."""
+    rows = raw.get("rows") if isinstance(raw, dict) else None
+    if not isinstance(rows, list):
+        return UnboundForwardsResult()
+    out: list[UnboundForwardInfo] = []
+    for row in rows[:MAX_HOSTS]:
+        if not isinstance(row, dict):
+            continue
+        kind = _text(row.get("type"), 16)
+        if kind is not None and kind.lower() != "forward":
+            continue
+        uuid = _text(row.get("uuid"), 64)
+        if uuid is None:
+            continue
+        port = row.get("port")
+        out.append(
+            UnboundForwardInfo(
+                uuid=uuid,
+                enabled=row.get("enabled") is None or _flag(row.get("enabled")),
+                domain=_text(row.get("domain"), 255),
+                server=_text(row.get("server"), 64),
+                port=_text(str(port) if isinstance(port, int) else port, 5),
+                description=_text(row.get("description"), 255),
+            )
+        )
+    return UnboundForwardsResult(forwards=out, truncated=len(rows) > MAX_HOSTS)

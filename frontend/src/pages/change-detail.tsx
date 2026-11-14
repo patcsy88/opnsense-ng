@@ -119,6 +119,33 @@ function currentDomainRows(s: Record<string, unknown>): [string, string][] {
   ];
 }
 
+function unboundForwardRows(p: Record<string, unknown>): [string, string][] {
+  if (p.server === undefined) {
+    return [
+      ["Forward", String(p.label ?? "—")],
+      ...(p.enabled === undefined ? [] : ([["Enabled", p.enabled ? "Yes" : "No"]] as [string, string][])),
+      ...(p.domain === undefined ? [] : ([["Domain", String(p.domain)]] as [string, string][])),
+      ...risk(p),
+    ];
+  }
+  return [
+    ["Description", String(p.description ?? "—")],
+    ["Domain", String(p.domain ?? "—")],
+    ["DNS server", `${String(p.server)}${p.port ? `:${String(p.port)}` : ""}`],
+    ["Enabled", p.enabled === false ? "No" : "Yes"],
+    ...risk(p),
+  ];
+}
+
+function currentUnboundForwardRows(s: Record<string, unknown>): [string, string][] {
+  return [
+    ["Domain", String(s.domain ?? "—")],
+    ["DNS server", `${String(s.server ?? "—")}${s.port ? `:${String(s.port)}` : ""}`],
+    ["Enabled", s.enabled === false ? "No" : "Yes"],
+    ["Description", String(s.description ?? "—")],
+  ];
+}
+
 function unboundHostRows(p: Record<string, unknown>): [string, string][] {
   const name = `${String(p.hostname)}${p.domain ? `.${String(p.domain)}` : ""}`;
   if (p.server === undefined) {
@@ -152,6 +179,7 @@ function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [
   if (kind === "dnsmasq_host") return hostRows(p);
   if (kind === "dnsmasq_domain") return domainRows(p);
   if (kind === "unbound_host") return unboundHostRows(p);
+  if (kind === "unbound_forward") return unboundForwardRows(p);
   if (kind === "nat_forward") return forwardRows(p);
   if (kind === "rule" && p.action !== undefined) {
     const ports = (v: unknown) => (v ? `:${String(v)}` : "");
@@ -257,7 +285,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : "Alias"} to delete` : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : c.kind === "unbound_forward" ? "Forward" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -285,6 +313,8 @@ export function ChangeDetailPage() {
                     ? "This domain override will be deleted. See the current override below."
                     : c.kind === "unbound_host"
                     ? "This host override will be deleted. See the current override below."
+                    : c.kind === "unbound_forward"
+                    ? "This forward will be deleted. See the current forward below."
                     : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
@@ -352,6 +382,27 @@ export function ChangeDetailPage() {
           <CardContent>
             <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
               {ruleRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "unbound_forward" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current forward</CardTitle>
+            <CardDescription>
+              The forward as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {currentUnboundForwardRows(c.base_snapshot).map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>

@@ -29,8 +29,11 @@ from app.opnsense.normalise.system import (
 )
 from app.opnsense.normalise.traffic import TrafficInterface, TrafficResult, normalise_traffic
 from app.opnsense.normalise.unbound import (
+    UnboundForwardInfo,
+    UnboundForwardsResult,
     UnboundHostInfo,
     UnboundHostsResult,
+    normalise_unbound_forwards,
     normalise_unbound_hosts,
 )
 from app.opnsense.normalise.wireguard import WireguardRecord, WireguardResult, normalise_wireguard
@@ -60,6 +63,8 @@ __all__ = [
     "TopItem",
     "TrafficInterface",
     "TrafficResult",
+    "UnboundForwardInfo",
+    "UnboundForwardsResult",
     "UnboundHostInfo",
     "UnboundHostsResult",
     "WireguardRecord",
@@ -78,6 +83,7 @@ __all__ = [
     "normalise_services",
     "normalise_system_status",
     "normalise_traffic",
+    "normalise_unbound_forwards",
     "normalise_unbound_hosts",
     "normalise_wireguard",
     "summarise_log",
