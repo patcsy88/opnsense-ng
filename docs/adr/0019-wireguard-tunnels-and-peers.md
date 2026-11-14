@@ -49,12 +49,15 @@ The apply procedure reuses the shared resolver one (lock, stale check, write, se
 the request is `failed`, with the message that the change is saved but **not active**. Existing
 Dnsmasq and Unbound behaviour must not change.
 
-### 2. Scope of the first release (recommended)
+### 2. Scope of the first release (owner decision 2026-11-15: tunnels writable too)
 
 - **Peers:** create, update, delete and enable/disable.
-- **Tunnels:** read-only listing in the UI, **no tunnel writes in the first release**. A tunnel edit
-  can cut the admin's own VPN access and carries the private key. Tunnel writes follow only if the
-  owner wants them, after the peer lab test.
+- **Tunnels:** create, update, delete and enable/disable, as a second change kind
+  `wireguard_tunnel`. **Every tunnel change, including a toggle, is high risk** (a tunnel edit can cut
+  the admin's own VPN access). Fields: `name`, `listen port`, `tunneladdress`, optional `mtu`,
+  `disableroutes`, `enabled`, and the linked peers. **Open issue:** a tunnel needs a private key, which
+  this app must never handle (see section 3 and the questions). Tunnels are built after peers, with
+  their own lab test.
 - **Out of scope in any case:** config download, QR codes, the config builder, instance
   start/stop/restart (each needs its own ADR), and any private-key handling.
 
@@ -138,7 +141,8 @@ throwaway tunnel state), and that the user's own VPN stays up.
 1. Registry, normaliser, schema, staging, apply spec and list endpoint for peers, with tests.
 2. Frontend tab, with tests.
 3. Lab test, then mark the operations verified and update the docs.
-4. Tunnel writes, only if the owner asks, as an amendment to this ADR.
+4. Tunnel writes (`wireguard_tunnel`), with tests, the frontend tab and a lab test using a throwaway
+   tunnel on an unused port, then mark verified.
 
 ## Consequences
 
@@ -161,18 +165,30 @@ throwaway tunnel state), and that the user's own VPN stays up.
 - **Config download or QR code.** Rejected for now: needs the private key or an unreviewed secret
   flow.
 
+## Owner decisions so far (2026-11-15)
+
+1. Tunnels are writable too, not only peers.
+2. Creating a peer is normal risk (delete, disable and key/address/tunnel changes stay high risk).
+
 ## Questions for the owner
 
-1. **Scope:** peers only in the first release, with tunnels read-only (recommended), or tunnels
-   writable too?
-2. **Risk:** is "creating a peer is normal risk; delete, disable and key/address/tunnel changes are
-   high risk" right, or should creation also be high risk?
-3. **Public keys:** may `admin` and `network_admin` see them in lists (reversing ADR-0009's hiding)?
-4. **Preshared keys:** leave unsettable and unreadable in the first release (recommended)?
-5. **Privilege:** you will need to give the lab API user the WireGuard config privilege before the lab
+1. ~~Scope~~ Answered: tunnels writable too.
+2. ~~Risk~~ Answered: creating a peer is normal risk.
+3. **Tunnel private key (new):** how should a new tunnel get its key? Options below.
+   - **A. Firewall generates it (recommended for this app).** On `addServer`, OPNsense's model can
+     fill in a key pair itself if none is sent. The app sends no private key, and drops it from every
+     response and read-back. The private key then exists only on the firewall. Needs lab confirmation
+     that an empty key is accepted.
+   - **B. Only edit existing tunnels.** No tunnel creation here; new tunnels are made in OPNsense.
+     An update never sends or reads a private key.
+   - **C. The person supplies a private key in the form.** Rejected by this ADR: it would pass through
+     the browser and backend.
+4. **Public keys:** may `admin` and `network_admin` see them in lists (reversing ADR-0009's hiding)?
+5. **Preshared keys:** leave unsettable and unreadable in the first release (recommended)?
+6. **Privilege:** you will need to give the lab API user the WireGuard config privilege before the lab
    test. Is that acceptable, and do you want to check what it also grants?
-6. **Lab test:** is it acceptable to create, edit, disable and delete a throwaway peer on the lab
-   tunnel, knowing `reconfigure` might briefly drop VPN sessions?
-7. **Visibility:** lists for `admin` and `network_admin` only, as for DNS?
+7. **Lab test:** is it acceptable to create, edit, disable and delete a throwaway peer and a throwaway
+   tunnel on the lab, knowing `reconfigure` might briefly drop VPN sessions?
+8. **Visibility:** lists for `admin` and `network_admin` only, as for DNS?
 
 No code is built until this ADR is accepted.
