@@ -1,6 +1,6 @@
 # ADR-0019: WireGuard tunnel and peer changes (staged)
 
-- Status: proposed
+- Status: accepted
 - Date: 2026-11-15
 - Deciders: project owner
 
@@ -165,30 +165,16 @@ throwaway tunnel state), and that the user's own VPN stays up.
 - **Config download or QR code.** Rejected for now: needs the private key or an unreviewed secret
   flow.
 
-## Owner decisions so far (2026-11-15)
+## Owner decisions (2026-11-15)
 
-1. Tunnels are writable too, not only peers.
-2. Creating a peer is normal risk (delete, disable and key/address/tunnel changes stay high risk).
+All accepted: (1) tunnels are writable too, not only peers; (2) creating a peer is normal risk, while
+delete, disable and key, address or tunnel changes stay high risk and every tunnel change is high risk;
+(3) option A: the firewall generates a new tunnel's private key, this app sends none and drops it from
+every response; (4) admin and network_admin may see public keys in lists; (5) preshared keys stay
+unsettable and unreadable; (6) the lab API user gets the WireGuard config privilege; (7) the lab test
+may create, edit, disable and delete a throwaway peer and tunnel; (8) lists are visible to `admin` and
+`network_admin` only (taken as the recommended default).
 
-## Questions for the owner
+## Build status
 
-1. ~~Scope~~ Answered: tunnels writable too.
-2. ~~Risk~~ Answered: creating a peer is normal risk.
-3. **Tunnel private key (new):** how should a new tunnel get its key? Options below.
-   - **A. Firewall generates it (recommended for this app).** On `addServer`, OPNsense's model can
-     fill in a key pair itself if none is sent. The app sends no private key, and drops it from every
-     response and read-back. The private key then exists only on the firewall. Needs lab confirmation
-     that an empty key is accepted.
-   - **B. Only edit existing tunnels.** No tunnel creation here; new tunnels are made in OPNsense.
-     An update never sends or reads a private key.
-   - **C. The person supplies a private key in the form.** Rejected by this ADR: it would pass through
-     the browser and backend.
-4. **Public keys:** may `admin` and `network_admin` see them in lists (reversing ADR-0009's hiding)?
-5. **Preshared keys:** leave unsettable and unreadable in the first release (recommended)?
-6. **Privilege:** you will need to give the lab API user the WireGuard config privilege before the lab
-   test. Is that acceptable, and do you want to check what it also grants?
-7. **Lab test:** is it acceptable to create, edit, disable and delete a throwaway peer and a throwaway
-   tunnel on the lab, knowing `reconfigure` might briefly drop VPN sessions?
-8. **Visibility:** lists for `admin` and `network_admin` only, as for DNS?
-
-No code is built until this ADR is accepted.
+Not started. Peers first, then tunnels.
