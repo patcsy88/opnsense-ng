@@ -5,7 +5,7 @@
 | 1 | Foundation, OpenCode setup, authentication, API connectivity, dashboard | P0 |
 | 2 | Interface monitoring, firewall rules, aliases | P0 |
 | 3 | NAT, firewall logs, traffic monitoring (done) | P1 |
-| 4 | VPN, DHCP, DNS, service management (read-only views done; service start, stop and restart built per ADR-0016, pending the lab test; VPN, DNS and DHCP changes need their own ADRs) | P1 |
+| 4 | VPN, DHCP, DNS, service management (read-only views done; service start, stop and restart built per ADR-0016, pending the lab test; Dnsmasq static hosts built per ADR-0017, pending the lab test (domain overrides next); VPN and Unbound changes need their own ADRs) | P1 |
 | 5 | Audit logging, advanced security, multi-firewall (done: audit viewer, TOTP MFA, user management, PostgreSQL login limits, multi-firewall overview) | P2 |
 | 6 | Analytics, notifications, automation | P2 |
 

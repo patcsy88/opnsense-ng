@@ -43,6 +43,11 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `dns.totals` | GET | `/api/unbound/overview/totals/10` | Services: Unbound | yes | no | 26.7.8_2 | yes |
 | `wireguard.status` | GET | `/api/wireguard/service/show` | VPN: WireGuard: Status | yes | no | 26.7.8_2 | yes |
 | `dhcp.leases` | GET | `/api/dnsmasq/leases/search` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | 26.7.8_2 | yes |
+| `dnsmasq.hosts.list` | GET | `/api/dnsmasq/settings/searchHost` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | 26.7.8_2 | no |
+| `dnsmasq.hosts.add` | POST | `/api/dnsmasq/settings/addHost` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | no |
+| `dnsmasq.hosts.update` | POST | `/api/dnsmasq/settings/setHost/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | no |
+| `dnsmasq.hosts.delete` | POST | `/api/dnsmasq/settings/delHost/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | no |
+| `dnsmasq.reconfigure` | POST | `/api/dnsmasq/service/reconfigure` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | no |
 | `services.list` | GET | `/api/core/service/search` | Status: Services | yes | no | 26.7.8_2 | yes |
 | `services.start` | POST | `/api/core/service/start/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
 | `services.stop` | POST | `/api/core/service/stop/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
@@ -120,6 +125,8 @@ Traffic (ADR-0007) uses only the plain `traffic/interface` snapshot: cumulative 
 Services lists service status (`services.list`): id, name, instance, description, running and locked flags, capped at 500 rows. Admins can start, stop and restart services (`services.start`, `services.stop`, `services.restart`, ADR-0016) on firewalls with `allow_writes` on. The path takes a validated service name and an optional instance (`^[A-Za-z0-9_.-]{1,64}$`), never free text. The endpoints answer `ok` once the command is queued, so the backend reads the list back for up to 10 s and reports confirmed or not confirmed. These three operations stay unverified until the lab test.
 
 DHCP leases (`dhcp.leases`, ADR-0008) lists Dnsmasq leases: address, hostname, interface, lease type, vendor and expiry, capped at 1000 rows. MAC addresses, client ids and IAIDs are dropped in the backend. Access is admin, network_admin and security_admin. The privilege also covers Dnsmasq settings writes in OPNsense, but no Dnsmasq write operation is registered. Verified on the lab (26.7.8_2).
+
+Dnsmasq static hosts (ADR-0017): `dnsmasq.hosts.*` and `dnsmasq.reconfigure` are used only by the staged apply procedure, plus a read-only host list for admin and network_admin (MAC addresses included). Saved changes take effect only after `reconfigure`, which restarts Dnsmasq. `setHost` is an upsert, so apply confirms the host exists and still matches its stored fingerprint first. All five operations are unverified until the lab test. Domain overrides are a later step.
 
 WireGuard status (`wireguard.status`, ADR-0009) lists tunnels and their peers: name, status (online within 300 s of a handshake, stale, offline), endpoint, allowed IPs, last handshake and transfer counters, capped at 500 rows. Fields are copied from a whitelist, so private, preshared and public keys never leave the backend. Access is admin, network_admin and security_admin. The privilege also allows service control in OPNsense, but no write operation is registered. Verified on the lab (26.7.8_2).
 
