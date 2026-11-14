@@ -147,7 +147,7 @@ _ENTRIES = (
         required_privilege="Status: Services",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Queues a service start and always answers result ok, so the caller must read the "
         "service list back (ADR-0016). Admin only, allow_writes required. Verified on the lab.",
     ),
@@ -159,7 +159,7 @@ _ENTRIES = (
         required_privilege="Status: Services",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Queues a service stop and always answers result ok, so the caller must read the "
         "service list back (ADR-0016). Admin only, allow_writes required. Verified on the lab.",
     ),
@@ -171,7 +171,7 @@ _ENTRIES = (
         required_privilege="Status: Services",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Queues a service restart; always answers result ok, so the caller must read the "
         "service list back (ADR-0016). Admin only, allow_writes required. Verified on the lab.",
     ),

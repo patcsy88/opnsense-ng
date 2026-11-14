@@ -66,9 +66,9 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `dnsmasq.domains.update` | POST | `/api/dnsmasq/settings/setDomain/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.delete` | POST | `/api/dnsmasq/settings/delDomain/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
 | `services.list` | GET | `/api/core/service/search` | Status: Services | yes | no | 26.7.8_2 | yes |
-| `services.start` | POST | `/api/core/service/start/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
-| `services.stop` | POST | `/api/core/service/stop/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
-| `services.restart` | POST | `/api/core/service/restart/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
+| `services.start` | POST | `/api/core/service/start/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | yes |
+| `services.stop` | POST | `/api/core/service/stop/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | yes |
+| `services.restart` | POST | `/api/core/service/restart/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | yes |
 | `traffic.interfaces` | GET | `/api/diagnostics/traffic/interface` | Reporting: Traffic | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.add` | POST | `/api/firewall/d_nat/addRule` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.update` | POST | `/api/firewall/d_nat/setRule/{uuid}` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
