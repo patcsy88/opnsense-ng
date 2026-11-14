@@ -333,11 +333,24 @@ export const leasesResponseSchema = z.object({
 export const serviceSchema = z.object({
   id: z.string(),
   name: z.string(),
+  instance: z.string().nullable().optional(),
   description: z.string().nullable(),
   running: z.boolean(),
   locked: z.boolean(),
 });
 export type ServiceInfo = z.infer<typeof serviceSchema>;
+
+export const serviceActionSchema = z.object({
+  firewall_id: z.uuid(),
+  service: z.string(),
+  instance: z.string().nullable(),
+  action: z.string(),
+  was_running: z.boolean(),
+  running: z.boolean(),
+  confirmed: z.boolean(),
+  message: z.string(),
+});
+export type ServiceAction = z.infer<typeof serviceActionSchema>;
 
 export const servicesResponseSchema = z.object({
   firewall_id: z.uuid(),

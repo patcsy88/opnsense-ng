@@ -23,7 +23,9 @@ class UnsupportedOperationError(Exception):
 
 
 _UUID = re.compile(r"^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$")
-_ALLOWED_PARAMS = frozenset({"uuid"})
+_SERVICE_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+_ALLOWED_PARAMS = frozenset({"uuid", "service", "instance"})
+_PATTERNS = {"uuid": _UUID, "service": _SERVICE_NAME, "instance": _SERVICE_NAME}
 _ALLOWED_QUERY = frozenset({"limit", "digest"})
 _QUERY_VALUE = re.compile(r"^[A-Za-z0-9]{1,64}$")
 
@@ -36,7 +38,9 @@ class Operation(BaseModel):
     operation_id: str = Field(pattern=r"^[a-z][a-z0-9_.]*$")
     method: HttpMethod
     # Fixed path, never user supplied. The only variable part is a declared trailing {uuid} slot.
-    endpoint: str = Field(pattern=r"^/api/[A-Za-z0-9_/]+(/\{uuid\}(/[01])?)?$")
+    endpoint: str = Field(
+        pattern=r"^/api/[A-Za-z0-9_/]+(/\{uuid\}(/[01])?|/\{service\}(/\{instance\})?)?$"
+    )
     path_params: tuple[str, ...] = ()
     # Declared query parameter names (GET only). Values are checked to be short alphanumerics.
     query_params: tuple[str, ...] = ()
@@ -54,7 +58,8 @@ class Operation(BaseModel):
     @model_validator(mode="after")
     def _check_path_params(self) -> Operation:
         declared = set(self.path_params)
-        if not declared <= _ALLOWED_PARAMS or ("{uuid}" in self.endpoint) != ("uuid" in declared):
+        slots = {n for n in _ALLOWED_PARAMS if "{" + n + "}" in self.endpoint}
+        if not declared <= _ALLOWED_PARAMS or slots != declared:
             raise ValueError("endpoint placeholders and path_params must match")
         if self.query_params and (
             not set(self.query_params) <= _ALLOWED_QUERY or self.method is not HttpMethod.GET
@@ -72,13 +77,17 @@ class Operation(BaseModel):
         return dict(given)
 
     def resolve_endpoint(self, params: dict[str, str] | None = None) -> str:
-        """Fill the declared slots. Values must be canonical lowercase UUIDs, nothing else."""
-        given = params or {}
-        if set(given) != set(self.path_params):
+        """Fill the declared slots. UUIDs must be canonical lowercase; service and instance names
+        must match a short safe pattern. An optional trailing instance may be left out."""
+        given = {k: v for k, v in (params or {}).items() if not (k == "instance" and not v)}
+        needed = set(self.path_params) - {"instance"}
+        if not needed <= set(given) <= set(self.path_params):
             raise ValueError(f"{self.operation_id} needs path parameters {self.path_params}")
         endpoint = self.endpoint
+        if "instance" in self.path_params and "instance" not in given:
+            endpoint = endpoint.replace("/{instance}", "")
         for name, value in given.items():
-            if not isinstance(value, str) or not _UUID.match(value):
+            if not isinstance(value, str) or not _PATTERNS[name].match(value):
                 raise ValueError(f"Invalid value for path parameter {name}")
             endpoint = endpoint.replace("{" + name + "}", value)
         return endpoint

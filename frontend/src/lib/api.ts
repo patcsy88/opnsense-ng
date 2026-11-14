@@ -4,6 +4,7 @@ import {
   connectivitySchema,
   firewallListSchema,
   firewallOptionListSchema,
+  serviceActionSchema,
   overviewSchema,
   firewallSchema,
   loginResponseSchema,
@@ -339,6 +340,15 @@ export const api = {
   services: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/services`, {
       schema: servicesResponseSchema,
+    }),
+  controlService: (
+    id: string,
+    action: "start" | "stop" | "restart",
+    body: { service: string; instance?: string | null; confirm_name?: string },
+  ) =>
+    request("POST", `${base}/firewalls/${encodeURIComponent(id)}/services/${action}`, {
+      body,
+      schema: serviceActionSchema,
     }),
   traffic: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/traffic`, {

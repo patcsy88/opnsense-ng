@@ -1,4 +1,4 @@
-"""Service status list (Status: Services). Read-only; start/stop/restart are not supported."""
+"""Service status list (Status: Services). Control actions live in api/service_control.py."""
 
 from typing import Any
 
@@ -10,6 +10,7 @@ MAX_SERVICES = 500
 class ServiceInfo(BaseModel):
     id: str
     name: str
+    instance: str | None = None
     description: str | None = None
     running: bool
     locked: bool
@@ -36,9 +37,12 @@ def normalise_services(raw: Any) -> ServicesResult:
             continue
         ident = row.get("id")
         description = row.get("description")
+        full_id = (ident if isinstance(ident, str) and ident else name)[:128]
+        instance = full_id[len(name) + 1 :] if full_id.startswith(name + "/") else None
         out.append(
             ServiceInfo(
-                id=(ident if isinstance(ident, str) and ident else name)[:128],
+                id=full_id,
+                instance=instance or None,
                 name=name[:128],
                 description=description[:255]
                 if isinstance(description, str) and description

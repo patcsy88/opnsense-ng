@@ -15,6 +15,9 @@ SYSTEM_DISK = "system.disk"
 INTERFACES_OVERVIEW = "interfaces.overview"
 TRAFFIC_INTERFACES = "traffic.interfaces"
 SERVICES_LIST = "services.list"
+SERVICES_START = "services.start"
+SERVICES_STOP = "services.stop"
+SERVICES_RESTART = "services.restart"
 DHCP_LEASES = "dhcp.leases"
 WIREGUARD_STATUS = "wireguard.status"
 DNS_STATS = "dns.stats"
@@ -113,6 +116,42 @@ _ENTRIES = (
         verified=True,
         notes="Service list with a running flag. The same controller has start, restart and "
         "stop; this app only reads. Verified on the lab.",
+    ),
+    Operation(
+        operation_id=SERVICES_START,
+        method=HttpMethod.POST,
+        endpoint="/api/core/service/start/{service}/{instance}",
+        path_params=("service", "instance"),
+        required_privilege="Status: Services",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Queues a service start and always answers result ok, so the caller must read the "
+        "service list back (ADR-0016). Admin only, allow_writes required. Unverified until lab.",
+    ),
+    Operation(
+        operation_id=SERVICES_STOP,
+        method=HttpMethod.POST,
+        endpoint="/api/core/service/stop/{service}/{instance}",
+        path_params=("service", "instance"),
+        required_privilege="Status: Services",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Queues a service stop and always answers result ok, so the caller must read the "
+        "service list back (ADR-0016). Admin only, allow_writes required. Unverified until lab.",
+    ),
+    Operation(
+        operation_id=SERVICES_RESTART,
+        method=HttpMethod.POST,
+        endpoint="/api/core/service/restart/{service}/{instance}",
+        path_params=("service", "instance"),
+        required_privilege="Status: Services",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Queues a service restart; always answers result ok, so the caller must read the "
+        "service list back (ADR-0016). Admin only, allow_writes required. Unverified until lab.",
     ),
     Operation(
         operation_id=DHCP_LEASES,

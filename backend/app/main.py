@@ -10,7 +10,7 @@ from slowapi.errors import RateLimitExceeded
 from slowapi.middleware import SlowAPIMiddleware
 from starlette.middleware.trustedhost import TrustedHostMiddleware
 
-from app.api import audit_log, changes, firewalls, health, overview
+from app.api import audit_log, changes, firewalls, health, overview, service_control
 from app.auth import account as mfa_account
 from app.auth import router as auth_router
 from app.auth import users as users_api
@@ -63,6 +63,7 @@ def create_app() -> FastAPI:
     app.include_router(auth_router.router)
     app.include_router(overview.router)  # before firewalls: fixed path, no id
     app.include_router(firewalls.router)
+    app.include_router(service_control.router)
     app.include_router(changes.router)
     app.include_router(audit_log.router)
     app.include_router(mfa_account.router)

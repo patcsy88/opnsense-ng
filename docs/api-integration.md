@@ -44,6 +44,9 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `wireguard.status` | GET | `/api/wireguard/service/show` | VPN: WireGuard: Status | yes | no | 26.7.8_2 | yes |
 | `dhcp.leases` | GET | `/api/dnsmasq/leases/search` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | 26.7.8_2 | yes |
 | `services.list` | GET | `/api/core/service/search` | Status: Services | yes | no | 26.7.8_2 | yes |
+| `services.start` | POST | `/api/core/service/start/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
+| `services.stop` | POST | `/api/core/service/stop/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
+| `services.restart` | POST | `/api/core/service/restart/{service}/{instance}` | Status: Services | no | no | 26.7.8_2 | no |
 | `traffic.interfaces` | GET | `/api/diagnostics/traffic/interface` | Reporting: Traffic | yes | no | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.add` | POST | `/api/firewall/d_nat/addRule` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
 | `firewall.nat.port_forwards.update` | POST | `/api/firewall/d_nat/setRule/{uuid}` | Firewall: NAT: Destination NAT | no | yes | 26.7.8_2 | yes |
@@ -114,7 +117,7 @@ Port forward changes (ADR-0006) use the `firewall.nat.port_forwards.*` write ope
 
 Traffic (ADR-0007) uses only the plain `traffic/interface` snapshot: cumulative byte and packet counters per interface, keyed by interface identifier with a friendly `name`. The backend normalises it to in/out bytes and packets, caches it for 2 s per firewall, and stores nothing. The browser works out rates from consecutive polls. Verified on the lab (26.7.8_2) with the privilege Reporting: Traffic. Limited to admin, network_admin and security_admin.
 
-Services lists service status only (`services.list`): id, name, description, running and locked flags, capped at 500 rows. The same OPNsense controller has start, restart and stop; they are deliberately not in the registry, and a service control feature needs its own ADR. Viewing is open to every signed-in role. Verified on the lab (26.7.8_2) with the privilege Status: Services.
+Services lists service status (`services.list`): id, name, instance, description, running and locked flags, capped at 500 rows. Admins can start, stop and restart services (`services.start`, `services.stop`, `services.restart`, ADR-0016) on firewalls with `allow_writes` on. The path takes a validated service name and an optional instance (`^[A-Za-z0-9_.-]{1,64}$`), never free text. The endpoints answer `ok` once the command is queued, so the backend reads the list back for up to 10 s and reports confirmed or not confirmed. These three operations stay unverified until the lab test.
 
 DHCP leases (`dhcp.leases`, ADR-0008) lists Dnsmasq leases: address, hostname, interface, lease type, vendor and expiry, capped at 1000 rows. MAC addresses, client ids and IAIDs are dropped in the backend. Access is admin, network_admin and security_admin. The privilege also covers Dnsmasq settings writes in OPNsense, but no Dnsmasq write operation is registered. Verified on the lab (26.7.8_2).
 
