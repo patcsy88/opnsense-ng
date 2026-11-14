@@ -332,7 +332,7 @@ describe("domain override change review", () => {
         return HttpResponse.json({ ...approved, status: "applied" });
       }),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     expect(await screen.findByText("lab.example")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.54:5353")).toBeInTheDocument();
     fireEvent.click(

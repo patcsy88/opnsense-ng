@@ -12,6 +12,17 @@ export function AdministrationPage() {
       <div className="grid gap-4 md:grid-cols-3">
         <Card>
           <CardHeader>
+            <CardTitle>Changes</CardTitle>
+            <CardDescription>Review, approve and apply staged change requests.</CardDescription>
+          </CardHeader>
+          <CardContent>
+            <Link className="text-sm text-primary underline" to="/administration/changes">
+              Open
+            </Link>
+          </CardContent>
+        </Card>
+        <Card>
+          <CardHeader>
             <CardTitle>Firewall Connections</CardTitle>
             <CardDescription>Manage the OPNsense instances this app connects to.</CardDescription>
           </CardHeader>

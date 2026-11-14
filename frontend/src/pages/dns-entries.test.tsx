@@ -356,7 +356,7 @@ describe("DNS/DHCP host change review", () => {
         return HttpResponse.json({ ...high, status: "applied" });
       }),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(
       await screen.findByRole("button", { name: "Apply to firewall…" }),
     );
@@ -381,7 +381,7 @@ describe("DNS/DHCP host change review", () => {
     server.use(
       http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(hidden)),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     expect(await screen.findByText("IP addresses")).toBeInTheDocument();
     expect(screen.queryByText("MAC addresses")).not.toBeInTheDocument();
   });

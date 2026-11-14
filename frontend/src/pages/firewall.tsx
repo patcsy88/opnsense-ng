@@ -45,7 +45,7 @@ function AliasesCard({ firewallId }: { firewallId: string }) {
       const made = await run();
       await qc.invalidateQueries({ queryKey: ["changes"] });
       close();
-      navigate(`/changes/${made.id}`);
+      navigate(`/administration/changes/${made.id}`);
     } catch (e) {
       setError(describeError(e).message);
     } finally {
@@ -204,7 +204,7 @@ export function FirewallPage() {
       .then(async (made) => {
         await qc.invalidateQueries({ queryKey: ["changes"] });
         closeRule();
-        navigate(`/changes/${made.id}`);
+        navigate(`/administration/changes/${made.id}`);
       })
       .catch((e: unknown) => setRuleError(describeError(e).message))
       .finally(() => setRulePending(false));
@@ -375,7 +375,7 @@ export function FirewallPage() {
             .then(async (made) => {
               await qc.invalidateQueries({ queryKey: ["changes"] });
               closeRule();
-              navigate(`/changes/${made.id}`);
+              navigate(`/administration/changes/${made.id}`);
             })
             .catch((e: unknown) => setRuleError(describeError(e).message))
             .finally(() => setRulePending(false));
@@ -405,7 +405,7 @@ export function FirewallPage() {
             .then(async (made) => {
               await qc.invalidateQueries({ queryKey: ["changes"] });
               closeToggle();
-              navigate(`/changes/${made.id}`);
+              navigate(`/administration/changes/${made.id}`);
             })
             .catch((e: unknown) => setToggleError(describeError(e).message))
             .finally(() => setTogglePending(false));

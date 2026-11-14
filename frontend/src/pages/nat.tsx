@@ -133,7 +133,7 @@ export function NatPage() {
       .then(async (made) => {
         await qc.invalidateQueries({ queryKey: ["changes"] });
         close();
-        navigate(`/changes/${made.id}`);
+        navigate(`/administration/changes/${made.id}`);
       })
       .catch((e: unknown) => setChangeError(describeError(e).message))
       .finally(() => setPending(false));

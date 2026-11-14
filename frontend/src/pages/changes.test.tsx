@@ -48,14 +48,14 @@ function base(user: object, detail: Record<string, unknown> = {}) {
 describe("Changes", () => {
   it("lists requests and shows the no-rollback notice", async () => {
     base(ADMIN);
-    renderApp(<App />, "/changes");
+    renderApp(<App />, "/administration/changes");
     expect(await screen.findByText("create alias web_hosts")).toBeInTheDocument();
     expect(screen.getByText(/no automatic rollback/i)).toBeInTheDocument();
   });
 
   it("hides the create button from view-only roles", async () => {
     base(READER);
-    renderApp(<App />, "/changes");
+    renderApp(<App />, "/administration/changes");
     await screen.findByText("create alias web_hosts");
     expect(screen.queryByRole("button", { name: /new alias/i })).not.toBeInTheDocument();
   });
@@ -71,7 +71,7 @@ describe("Changes", () => {
         return HttpResponse.json(change(), { status: 201 });
       }),
     );
-    renderApp(<App />, "/changes");
+    renderApp(<App />, "/administration/changes");
     const open = await screen.findByRole("button", { name: /new alias/i });
     await waitFor(() => expect(open).toBeEnabled());
     fireEvent.click(open);
@@ -93,7 +93,7 @@ describe("Changes", () => {
         HttpResponse.json({ detail: "An open request already creates an alias with this name" }, { status: 400 }),
       ),
     );
-    renderApp(<App />, "/changes");
+    renderApp(<App />, "/administration/changes");
     const open = await screen.findByRole("button", { name: /new alias/i });
     await waitFor(() => expect(open).toBeEnabled());
     fireEvent.click(open);
@@ -105,7 +105,7 @@ describe("Changes", () => {
 
   it("lets the requester submit, but not approve their own request", async () => {
     base(NETADMIN, { status: "in_review" });
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     expect(await screen.findByText(/cannot approve your own request/i)).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: "Approve" })).not.toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
@@ -122,7 +122,7 @@ describe("Changes", () => {
         return HttpResponse.json(current);
       }),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(await screen.findByRole("button", { name: "Submit for review" }));
     await waitFor(() => expect(called).toEqual(["submit"]));
     expect(await screen.findByText("In review", { selector: "span" })).toBeInTheDocument();
@@ -130,7 +130,7 @@ describe("Changes", () => {
 
   it("lets another network admin approve", async () => {
     base({ ...NETADMIN, username: "dave" }, { status: "in_review" });
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     expect(await screen.findByRole("button", { name: "Approve" })).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Reject" })).toBeInTheDocument();
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
@@ -147,7 +147,7 @@ describe("Changes", () => {
         return HttpResponse.json(current);
       }),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
     expect(await screen.findByText(/no automatic rollback/i)).toBeInTheDocument();
     expect(applied).toEqual([]);
@@ -166,7 +166,7 @@ describe("Changes", () => {
         return HttpResponse.json(current);
       }),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
     const confirm = await screen.findByRole("button", { name: "Apply now" });
     expect(confirm).toBeDisabled();
@@ -177,7 +177,7 @@ describe("Changes", () => {
 
   it("does not show Apply to a network admin", async () => {
     base(NETADMIN, { status: "approved", requester_username: "dave" });
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     await screen.findByRole("heading", { name: "create alias web_hosts" });
     expect(screen.queryByRole("button", { name: /apply/i })).not.toBeInTheDocument();
   });
@@ -187,7 +187,7 @@ describe("Changes", () => {
       status: "failed",
       failure_message: "The alias is saved on the firewall but NOT active: timeout",
     });
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     expect(await screen.findByRole("alert")).toHaveTextContent("saved on the firewall but NOT active");
   });
 
@@ -310,13 +310,13 @@ describe("Alias update and delete", () => {
       status: "validated",
       base_snapshot: { name: "web", type: "host", content: ["10.0.0.1"], description: "Web", enabled: true },
     });
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     expect(await screen.findByText("Before this change")).toBeInTheDocument();
   });
 
   it("describes the deletion in the apply dialog and requires the typed name", async () => {
     base(ADMIN, { action: "delete", status: "approved", high_risk: true });
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
     expect(await screen.findByText(/deletes the alias web_hosts/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
@@ -411,7 +411,7 @@ describe("Rule enable/disable", () => {
         HttpResponse.json(ruleChange({ status: "approved", high_risk: true })),
       ),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
     expect(await screen.findByText(/disables the rule "Web out"/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
@@ -492,7 +492,7 @@ describe("Rule enable/disable", () => {
         HttpResponse.json(ruleChange({ action: "delete", status: "approved", high_risk: true })),
       ),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
     expect(await screen.findByText(/permanently deletes the rule "Web out"/i)).toBeInTheDocument();
     expect(screen.getByRole("button", { name: "Apply now" })).toBeDisabled();
@@ -544,7 +544,7 @@ describe("New rule", () => {
         ),
       ),
     );
-    renderApp(<App />, "/changes");
+    renderApp(<App />, "/administration/changes");
     const newRule = await screen.findByRole("button", { name: /new rule/i });
     await waitFor(() => expect(newRule).toBeEnabled());
     fireEvent.click(newRule);
@@ -582,7 +582,7 @@ describe("New rule", () => {
       http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
       http.get("/api/v1/changes", () => HttpResponse.json([])),
     );
-    renderApp(<App />, "/changes");
+    renderApp(<App />, "/administration/changes");
     const newRule = await screen.findByRole("button", { name: /new rule/i });
     await waitFor(() => expect(newRule).toBeEnabled());
     fireEvent.click(newRule);
@@ -598,7 +598,7 @@ describe("New rule", () => {
       http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
       http.get("/api/v1/changes", () => HttpResponse.json([])),
     );
-    renderApp(<App />, "/changes");
+    renderApp(<App />, "/administration/changes");
     await screen.findByRole("heading", { name: "Changes" });
     await screen.findByRole("combobox", { name: /firewall/i });
     expect(screen.queryByRole("button", { name: /new rule/i })).not.toBeInTheDocument();

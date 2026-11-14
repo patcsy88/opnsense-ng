@@ -218,7 +218,7 @@ describe("Port forward change detail", () => {
       http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
       http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(change({ status: "approved" }))),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     fireEvent.click(await screen.findByRole("button", { name: /apply to firewall/i }));
     expect(await screen.findByText(/creates the port forward "Web"/i)).toBeInTheDocument();
     expect(screen.getByText(/does not add a pass rule/i)).toBeInTheDocument();
@@ -239,7 +239,7 @@ describe("Port forward change detail", () => {
         ),
       ),
     );
-    renderApp(<App />, `/changes/${CID}`);
+    renderApp(<App />, `/administration/changes/${CID}`);
     expect(await screen.findByText("Port forward to delete")).toBeInTheDocument();
     expect(screen.getByText("Current port forward")).toBeInTheDocument();
   });

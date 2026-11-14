@@ -204,7 +204,7 @@ export function ChangeDetailPage() {
   return (
     <div className="space-y-4">
       <p className="text-sm">
-        <Link className="text-primary underline" to="/changes">
+        <Link className="text-primary underline" to="/administration/changes">
           ← All changes
         </Link>
       </p>

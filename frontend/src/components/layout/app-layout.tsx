@@ -125,7 +125,7 @@ export function AppLayout() {
           aria-label="Quick"
           className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-card md:hidden"
         >
-          {["/", "/firewall", "/changes", "/services"].map((path) => NAV_ITEMS.find((n) => n.to === path)).map((item) =>
+          {["/", "/firewall", "/services", "/administration"].map((path) => NAV_ITEMS.find((n) => n.to === path)).map((item) =>
             item ? (
               <NavLink
                 key={item.to}

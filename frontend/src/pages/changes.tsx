@@ -48,7 +48,7 @@ export function ChangesPage() {
           : await api.stageAlias(selected, input as AliasProposalInput);
       await qc.invalidateQueries({ queryKey: ["changes"] });
       setCreating(null);
-      navigate(`/changes/${made.id}`);
+      navigate(`/administration/changes/${made.id}`);
     } catch (e) {
       setFormError(describeError(e).message);
     } finally {
@@ -58,6 +58,11 @@ export function ChangesPage() {
 
   return (
     <div className="space-y-4">
+      <p className="text-sm">
+        <Link className="text-primary underline" to="/administration">
+          ← Administration
+        </Link>
+      </p>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Changes</h1>
         <div className="flex flex-wrap items-center gap-3">
@@ -141,7 +146,7 @@ export function ChangesPage() {
                   {list.data.map((c) => (
                     <TableRow key={c.id}>
                       <TableCell className="font-medium">
-                        <Link className="text-primary underline" to={`/changes/${c.id}`}>
+                        <Link className="text-primary underline" to={`/administration/changes/${c.id}`}>
                           {describeChange(c)}
                         </Link>
                       </TableCell>

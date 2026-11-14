@@ -36,8 +36,8 @@ export function App() {
           ))}
           <Route path="/overview" element={<OverviewPage />} />
           <Route path="/firewall" element={<FirewallPage />} />
-          <Route path="/changes" element={<ChangesPage />} />
-          <Route path="/changes/:id" element={<ChangeDetailPage />} />
+          <Route path="/administration/changes" element={<ChangesPage />} />
+          <Route path="/administration/changes/:id" element={<ChangeDetailPage />} />
           <Route path="/nat" element={<NatPage />} />
           <Route path="/network" element={<NetworkPage />} />
           <Route element={<ProtectedRoute roles={["admin", "network_admin", "security_admin"]} />}>
@@ -62,6 +62,7 @@ export function App() {
             <Route path="/administration/firewalls" element={<FirewallConnectionsPage />} />
             <Route path="/administration/users" element={<UsersPage />} />
           </Route>
+          <Route path="/changes/*" element={<Navigate to="/administration/changes" replace />} />
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>
       </Route>

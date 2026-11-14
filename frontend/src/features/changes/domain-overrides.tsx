@@ -70,7 +70,7 @@ export function DomainOverrides({ firewallId }: { firewallId: string }) {
       .then(async (made) => {
         await qc.invalidateQueries({ queryKey: ["changes"] });
         close();
-        navigate(`/changes/${made.id}`);
+        navigate(`/administration/changes/${made.id}`);
       })
       .catch((e: unknown) => setChangeError(describeError(e).message))
       .finally(() => setPending(false));
@@ -109,7 +109,7 @@ export function DomainOverrides({ firewallId }: { firewallId: string }) {
                     <ChangeStatusBadge status={c.status} />
                     <Link
                       className="text-primary underline"
-                      to={`/changes/${c.id}`}
+                      to={`/administration/changes/${c.id}`}
                     >
                       {c.action} {String(c.proposed?.label ?? "override")}
                     </Link>
