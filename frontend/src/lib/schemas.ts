@@ -352,6 +352,34 @@ export const serviceActionSchema = z.object({
 });
 export type ServiceAction = z.infer<typeof serviceActionSchema>;
 
+export const dnsmasqHostSchema = z.object({
+  uuid: z.string().nullable(),
+  host: z.string().nullable(),
+  domain: z.string().nullable(),
+  ips: z.array(z.string()),
+  hwaddrs: z.array(z.string()),
+  cnames: z.array(z.string()),
+  ignore: z.boolean(),
+  description: z.string().nullable(),
+});
+export type DnsmasqHost = z.infer<typeof dnsmasqHostSchema>;
+
+export const dnsmasqHostsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  hosts: z.array(dnsmasqHostSchema),
+  registry_verified: z.boolean(),
+});
+
+export interface HostProposalInput {
+  host: string;
+  domain: string;
+  ips: string[];
+  hwaddrs: string[];
+  cnames: string[];
+  ignore: boolean;
+  description: string;
+}
+
 export const servicesResponseSchema = z.object({
   firewall_id: z.uuid(),
   services: z.array(serviceSchema),

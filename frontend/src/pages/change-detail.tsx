@@ -73,8 +73,37 @@ function currentForwardRows(s: Record<string, unknown>): [string, string][] {
   ];
 }
 
+const list = (v: unknown) => (Array.isArray(v) && v.length > 0 ? v.map(String).join(", ") : "—");
+
+function hostRows(p: Record<string, unknown>): [string, string][] {
+  if (p.ips === undefined) {
+    return [["Host entry", String(p.label ?? "—")], ...risk(p)];
+  }
+  return [
+    ["Description", String(p.description ?? "—")],
+    ["Name", `${String(p.host)}${p.domain ? `.${String(p.domain)}` : ""}`],
+    ["IP addresses", list(p.ips)],
+    ...(p.hwaddrs === undefined ? [] : ([["MAC addresses", list(p.hwaddrs)]] as [string, string][])),
+    ["Aliases", list(p.cnames)],
+    ["Ignore (block DHCP)", p.ignore ? "Yes" : "No"],
+    ...risk(p),
+  ];
+}
+
+function currentHostRows(s: Record<string, unknown>): [string, string][] {
+  return [
+    ["Name", `${String(s.host ?? "—")}${s.domain ? `.${String(s.domain)}` : ""}`],
+    ["IP addresses", list(s.ips)],
+    ...(s.hwaddrs === undefined ? [] : ([["MAC addresses", list(s.hwaddrs)]] as [string, string][])),
+    ["Aliases", list(s.cnames)],
+    ["Ignore (block DHCP)", s.ignore ? "Yes" : "No"],
+    ["Description", String(s.description ?? "—")],
+  ];
+}
+
 function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
+  if (kind === "dnsmasq_host") return hostRows(p);
   if (kind === "nat_forward") return forwardRows(p);
   if (kind === "rule" && p.action !== undefined) {
     const ports = (v: unknown) => (v ? `:${String(v)}` : "");
@@ -180,7 +209,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : "Alias"} to delete` : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -202,7 +231,9 @@ export function ChangeDetailPage() {
                 ? "This rule will be deleted. See the current rule below."
                 : c.kind === "nat_forward"
                   ? "This port forward will be deleted. See the current forward below."
-                  : "This alias will be deleted. The values above are what it holds now."}
+                  : c.kind === "dnsmasq_host"
+                    ? "This host entry will be deleted. See the current entry below."
+                    : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
         </CardContent>
@@ -269,6 +300,27 @@ export function ChangeDetailPage() {
           <CardContent>
             <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
               {ruleRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "dnsmasq_host" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current host entry</CardTitle>
+            <CardDescription>
+              The entry as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {currentHostRows(c.base_snapshot).map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>

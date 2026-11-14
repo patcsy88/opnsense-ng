@@ -1,8 +1,10 @@
 """Change request endpoints (ADR-0005). Staging and review only: nothing here calls OPNsense."""
 
+import ipaddress
 import uuid
 from datetime import datetime
 from typing import Any
+from urllib.parse import urlsplit
 
 from fastapi import APIRouter, Depends, HTTPException, Query, Request, status
 from pydantic import BaseModel, ConfigDict, Field
@@ -13,6 +15,7 @@ from app import audit
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
 from app.changes import apply as apply_changes
 from app.changes import service
+from app.changes.dnsmasq_schemas import HostProposal
 from app.changes.forward_schemas import ForwardProposal, forward_risk
 from app.changes.rule_schemas import RuleProposal
 from app.changes.schemas import AliasProposal
@@ -84,6 +87,21 @@ def _detail(db: Session, cr: ChangeRequest) -> ChangeDetailOut:
         ChangeEventOut.model_validate(e, from_attributes=True) for e in service.list_events(db, cr)
     ]
     return ChangeDetailOut(**_out(cr).model_dump(), events=events)
+
+
+def _visible[T: ChangeOut](out: T, user: CurrentUser) -> T:
+    """MAC addresses in Dnsmasq host requests are only for admin and network_admin (ADR-0017)."""
+    if out.kind != "dnsmasq_host" or user.role in MANAGERS:
+        return out
+
+    def strip(data: dict[str, Any] | None) -> dict[str, Any] | None:
+        if data is None:
+            return None
+        return {k: v for k, v in data.items() if k not in ("hwaddrs",)}
+
+    out.proposed = strip(out.proposed)
+    out.base_snapshot = strip(out.base_snapshot)
+    return out
 
 
 def _get(db: Session, change_id: uuid.UUID) -> ChangeRequest:
@@ -1042,7 +1060,7 @@ def list_changes(
         if status_filter not in {s.value for s in Status}:
             raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Unknown status")
         query = query.where(ChangeRequest.status == status_filter)
-    return [_out(cr) for cr in db.scalars(query)]
+    return [_visible(_out(cr), _user) for cr in db.scalars(query)]
 
 
 @router.get("/{change_id}", response_model=ChangeDetailOut)
@@ -1051,7 +1069,7 @@ def get_change(
     _user: CurrentUser = Depends(require_roles(*ALL_ROLES)),
     db: Session = Depends(get_db),
 ) -> ChangeDetailOut:
-    return _detail(db, _get(db, change_id))
+    return _visible(_detail(db, _get(db, change_id)), _user)
 
 
 def _move(
@@ -1157,6 +1175,7 @@ def apply_change(
         run = {
             "rule": apply_changes.apply_rule_change,
             "nat_forward": apply_changes.apply_forward_change,
+            "dnsmasq_host": apply_changes.apply_host_change,
         }.get(cr.kind, apply_changes.apply_alias_change)
         cr = run(
             db,
@@ -1180,3 +1199,204 @@ def apply_change(
             change_id=change_id,
         ) from None
     return _detail(db, cr)
+
+
+class HostCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    host: HostProposal
+
+
+class HostDeleteCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+
+
+def firewall_identity(fw: Firewall) -> tuple[frozenset[str], str | None]:
+    """The firewall's own address or host name, as far as the stored URL tells us."""
+    name = urlsplit(fw.base_url).hostname
+    if not name:
+        return frozenset(), None
+    try:
+        return frozenset({str(ipaddress.ip_address(name))}), None
+    except ValueError:
+        return frozenset(), name.split(".")[0]
+
+
+def _host_label(h: Any) -> str:
+    return (h.description or h.host or str(h.uuid)[:8])[:64]
+
+
+def _stage_host(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+    *,
+    action: str,
+    target: str | None,
+    proposal: HostProposal | None = None,
+) -> ChangeDetailOut:
+    """Shared staging for create, update and delete of a Dnsmasq static host (ADR-0017). Reads the
+    hosts read-only; nothing is written to the firewall."""
+    audit_action = f"change.stage_host_{action}"
+    if target is not None and not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid host id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_hosts(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the host entries from the firewall") from None
+
+    current = next((h for h in rows if h.uuid == target), None) if target else None
+    if target is not None and current is None:
+        raise refuse("That host entry was not found on the firewall")
+    addresses, hostname = firewall_identity(fw)
+
+    proposed: dict[str, Any]
+    if proposal is not None:
+        clash = apply_changes.host_conflict(proposal.model_dump(), rows, target)
+        if clash:
+            raise refuse(clash)
+        reasons = proposal.risk_reasons(addresses, hostname)
+        proposed = {**proposal.model_dump(), "label": proposal.description, "risk": reasons}
+        if action == "update" and current is not None:
+            proposed["label"] = _host_label(current)
+    elif action == "delete" and current is not None:
+        reasons = ["deletes a host entry"]
+        proposed = {
+            "label": _host_label(current),
+            "host": current.host,
+            "domain": current.domain,
+            "description": current.description or "",
+            "risk": reasons,
+        }
+    else:
+        raise refuse("Unsupported request")
+
+    if action == "create":
+        clash_expr = ChangeRequest.proposed["description"].astext == proposed["description"]
+        duplicate = db.scalar(
+            select(ChangeRequest.id).where(
+                ChangeRequest.firewall_id == firewall_id,
+                ChangeRequest.kind == "dnsmasq_host",
+                ChangeRequest.action == "create",
+                clash_expr,
+                ChangeRequest.status.in_(OPEN_STATES),
+            )
+        )
+    else:
+        duplicate = db.scalar(
+            select(ChangeRequest.id).where(
+                ChangeRequest.firewall_id == firewall_id,
+                ChangeRequest.kind == "dnsmasq_host",
+                ChangeRequest.target_uuid == target,
+                ChangeRequest.status.in_(OPEN_STATES),
+            )
+        )
+    if duplicate is not None:
+        raise refuse("An open request already changes this host entry", duplicate)
+
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="dnsmasq_host",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump() if current is not None else None,
+            high_risk=bool(reasons) or action == "delete",
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post("/dnsmasq-hosts", response_model=ChangeDetailOut, status_code=201)
+def stage_host_create(
+    request: Request,
+    body: HostCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new Dnsmasq static host."""
+    return _stage_host(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="create",
+        target=None,
+        proposal=body.host,
+    )
+
+
+@router.post("/dnsmasq-hosts/{target}/update", response_model=ChangeDetailOut, status_code=201)
+def stage_host_update(
+    request: Request,
+    target: str,
+    body: HostCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing a Dnsmasq static host."""
+    return _stage_host(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="update",
+        target=target,
+        proposal=body.host,
+    )
+
+
+@router.post("/dnsmasq-hosts/{target}/delete", response_model=ChangeDetailOut, status_code=201)
+def stage_host_delete(
+    request: Request,
+    target: str,
+    body: HostDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting a Dnsmasq static host. Always high risk."""
+    return _stage_host(
+        request, body.firewall_id, user, db, settings, action="delete", target=target
+    )

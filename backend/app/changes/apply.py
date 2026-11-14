@@ -22,6 +22,7 @@ from starlette.requests import Request
 from app import audit
 from app.auth.deps import CurrentUser
 from app.changes import service
+from app.changes.dnsmasq_schemas import host_key
 from app.changes.fingerprint import fingerprint
 from app.changes.forward_schemas import ForwardProposal
 from app.changes.rule_schemas import RuleProposal
@@ -34,8 +35,14 @@ from app.opnsense.client import OPNsenseClient
 from app.opnsense.errors import ConnectionStatus, FirewallError
 from app.opnsense.normalise import NatRule, normalise_aliases, normalise_nat, normalise_rules
 from app.opnsense.normalise.aliases import AliasInfo
+from app.opnsense.normalise.dnsmasq import HostInfo, normalise_hosts
 from app.opnsense.normalise.rules import RuleInfo
 from app.opnsense.registry.entries import (
+    DNSMASQ_HOSTS_ADD,
+    DNSMASQ_HOSTS_DELETE,
+    DNSMASQ_HOSTS_LIST,
+    DNSMASQ_HOSTS_UPDATE,
+    DNSMASQ_RECONFIGURE,
     FIREWALL_ALIASES_ADD,
     FIREWALL_ALIASES_DELETE,
     FIREWALL_ALIASES_LIST,
@@ -129,7 +136,7 @@ def begin_apply(
     if cr.action != "create" and not cr.target_uuid:
         raise ApplyRefused(f"This request has no target {kind}")
     if cr.high_risk and confirm_name != cr.proposed.get(confirm_key):
-        what = "alias name" if kind == "alias" else "rule label"
+        what = {"alias": "alias name", "dnsmasq_host": "description"}.get(kind, "rule label")
         raise ApplyRefused(f"Type the {what} to confirm this high-risk change")
     fw = db.get(Firewall, cr.firewall_id)
     if fw is None:
@@ -859,3 +866,208 @@ def _finish(
         cr.result_snapshot = snapshot
     db.commit()
     return cr
+
+
+def read_hosts(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[HostInfo]:
+    """Read-only: the Dnsmasq static hosts currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, DNSMASQ_HOSTS_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_hosts(raw).hosts)
+
+
+def host_conflict(proposed: dict[str, Any], hosts: list[HostInfo], own: str | None) -> str | None:
+    """Duplicate name or MAC against the hosts on the firewall, ignoring the entry being edited."""
+    key = host_key(proposed.get("host"), proposed.get("domain"))
+    macs = set(proposed.get("hwaddrs") or [])
+    for h in hosts:
+        if h.uuid == own:
+            continue
+        if host_key(h.host, h.domain) == key:
+            return "A host entry with this name and domain already exists on the firewall"
+        if macs & set(h.hwaddrs):
+            return "Another host entry on the firewall already uses one of these MAC addresses"
+    return None
+
+
+def host_payload(proposed: dict[str, Any]) -> dict[str, Any]:
+    """Body for addHost/setHost. Client id, lease time, tags, local and comments stay at defaults
+    on create and untouched on update."""
+    return {
+        "host": {
+            "host": proposed["host"],
+            "domain": proposed.get("domain", ""),
+            "ip": ",".join(proposed["ips"]),
+            "hwaddr": ",".join(proposed.get("hwaddrs", [])),
+            "cnames": ",".join(proposed.get("cnames", [])),
+            "ignore": "1" if proposed.get("ignore") else "0",
+            "descr": proposed["description"],
+        }
+    }
+
+
+def apply_host_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    """Dnsmasq static host apply (ADR-0017): stale check, save, `reconfigure`, read back. No
+    automatic rollback. Reconfigure restarts Dnsmasq, so DNS and DHCP pause briefly."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    cr, fw = begin_apply(
+        db,
+        change_id=change_id,
+        user=user,
+        request=request,
+        kind="dnsmasq_host",
+        actions=("create", "update", "delete"),
+        confirm_name=confirm_name,
+        confirm_key="label",
+    )
+    firewall_id = fw.id
+    action = cr.action
+    target = cr.target_uuid
+    proposed = dict(cr.proposed or {})
+    params = {"uuid": target} if action != "create" and target else None
+    client: OPNsenseClient | None = None
+    saved = False
+    try:
+        try:
+            client = open_client(fw, settings)
+        except CredentialDecryptionError:
+            return _finish(
+                db, cr, Status.failed, user, request, "Stored credentials could not be decrypted"
+            )
+        try:
+            listing = _call(db, client, DNSMASQ_HOSTS_LIST, None, user, fw.id, request)
+        except FirewallError as exc:
+            return _finish(db, cr, Status.failed, user, request, f"Check failed: {exc.message}")
+        hosts = normalise_hosts(listing).hosts
+        if action != "create":
+            current = next((h for h in hosts if h.uuid == target), None)
+            if current is None:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The host entry no longer exists on the firewall; nothing was changed",
+                )
+            if fingerprint(current.model_dump()) != cr.base_fingerprint:
+                return _finish(
+                    db,
+                    cr,
+                    Status.stale,
+                    user,
+                    request,
+                    "The host entry was changed on the firewall after this request was made; "
+                    "nothing was changed. Create a new request.",
+                )
+        if action != "delete":
+            clash = host_conflict(proposed, hosts, target if action == "update" else None)
+            if clash:
+                return _finish(db, cr, Status.stale, user, request, f"{clash}; nothing was changed")
+
+        try:
+            if action == "delete":
+                reply = _call(db, client, DNSMASQ_HOSTS_DELETE, {}, user, fw.id, request, params)
+                want = "deleted"
+            else:
+                reply = _call(
+                    db,
+                    client,
+                    DNSMASQ_HOSTS_UPDATE if action == "update" else DNSMASQ_HOSTS_ADD,
+                    host_payload(proposed),
+                    user,
+                    fw.id,
+                    request,
+                    params,
+                )
+                want = "saved"
+        except FirewallError as exc:
+            return _finish(db, cr, Status.failed, user, request, f"Not saved: {exc.message}")
+        if not isinstance(reply, dict) or reply.get("result") != want:
+            return _finish(db, cr, Status.failed, user, request, _validation_message(reply))
+        saved = True
+        if action == "create":
+            new_id = reply.get("uuid")
+            target = new_id if isinstance(new_id, str) else None
+
+        try:
+            result = _call(db, client, DNSMASQ_RECONFIGURE, {}, user, fw.id, request)
+        except FirewallError as exc:
+            return _finish(
+                db,
+                cr,
+                Status.failed,
+                user,
+                request,
+                f"The change is saved on the firewall but NOT active: {exc.message}",
+            )
+        status_text = result.get("status") if isinstance(result, dict) else None
+        if not isinstance(status_text, str) or status_text.strip().lower() != "ok":
+            return _finish(
+                db,
+                cr,
+                Status.failed,
+                user,
+                request,
+                "The change is saved on the firewall but NOT active: activation was not confirmed",
+            )
+
+        if action == "delete":
+            return _finish(db, cr, Status.applied, user, request, None, None)
+        snapshot: dict[str, Any] | None
+        try:
+            after = normalise_hosts(
+                _call(db, client, DNSMASQ_HOSTS_LIST, None, user, fw.id, request)
+            ).hosts
+            match = next(
+                (
+                    h
+                    for h in after
+                    if (
+                        h.uuid == target
+                        if target
+                        else host_key(h.host, h.domain)
+                        == host_key(proposed.get("host"), proposed.get("domain"))
+                    )
+                ),
+                None,
+            )
+            snapshot = match.model_dump() if match else None
+        except FirewallError:
+            snapshot = None
+        return _finish(db, cr, Status.applied, user, request, None, snapshot)
+    except Exception:
+        log.exception("apply_crashed", change_request=str(cr.id), firewall_id=str(firewall_id))
+        db.rollback()
+        db.refresh(cr)
+        state = (
+            "saved on the firewall, activation unknown"
+            if saved
+            else "the firewall state is unknown"
+        )
+        return _finish(
+            db, cr, Status.failed, user, request, f"Unexpected error; {state}. Check the firewall."
+        )
+    finally:
+        if client is not None:
+            anyio.from_thread.run(client.aclose)

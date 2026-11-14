@@ -15,6 +15,11 @@ SYSTEM_DISK = "system.disk"
 INTERFACES_OVERVIEW = "interfaces.overview"
 TRAFFIC_INTERFACES = "traffic.interfaces"
 SERVICES_LIST = "services.list"
+DNSMASQ_HOSTS_LIST = "dnsmasq.hosts.list"
+DNSMASQ_HOSTS_ADD = "dnsmasq.hosts.add"
+DNSMASQ_HOSTS_UPDATE = "dnsmasq.hosts.update"
+DNSMASQ_HOSTS_DELETE = "dnsmasq.hosts.delete"
+DNSMASQ_RECONFIGURE = "dnsmasq.reconfigure"
 SERVICES_START = "services.start"
 SERVICES_STOP = "services.stop"
 SERVICES_RESTART = "services.restart"
@@ -152,6 +157,58 @@ _ENTRIES = (
         verified=False,
         notes="Queues a service restart; always answers result ok, so the caller must read the "
         "service list back (ADR-0016). Admin only, allow_writes required. Unverified until lab.",
+    ),
+    Operation(
+        operation_id=DNSMASQ_HOSTS_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/dnsmasq/settings/searchHost",
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Static host entries (ADR-0017). Unverified until lab.",
+    ),
+    Operation(
+        operation_id=DNSMASQ_HOSTS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/dnsmasq/settings/addHost",
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Saves a static host, not yet active. Reviewed apply only (ADR-0017). Body: host.",
+    ),
+    Operation(
+        operation_id=DNSMASQ_HOSTS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/dnsmasq/settings/setHost/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Upsert, so apply confirms the host exists first (ADR-0017). Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=DNSMASQ_HOSTS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/dnsmasq/settings/delHost/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Deletes a static host. Reviewed apply only (ADR-0017).",
+    ),
+    Operation(
+        operation_id=DNSMASQ_RECONFIGURE,
+        method=HttpMethod.POST,
+        endpoint="/api/dnsmasq/service/reconfigure",
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Restarts Dnsmasq to activate saved changes; DNS and DHCP pause briefly. Apply only.",
     ),
     Operation(
         operation_id=DHCP_LEASES,

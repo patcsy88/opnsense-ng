@@ -13,6 +13,7 @@ import { FirewallConnectionsPage } from "@/pages/firewall-connections";
 import { NatPage } from "@/pages/nat";
 import { OverviewPage } from "@/pages/overview";
 import { DhcpPage } from "@/pages/dhcp";
+import { DnsEntriesPage } from "@/pages/dns-entries";
 import { DnsPage } from "@/pages/dns";
 import { LogsPage } from "@/pages/logs";
 import { ServicesPage } from "@/pages/services";
@@ -44,6 +45,11 @@ export function App() {
             <Route path="/traffic" element={<TrafficPage />} />
             <Route path="/dhcp" element={<DhcpPage />} />
             <Route path="/dns" element={<DnsPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={["admin", "network_admin"]} />}>
+            <Route path="/dhcp/entries" element={<DnsEntriesPage />} />
+          </Route>
+          <Route element={<ProtectedRoute roles={["admin", "network_admin", "security_admin"]} />}>
             <Route path="/vpn" element={<VpnPage />} />
           </Route>
           <Route path="/account" element={<AccountPage />} />

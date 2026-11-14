@@ -1,11 +1,13 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
+import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useAuth } from "@/features/auth/auth";
 import { api } from "@/lib/api";
 
 function expiry(value: string | null): string {
@@ -15,6 +17,7 @@ function expiry(value: string | null): string {
 }
 
 export function DhcpPage() {
+  const { hasRole } = useAuth();
   const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
   const [chosen, setChosen] = useState<string | null>(null);
   const [text, setText] = useState("");
@@ -46,6 +49,11 @@ export function DhcpPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">DHCP</h1>
+        {hasRole("admin", "network_admin") && (
+          <Link className="text-sm text-primary underline" to="/dhcp/entries">
+            Manage static hosts
+          </Link>
+        )}
         {firewalls.length > 0 && (
           <label className="flex items-center gap-2 text-sm">
             Firewall

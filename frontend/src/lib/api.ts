@@ -5,6 +5,7 @@ import {
   firewallListSchema,
   firewallOptionListSchema,
   serviceActionSchema,
+  dnsmasqHostsResponseSchema,
   overviewSchema,
   firewallSchema,
   loginResponseSchema,
@@ -34,6 +35,7 @@ import {
   userSchema,
   type AliasProposalInput,
   type ForwardProposalInput,
+  type HostProposalInput,
   type RuleProposalInput,
   type FirewallCreateInput,
   type FirewallUpdateInput,
@@ -340,6 +342,25 @@ export const api = {
   services: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/services`, {
       schema: servicesResponseSchema,
+    }),
+  dnsmasqHosts: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dnsmasq/hosts`, {
+      schema: dnsmasqHostsResponseSchema,
+    }),
+  stageHost: (firewallId: string, host: HostProposalInput) =>
+    request("POST", `${base}/changes/dnsmasq-hosts`, {
+      body: { firewall_id: firewallId, host },
+      schema: changeDetailSchema,
+    }),
+  stageHostUpdate: (firewallId: string, uuid: string, host: HostProposalInput) =>
+    request("POST", `${base}/changes/dnsmasq-hosts/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, host },
+      schema: changeDetailSchema,
+    }),
+  stageHostDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/dnsmasq-hosts/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
     }),
   controlService: (
     id: string,
