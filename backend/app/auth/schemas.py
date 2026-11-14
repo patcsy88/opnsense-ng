@@ -27,6 +27,7 @@ class UserOut(BaseModel):
     # True while the user's role requires MFA and they have not enrolled: the session is
     # restricted to the enrolment endpoints (ADR-0012).
     mfa_enrolment_required: bool = False
+    must_change_password: bool = False
 
 
 class LoginResponse(BaseModel):

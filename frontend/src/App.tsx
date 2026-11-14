@@ -5,6 +5,7 @@ import { ProtectedRoute } from "@/components/protected-route";
 import { AdministrationPage } from "@/pages/administration";
 import { AccountPage } from "@/pages/account";
 import { AuditPage } from "@/pages/audit";
+import { UsersPage } from "@/pages/users";
 import { ChangeDetailPage } from "@/pages/change-detail";
 import { ChangesPage } from "@/pages/changes";
 import { DashboardPage } from "@/pages/dashboard";
@@ -51,6 +52,7 @@ export function App() {
           </Route>
           <Route element={<ProtectedRoute roles={["admin"]} />}>
             <Route path="/administration/firewalls" element={<FirewallConnectionsPage />} />
+            <Route path="/administration/users" element={<UsersPage />} />
           </Route>
           <Route path="*" element={<Navigate to="/" replace />} />
         </Route>

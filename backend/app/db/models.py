@@ -40,6 +40,8 @@ class User(Base):
     )
     # TOTP (ADR-0012). The secret is Fernet-encrypted and bound to this user's id; it exists
     # before mfa_enabled while enrolment is pending.
+    # Set for a temporary password (ADR-0013): the session may only change the password.
+    must_change_password: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     mfa_enabled: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
     mfa_secret_encrypted: Mapped[str | None] = mapped_column(Text, nullable=True)
     # Last accepted time step; a code for the same or an earlier step is refused.

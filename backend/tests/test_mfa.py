@@ -339,6 +339,7 @@ async def test_restricted_session_reaches_only_enrolment_me_and_logout(
     allowed = {
         ("GET", "/api/v1/auth/me"),
         ("POST", "/api/v1/auth/logout"),
+        ("POST", "/api/v1/auth/password"),
         ("GET", MFA),
         ("POST", f"{MFA}/enrol/start"),
         ("POST", f"{MFA}/enrol/confirm"),

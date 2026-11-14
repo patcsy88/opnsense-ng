@@ -56,7 +56,7 @@ def _load(db: Session, user: CurrentUser) -> User:
     return row
 
 
-def _guard_attempt(db: Session, request: Request, user: User, action: str) -> None:
+def guard_attempt(db: Session, request: Request, user: User, action: str) -> None:
     remaining = throttle.locked_seconds(db, user.username)
     if remaining:
         audit.record(
@@ -75,7 +75,7 @@ def _guard_attempt(db: Session, request: Request, user: User, action: str) -> No
         )
 
 
-def _fail(
+def fail(
     db: Session,
     request: Request,
     settings: Settings,
@@ -98,7 +98,7 @@ def _fail(
     return HTTPException(status.HTTP_401_UNAUTHORIZED, message)
 
 
-def _ok(db: Session, request: Request, user: User, action: str, **detail: int | str) -> None:
+def ok(db: Session, request: Request, user: User, action: str, **detail: int | str) -> None:
     audit.add(
         db,
         action=action,
@@ -134,14 +134,14 @@ def enrol_start(
     row = _load(db, user)
     if row.mfa_enabled:
         raise HTTPException(status.HTTP_409_CONFLICT, "MFA is already enabled")
-    _guard_attempt(db, request, row, "mfa.enrol_start")
+    guard_attempt(db, request, row, "mfa.enrol_start")
     if not verify_password(row.password_hash, body.password):
-        raise _fail(
+        raise fail(
             db, request, settings, row, "mfa.enrol_start", "wrong_password", "Wrong password"
         )
     secret = totp.new_secret()
     mfa.store_secret(db, settings, row, secret)
-    _ok(db, request, row, "mfa.enrol_start")
+    ok(db, request, row, "mfa.enrol_start")
     db.commit()
     uri = totp.otpauth_uri(secret, row.username)
     return EnrolStartOut(secret=secret, otpauth_uri=uri, qr=totp.qr_matrix(uri))
@@ -160,14 +160,14 @@ def enrol_confirm(
         raise HTTPException(status.HTTP_409_CONFLICT, "MFA is already enabled")
     if mfa.load_secret(settings, row) is None:
         raise HTTPException(status.HTTP_409_CONFLICT, "Start enrolment first")
-    _guard_attempt(db, request, row, "mfa.enable")
+    guard_attempt(db, request, row, "mfa.enable")
     if mfa.check_code(db, settings, row, body.code, allow_recovery=False) is None:
-        raise _fail(db, request, settings, row, "mfa.enable", "invalid_code", "Invalid code")
+        raise fail(db, request, settings, row, "mfa.enable", "invalid_code", "Invalid code")
     row.mfa_enabled = True
     codes = mfa.replace_recovery_codes(db, row)
     ended = sessions.revoke_user_sessions(db, row.id, except_session_id=user.session_id)
     throttle.clear(db, row.username)
-    _ok(db, request, row, "mfa.enable", other_sessions_ended=ended)
+    ok(db, request, row, "mfa.enable", other_sessions_ended=ended)
     db.commit()
     return RecoveryCodesOut(recovery_codes=codes)
 
@@ -175,11 +175,11 @@ def enrol_confirm(
 def _verify_password_and_code(
     db: Session, request: Request, settings: Settings, row: User, body: PasswordCodeIn, action: str
 ) -> None:
-    _guard_attempt(db, request, row, action)
+    guard_attempt(db, request, row, action)
     if not verify_password(row.password_hash, body.password):
-        raise _fail(db, request, settings, row, action, "wrong_password", "Wrong password or code")
+        raise fail(db, request, settings, row, action, "wrong_password", "Wrong password or code")
     if mfa.check_code(db, settings, row, body.code) is None:
-        raise _fail(db, request, settings, row, action, "invalid_code", "Wrong password or code")
+        raise fail(db, request, settings, row, action, "invalid_code", "Wrong password or code")
     throttle.clear(db, row.username)
 
 
@@ -208,7 +208,7 @@ def disable(
     _verify_password_and_code(db, request, settings, row, body, "mfa.disable")
     mfa.clear_mfa(db, row)
     ended = sessions.revoke_user_sessions(db, row.id, except_session_id=user.session_id)
-    _ok(db, request, row, "mfa.disable", other_sessions_ended=ended)
+    ok(db, request, row, "mfa.disable", other_sessions_ended=ended)
     db.commit()
 
 
@@ -226,6 +226,6 @@ def regenerate_recovery_codes(
     _verify_password_and_code(db, request, settings, row, body, "mfa.recovery_regenerate")
     codes = mfa.replace_recovery_codes(db, row)
     ended = sessions.revoke_user_sessions(db, row.id, except_session_id=user.session_id)
-    _ok(db, request, row, "mfa.recovery_regenerate", other_sessions_ended=ended)
+    ok(db, request, row, "mfa.recovery_regenerate", other_sessions_ended=ended)
     db.commit()
     return RecoveryCodesOut(recovery_codes=codes)

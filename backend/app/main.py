@@ -13,6 +13,7 @@ from starlette.middleware.trustedhost import TrustedHostMiddleware
 from app.api import audit_log, changes, firewalls, health
 from app.auth import account as mfa_account
 from app.auth import router as auth_router
+from app.auth import users as users_api
 from app.core.config import get_settings
 from app.core.http import SecurityHeadersMiddleware
 from app.core.logging import configure_logging
@@ -64,4 +65,6 @@ def create_app() -> FastAPI:
     app.include_router(changes.router)
     app.include_router(audit_log.router)
     app.include_router(mfa_account.router)
+    app.include_router(users_api.router)
+    app.include_router(users_api.password_router)
     return app

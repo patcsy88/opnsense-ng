@@ -319,6 +319,84 @@ function Manage({
   );
 }
 
+function ChangePassword({ mfaEnabled, forced }: { mfaEnabled: boolean; forced: boolean }) {
+  const qc = useQueryClient();
+  const [error, setError] = useState<string | null>(null);
+  const [done, setDone] = useState(false);
+  const change = useMutation({
+    mutationFn: (v: { current: string; next: string; code?: string }) => api.changePassword(v.current, v.next, v.code),
+    onSuccess: async () => {
+      setDone(true);
+      await qc.invalidateQueries({ queryKey: ME_KEY });
+    },
+    onError: (e) => setError(describeError(e).message),
+  });
+  const submit = (e: FormEvent<HTMLFormElement>) => {
+    e.preventDefault();
+    setError(null);
+    setDone(false);
+    const form = e.currentTarget;
+    const data = new FormData(form);
+    const current = String(data.get("current") ?? "");
+    const next = String(data.get("next") ?? "");
+    const again = String(data.get("again") ?? "");
+    const code = String(data.get("code") ?? "").trim();
+    if (!current || !next) return;
+    if (next !== again) {
+      setError("The new passwords do not match");
+      return;
+    }
+    change.mutate({ current, next, code: code || undefined }, { onSuccess: () => form.reset() });
+  };
+  return (
+    <Card>
+      <CardHeader>
+        <CardTitle>Change password</CardTitle>
+        <CardDescription>
+          {forced
+            ? "You are using a temporary password. Choose your own to continue."
+            : "At least 12 characters. Your other sessions will be signed out."}
+        </CardDescription>
+      </CardHeader>
+      <CardContent>
+        <form onSubmit={submit} className="max-w-sm space-y-3" noValidate>
+          <div className="space-y-1">
+            <Label htmlFor="pw-current">{forced ? "Temporary password" : "Current password"}</Label>
+            <Input id="pw-current" name="current" type="password" autoComplete="current-password" required />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="pw-next">New password</Label>
+            <Input id="pw-next" name="next" type="password" autoComplete="new-password" required />
+          </div>
+          <div className="space-y-1">
+            <Label htmlFor="pw-again">Repeat new password</Label>
+            <Input id="pw-again" name="again" type="password" autoComplete="new-password" required />
+          </div>
+          {mfaEnabled && (
+            <div className="space-y-1">
+              <Label htmlFor="pw-code">Code from your app</Label>
+              <Input id="pw-code" name="code" autoComplete="one-time-code" required />
+            </div>
+          )}
+          <Button type="submit" disabled={change.isPending}>
+            Change password
+          </Button>
+          {error && (
+            <p role="alert" className="text-sm text-destructive">
+              {error}
+            </p>
+          )}
+          {done && (
+            <p role="status" className="text-sm">
+              Password changed.
+            </p>
+          )}
+        </form>
+      </CardContent>
+    </Card>
+  );
+}
+
 export function AccountPage() {
   const { user } = useAuth();
   const [codes, setCodes] = useState<string[] | null>(null);
@@ -339,12 +417,18 @@ export function AccountPage() {
           using the app.
         </p>
       )}
+      {user?.must_change_password && (
+        <p role="alert" className="rounded-md border border-border bg-card p-3 text-sm">
+          Your password was set by an administrator. Change it to continue using the app.
+        </p>
+      )}
       <Card>
         <CardHeader>
           <CardTitle>{user?.username}</CardTitle>
           <CardDescription>Role: {user?.role}</CardDescription>
         </CardHeader>
       </Card>
+      {user && <ChangePassword mfaEnabled={user.mfa_enabled} forced={user.must_change_password} />}
       {codes ? (
         <RecoveryCodes codes={codes} onDone={() => setCodes(null)} />
       ) : status.isError ? (

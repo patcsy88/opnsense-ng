@@ -11,6 +11,7 @@ export const userSchema = z.object({
   role: roleSchema,
   mfa_enabled: z.boolean().default(false),
   mfa_enrolment_required: z.boolean().default(false),
+  must_change_password: z.boolean().default(false),
 });
 export type User = z.infer<typeof userSchema>;
 
@@ -20,6 +21,20 @@ export const loginResponseSchema = z.object({
   mfa_required: z.boolean().default(false),
   challenge: z.string().nullish(),
 });
+
+export const userRowSchema = z.object({
+  id: z.uuid(),
+  username: z.string(),
+  role: roleSchema,
+  is_active: z.boolean(),
+  mfa_enabled: z.boolean(),
+  must_change_password: z.boolean(),
+  created_at: z.string(),
+  sessions: z.number().int(),
+});
+export type UserRow = z.infer<typeof userRowSchema>;
+export const userListSchema = z.array(userRowSchema);
+export const tempPasswordSchema = z.object({ user: userRowSchema, temporary_password: z.string() });
 
 export const mfaStatusSchema = z.object({
   enabled: z.boolean(),

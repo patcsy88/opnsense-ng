@@ -21,7 +21,7 @@ export function ProtectedRoute({ roles }: { roles?: Role[] }) {
     );
   }
   if (!user) return <Navigate to="/login" replace state={{ from: location.pathname }} />;
-  if (user.mfa_enrolment_required && location.pathname !== "/account") {
+  if ((user.mfa_enrolment_required || user.must_change_password) && location.pathname !== "/account") {
     return <Navigate to="/account" replace />;
   }
   if (roles && !roles.includes(user.role)) {

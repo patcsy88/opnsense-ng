@@ -47,6 +47,7 @@ def user_out(user: User, settings: Settings) -> UserOut:
         role=user.role,
         mfa_enabled=user.mfa_enabled,
         mfa_enrolment_required=mfa.is_required(settings, user.role.value) and not user.mfa_enabled,
+        must_change_password=user.must_change_password,
     )
 
 
@@ -278,7 +279,9 @@ def login_mfa(
 def logout(
     request: Request,
     response: Response,
-    user: CurrentUser = Depends(require_roles(*ALL_ROLES, allow_restricted=True)),
+    user: CurrentUser = Depends(
+        require_roles(*ALL_ROLES, allow_restricted=True, allow_password_pending=True)
+    ),
     db: Session = Depends(get_db),
     settings: Settings = Depends(get_settings),
 ) -> None:
@@ -321,7 +324,9 @@ def logout_all(
 
 @router.get("/me", response_model=UserOut)
 def me(
-    user: CurrentUser = Depends(require_roles(*ALL_ROLES, allow_restricted=True)),
+    user: CurrentUser = Depends(
+        require_roles(*ALL_ROLES, allow_restricted=True, allow_password_pending=True)
+    ),
 ) -> UserOut:
     return UserOut(
         id=user.id,
@@ -329,4 +334,5 @@ def me(
         role=user.role,
         mfa_enabled=user.mfa_enabled,
         mfa_enrolment_required=user.mfa_restricted,
+        must_change_password=user.must_change_password,
     )

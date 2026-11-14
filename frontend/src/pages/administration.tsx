@@ -43,9 +43,16 @@ export function AdministrationPage() {
         <Card>
           <CardHeader>
             <CardTitle>Users</CardTitle>
+            <CardDescription>Create accounts, change roles, deactivate users and reset passwords or MFA.</CardDescription>
           </CardHeader>
           <CardContent>
-            <Badge>Planned</Badge>
+            {admin ? (
+              <Link className="text-sm text-primary underline" to="/administration/users">
+                Open
+              </Link>
+            ) : (
+              <Badge>Administrators only</Badge>
+            )}
           </CardContent>
         </Card>
       </div>

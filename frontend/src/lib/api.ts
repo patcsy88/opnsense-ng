@@ -6,6 +6,9 @@ import {
   firewallOptionListSchema,
   firewallSchema,
   loginResponseSchema,
+  tempPasswordSchema,
+  userListSchema,
+  userRowSchema,
   mfaEnrolStartSchema,
   mfaStatusSchema,
   recoveryCodesSchema,
@@ -202,6 +205,30 @@ export const api = {
       body: { challenge, code },
       schema: loginResponseSchema,
       skipUnauthorizedHandler: true,
+    }),
+  changePassword: (currentPassword: string, newPassword: string, code?: string) =>
+    request("POST", `${base}/auth/password`, {
+      body: { current_password: currentPassword, new_password: newPassword, ...(code ? { code } : {}) },
+      skipUnauthorizedHandler: true,
+    }),
+  listUsers: () => request("GET", `${base}/users`, { schema: userListSchema }),
+  createUser: (username: string, role: string) =>
+    request("POST", `${base}/users`, { body: { username, role }, schema: tempPasswordSchema }),
+  changeUserRole: (id: string, role: string) =>
+    request("POST", `${base}/users/${encodeURIComponent(id)}/role`, { body: { role }, schema: userRowSchema }),
+  deactivateUser: (id: string) =>
+    request("POST", `${base}/users/${encodeURIComponent(id)}/deactivate`, { body: {}, schema: userRowSchema }),
+  reactivateUser: (id: string) =>
+    request("POST", `${base}/users/${encodeURIComponent(id)}/reactivate`, { body: {}, schema: userRowSchema }),
+  resetUserPassword: (id: string) =>
+    request("POST", `${base}/users/${encodeURIComponent(id)}/reset-password`, {
+      body: {},
+      schema: tempPasswordSchema,
+    }),
+  resetUserMfa: (id: string, password: string, code?: string) =>
+    request("POST", `${base}/users/${encodeURIComponent(id)}/reset-mfa`, {
+      body: { password, ...(code ? { code } : {}) },
+      schema: userRowSchema,
     }),
   mfaStatus: () => request("GET", `${base}/auth/mfa`, { schema: mfaStatusSchema }),
   mfaEnrolStart: (password: string) =>

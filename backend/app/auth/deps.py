@@ -43,6 +43,7 @@ class CurrentUser:
     mfa_enabled: bool = False
     # The role requires MFA and the user has not enrolled yet.
     mfa_restricted: bool = False
+    must_change_password: bool = False
 
 
 def get_db(request: Request) -> Iterator[Session]:
@@ -86,7 +87,15 @@ def get_current_user(
         db.commit()
     request.state.session_csrf_hash = session.csrf_token_hash
     restricted = user.role.value in settings.mfa_required_roles and not user.mfa_enabled
-    return CurrentUser(user.id, user.username, user.role, session.id, user.mfa_enabled, restricted)
+    return CurrentUser(
+        user.id,
+        user.username,
+        user.role,
+        session.id,
+        user.mfa_enabled,
+        restricted,
+        user.must_change_password,
+    )
 
 
 def enforce_csrf(
@@ -125,10 +134,12 @@ def enforce_csrf(
 def require_roles(
     *allowed: Role,
     allow_restricted: bool = False,
+    allow_password_pending: bool = False,
 ) -> Callable[..., CurrentUser]:
     """RBAC dependency. Default deny: no allowed roles means nobody passes.
     Also enforces CSRF on state-changing methods, after authentication. A session that must
-    still enrol in MFA only passes where ``allow_restricted`` is set (ADR-0012)."""
+    still enrol in MFA only passes where ``allow_restricted`` is set (ADR-0012); one with a
+    temporary password only where ``allow_password_pending`` is set (ADR-0013)."""
     allowed_set = frozenset(allowed)
 
     def dependency(
@@ -138,6 +149,8 @@ def require_roles(
         settings: Settings = Depends(get_settings),
     ) -> CurrentUser:
         enforce_csrf(request, db, settings, user)
+        if user.must_change_password and not allow_password_pending:
+            raise HTTPException(status.HTTP_403_FORBIDDEN, "password_change_required")
         if user.mfa_restricted and not allow_restricted:
             raise HTTPException(status.HTTP_403_FORBIDDEN, "mfa_enrolment_required")
         if user.role not in allowed_set:
