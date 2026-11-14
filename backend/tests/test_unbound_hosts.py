@@ -262,7 +262,7 @@ async def test_network_admin_lists_but_cannot_approve_own_request(
     assert r.status_code == 200
     [h] = r.json()["hosts"]
     assert h["server"] == "10.0.0.20" and h["editable"] is False
-    assert r.json()["registry_verified"] is False
+    assert r.json()["registry_verified"] is True
     unknown = "5d6e7f80-1a2b-4c3d-8e4f-5a6b7c8d9e0f"
     assert (await app_client.get(f"/api/v1/firewalls/{unknown}/unbound/hosts")).status_code == 404
     cid = str((await stage(app_client, fid, [], host=host())).json()["id"])

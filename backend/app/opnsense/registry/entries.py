@@ -292,8 +292,8 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Unbound host overrides (ADR-0018). Unverified until lab.",
+        verified=True,
+        notes="Unbound host overrides (ADR-0018).",
     ),
     Operation(
         operation_id=UNBOUND_HOSTS_ADD,
@@ -302,7 +302,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Saves a host override, not yet active. Reviewed apply only (ADR-0018).",
     ),
     Operation(
@@ -313,7 +313,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Upsert, so apply confirms it exists first (ADR-0018). Reviewed apply only.",
     ),
     Operation(
@@ -324,7 +324,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Deletes a host override and its aliases. Reviewed apply only (ADR-0018).",
     ),
     Operation(
@@ -335,7 +335,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Enables a host override with an explicit state. Reviewed apply only (ADR-0018).",
     ),
     Operation(
@@ -346,7 +346,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Disables a host override with an explicit state. Reviewed apply only (ADR-0018).",
     ),
     Operation(
@@ -356,7 +356,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Restarts Unbound to activate saved changes; DNS pauses for all clients. Apply only.",
     ),
     Operation(

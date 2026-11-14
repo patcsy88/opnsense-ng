@@ -48,13 +48,13 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `dnsmasq.hosts.update` | POST | `/api/dnsmasq/settings/setHost/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
 | `dnsmasq.hosts.delete` | POST | `/api/dnsmasq/settings/delHost/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
 | `dnsmasq.reconfigure` | POST | `/api/dnsmasq/service/reconfigure` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
-| `unbound.hosts.list` | GET | `/api/unbound/settings/searchHostOverride` | Services: Unbound | yes | no | 26.7.8_2 | no |
-| `unbound.hosts.add` | POST | `/api/unbound/settings/addHostOverride` | Services: Unbound | no | no | 26.7.8_2 | no |
-| `unbound.hosts.update` | POST | `/api/unbound/settings/setHostOverride/{uuid}` | Services: Unbound | no | no | 26.7.8_2 | no |
-| `unbound.hosts.delete` | POST | `/api/unbound/settings/delHostOverride/{uuid}` | Services: Unbound | no | no | 26.7.8_2 | no |
-| `unbound.hosts.enable` | POST | `/api/unbound/settings/toggleHostOverride/{uuid}/1` | Services: Unbound | no | no | 26.7.8_2 | no |
-| `unbound.hosts.disable` | POST | `/api/unbound/settings/toggleHostOverride/{uuid}/0` | Services: Unbound | no | no | 26.7.8_2 | no |
-| `unbound.reconfigure` | POST | `/api/unbound/service/reconfigure` | Services: Unbound | no | no | 26.7.8_2 | no |
+| `unbound.hosts.list` | GET | `/api/unbound/settings/searchHostOverride` | Services: Unbound | yes | yes | 26.7.8_2 | yes |
+| `unbound.hosts.add` | POST | `/api/unbound/settings/addHostOverride` | Services: Unbound | yes | no | 26.7.8_2 | yes |
+| `unbound.hosts.update` | POST | `/api/unbound/settings/setHostOverride/{uuid}` | Services: Unbound | yes | no | 26.7.8_2 | yes |
+| `unbound.hosts.delete` | POST | `/api/unbound/settings/delHostOverride/{uuid}` | Services: Unbound | yes | no | 26.7.8_2 | yes |
+| `unbound.hosts.enable` | POST | `/api/unbound/settings/toggleHostOverride/{uuid}/1` | Services: Unbound | yes | no | 26.7.8_2 | yes |
+| `unbound.hosts.disable` | POST | `/api/unbound/settings/toggleHostOverride/{uuid}/0` | Services: Unbound | yes | no | 26.7.8_2 | yes |
+| `unbound.reconfigure` | POST | `/api/unbound/service/reconfigure` | Services: Unbound | yes | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.list` | GET | `/api/dnsmasq/settings/searchDomain` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.add` | POST | `/api/dnsmasq/settings/addDomain` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.update` | POST | `/api/dnsmasq/settings/setDomain/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
@@ -139,7 +139,7 @@ DHCP leases (`dhcp.leases`, ADR-0008) lists Dnsmasq leases: address, hostname, i
 
 Dnsmasq static hosts (ADR-0017): `dnsmasq.hosts.*` and `dnsmasq.reconfigure` are used only by the staged apply procedure, plus a read-only host list for admin and network_admin (MAC addresses included). Saved changes take effect only after `reconfigure`, which restarts Dnsmasq. `setHost` is an upsert, so apply confirms the host exists and still matches its stored fingerprint first. All five operations were verified on the lab (26.7.8_2) with a create, edit and delete of a throwaway host. Domain overrides (`dnsmasq.domains.*`) use the same flow, with the request body under the root key `domainoverride` (hosts use `host`); the firewall answers `result: failed` with no detail when the key is wrong. Every override is high risk, and the list endpoint `GET /api/v1/firewalls/{id}/dnsmasq/domains` is admin and network_admin only. All were verified on the lab (26.7.8_2).
 
-Unbound host overrides (ADR-0018): `unbound.hosts.*` and `unbound.reconfigure` use the same staged flow, with the request body under the root key `host` (from the upstream source, unconfirmed on the lab). Only A and AAAA rows are editable; MX and TXT rows are listed as not editable and refused at stage time, and alias rows are skipped. Enable and disable use the explicit-state endpoints and are normal risk. Applying restarts Unbound, which pauses DNS for every client. The list endpoint `GET /api/v1/firewalls/{id}/unbound/hosts` is admin and network_admin only. All seven operations are unverified until the lab test.
+Unbound host overrides (ADR-0018): `unbound.hosts.*` and `unbound.reconfigure` use the same staged flow, with the request body under the root key `host` (from the upstream source, unconfirmed on the lab). Only A and AAAA rows are editable; MX and TXT rows are listed as not editable and refused at stage time, and alias rows are skipped. Enable and disable use the explicit-state endpoints and are normal risk. Applying restarts Unbound, which pauses DNS for every client. The list endpoint `GET /api/v1/firewalls/{id}/unbound/hosts` is admin and network_admin only. All seven operations were verified on the lab (26.7.8_2) with a create, edit, disable, enable and delete of a throwaway host; the non-admin lab API user with "Services: Unbound" can write.
 
 WireGuard status (`wireguard.status`, ADR-0009) lists tunnels and their peers: name, status (online within 300 s of a handshake, stale, offline), endpoint, allowed IPs, last handshake and transfer counters, capped at 500 rows. Fields are copied from a whitelist, so private, preshared and public keys never leave the backend. Access is admin, network_admin and security_admin. The privilege also allows service control in OPNsense, but no write operation is registered. Verified on the lab (26.7.8_2).
 

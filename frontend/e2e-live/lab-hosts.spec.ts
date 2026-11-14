@@ -191,3 +191,75 @@ test("Dnsmasq domain override: create, edit, delete on the lab firewall", async 
   await open();
   await expect(overrideRow()).toHaveCount(0);
 });
+
+const UNBOUND_HOST = "zz-adr18";
+const UNBOUND_DOMAIN = "adr18.test";
+const UNBOUND_DESCRIPTION = "ADR18 lab test host";
+
+test("Unbound host override: create, edit, disable, delete on the lab firewall", async () => {
+  test.skip(!USER || !PASSWORD, "run through scripts/e2e-lab-hosts.sh");
+  const options = await (await page.request.get("/api/v1/firewalls")).json();
+  const fw = options.find((f: { name: string }) => f.name === FIREWALL);
+  expect(fw?.allow_writes, `allow_writes is on for ${FIREWALL}`).toBe(true);
+
+  const row = () => page.getByRole("row", { name: new RegExp(UNBOUND_HOST) });
+  const open = async () => {
+    await page.goto("/dns");
+    await page.locator("select").selectOption({ label: FIREWALL });
+    await page.getByRole("tab", { name: "Host overrides" }).click();
+  };
+  const stageDialogAction = async (name: string) => {
+    await page.getByRole("button", { name }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Create change request" })
+      .click();
+    await page.waitForURL(/\/changes\//);
+  };
+
+  await open();
+  await expect(row()).toHaveCount(0);
+
+  // Create
+  await page.getByRole("button", { name: "New host override" }).click();
+  await page.getByLabel("Host name", { exact: true }).fill(UNBOUND_HOST);
+  await page.getByLabel("Domain", { exact: true }).fill(UNBOUND_DOMAIN);
+  await page.getByLabel("IP address", { exact: true }).fill("192.0.2.80");
+  await page
+    .getByLabel("Description", { exact: true })
+    .fill(UNBOUND_DESCRIPTION);
+  await page.getByRole("button", { name: "Create change request" }).click();
+  await page.waitForURL(/\/changes\//);
+  await review(page);
+  await open();
+  await expect(row()).toContainText("192.0.2.80");
+
+  // Edit
+  await page
+    .getByRole("button", { name: `Edit host override ${UNBOUND_DESCRIPTION}` })
+    .click();
+  await page.getByLabel("IP address", { exact: true }).fill("192.0.2.81");
+  await page.getByRole("button", { name: "Create change request" }).click();
+  await page.waitForURL(/\/changes\//);
+  await review(page);
+  await open();
+  await expect(row()).toContainText("192.0.2.81");
+
+  // Disable (normal risk)
+  await stageDialogAction(`Disable host override ${UNBOUND_DESCRIPTION}`);
+  await review(page);
+  await open();
+  await expect(row()).toContainText("Disabled");
+
+  // Enable again
+  await stageDialogAction(`Enable host override ${UNBOUND_DESCRIPTION}`);
+  await review(page);
+  await open();
+  await expect(row()).not.toContainText("Disabled");
+
+  // Delete (high risk: the description is typed)
+  await stageDialogAction(`Delete host override ${UNBOUND_DESCRIPTION}`);
+  await review(page, UNBOUND_DESCRIPTION);
+  await open();
+  await expect(row()).toHaveCount(0);
+});
