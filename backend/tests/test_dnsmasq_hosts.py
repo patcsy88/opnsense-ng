@@ -128,10 +128,10 @@ def test_normaliser_is_tolerant_and_lowercases_macs() -> None:
     assert normalise_hosts(None).hosts == []
 
 
-def test_registry_entries_are_unverified_and_writes_are_not_read_only() -> None:
+def test_registry_entries_are_verified_and_writes_are_not_read_only() -> None:
     for op_id in ("dnsmasq.hosts.add", "dnsmasq.hosts.update", "dnsmasq.hosts.delete"):
         op = get_operation(op_id)
-        assert op.read_only is False and op.verified is False
+        assert op.read_only is False and op.verified is True
     assert get_operation("dnsmasq.hosts.list").read_only is True
     assert get_operation("dnsmasq.reconfigure").read_only is False
     update = get_operation("dnsmasq.hosts.update")
@@ -271,7 +271,7 @@ async def test_network_admin_sees_macs_and_the_host_list(app_client: httpx.Async
     assert r.status_code == 200
     body = r.json()
     assert (
-        body["hosts"][0]["hwaddrs"] == ["aa:bb:cc:dd:ee:01"] and body["registry_verified"] is False
+        body["hosts"][0]["hwaddrs"] == ["aa:bb:cc:dd:ee:01"] and body["registry_verified"] is True
     )
 
 

@@ -132,7 +132,7 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=False,
         notes="Queues a service start and always answers result ok, so the caller must read the "
-        "service list back (ADR-0016). Admin only, allow_writes required. Unverified until lab.",
+        "service list back (ADR-0016). Admin only, allow_writes required. Verified on the lab.",
     ),
     Operation(
         operation_id=SERVICES_STOP,
@@ -144,7 +144,7 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=False,
         notes="Queues a service stop and always answers result ok, so the caller must read the "
-        "service list back (ADR-0016). Admin only, allow_writes required. Unverified until lab.",
+        "service list back (ADR-0016). Admin only, allow_writes required. Verified on the lab.",
     ),
     Operation(
         operation_id=SERVICES_RESTART,
@@ -156,7 +156,7 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=False,
         notes="Queues a service restart; always answers result ok, so the caller must read the "
-        "service list back (ADR-0016). Admin only, allow_writes required. Unverified until lab.",
+        "service list back (ADR-0016). Admin only, allow_writes required. Verified on the lab.",
     ),
     Operation(
         operation_id=DNSMASQ_HOSTS_LIST,
@@ -165,8 +165,8 @@ _ENTRIES = (
         required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Static host entries (ADR-0017). Unverified until lab.",
+        verified=True,
+        notes="Static host entries (ADR-0017). Verified on the lab.",
     ),
     Operation(
         operation_id=DNSMASQ_HOSTS_ADD,
@@ -175,7 +175,7 @@ _ENTRIES = (
         required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Saves a static host, not yet active. Reviewed apply only (ADR-0017). Body: host.",
     ),
     Operation(
@@ -186,7 +186,7 @@ _ENTRIES = (
         required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Upsert, so apply confirms the host exists first (ADR-0017). Reviewed apply only.",
     ),
     Operation(
@@ -197,7 +197,7 @@ _ENTRIES = (
         required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Deletes a static host. Reviewed apply only (ADR-0017).",
     ),
     Operation(
@@ -207,7 +207,7 @@ _ENTRIES = (
         required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Restarts Dnsmasq to activate saved changes; DNS and DHCP pause briefly. Apply only.",
     ),
     Operation(
