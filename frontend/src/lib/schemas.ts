@@ -76,6 +76,26 @@ export const connectivitySchema = z.object({
 });
 export type Connectivity = z.infer<typeof connectivitySchema>;
 
+export const overviewEntrySchema = z.object({
+  id: z.uuid(),
+  name: z.string(),
+  reachable: z.boolean(),
+  status: z.string(),
+  message: z.string(),
+  hostname: z.string().nullable(),
+  version: z.string().nullable(),
+  uptime: z.string().nullable(),
+  cpu_used_percent: z.number().nullable(),
+  memory_used_percent: z.number().nullable(),
+  disk_used_percent: z.number().nullable(),
+  checked_at: z.number(),
+});
+export const overviewSchema = z.object({
+  firewalls: z.array(overviewEntrySchema),
+  truncated: z.boolean(),
+});
+export type OverviewEntry = z.infer<typeof overviewEntrySchema>;
+
 export const systemStatusSchema = z.object({
   hostname: z.string().nullable(),
   versions: z.array(z.string()),

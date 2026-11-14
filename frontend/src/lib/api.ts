@@ -4,6 +4,7 @@ import {
   connectivitySchema,
   firewallListSchema,
   firewallOptionListSchema,
+  overviewSchema,
   firewallSchema,
   loginResponseSchema,
   tempPasswordSchema,
@@ -266,6 +267,7 @@ export const api = {
   listFirewalls: () => request("GET", `${base}/firewalls`, { schema: firewallListSchema }),
   listFirewallOptions: () =>
     request("GET", `${base}/firewalls/options`, { schema: firewallOptionListSchema }),
+  getOverview: () => request("GET", `${base}/firewalls/overview`, { schema: overviewSchema }),
   createFirewall: (input: FirewallCreateInput) =>
     request("POST", `${base}/firewalls`, { body: input, schema: firewallSchema }),
   updateFirewall: (id: string, input: FirewallUpdateInput) =>

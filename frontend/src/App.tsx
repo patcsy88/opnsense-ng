@@ -11,6 +11,7 @@ import { ChangesPage } from "@/pages/changes";
 import { DashboardPage } from "@/pages/dashboard";
 import { FirewallConnectionsPage } from "@/pages/firewall-connections";
 import { NatPage } from "@/pages/nat";
+import { OverviewPage } from "@/pages/overview";
 import { DhcpPage } from "@/pages/dhcp";
 import { DnsPage } from "@/pages/dns";
 import { LogsPage } from "@/pages/logs";
@@ -32,6 +33,7 @@ export function App() {
           {NAV_ITEMS.filter((n) => !n.implemented).map((n) => (
             <Route key={n.to} path={n.to} element={<PlannedPage title={n.label} />} />
           ))}
+          <Route path="/overview" element={<OverviewPage />} />
           <Route path="/firewall" element={<FirewallPage />} />
           <Route path="/changes" element={<ChangesPage />} />
           <Route path="/changes/:id" element={<ChangeDetailPage />} />

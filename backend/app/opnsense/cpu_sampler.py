@@ -34,6 +34,15 @@ def sample_cpu(firewall_id: uuid.UUID, fetch: Callable[[], float | None]) -> flo
     return value
 
 
+def peek(firewall_id: uuid.UUID, max_age: float = 120.0) -> float | None:
+    """The last sampled value if it is recent. Never opens a stream (ADR-0015)."""
+    with _lock:
+        hit = _cache.get(firewall_id)
+    if hit and time.monotonic() - hit[0] <= max_age:
+        return hit[1]
+    return None
+
+
 def forget(firewall_id: uuid.UUID) -> None:
     with _lock:
         _cache.pop(firewall_id, None)

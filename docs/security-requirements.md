@@ -12,6 +12,7 @@
 | Input validation | Pydantic schemas on every request |
 | CSRF | Required for all state-changing requests |
 | Audit | User, action, firewall, timestamp, outcome, independent of OPNsense logs |
+| Multi-firewall overview | `GET /api/v1/firewalls/overview` (ADR-0015), read-only, any signed-in role. Non-admins see only reachable or unreachable. At most 4 firewalls are queried at once, 10 s budget each, 50 firewalls maximum, results cached 15 s per firewall, CPU from the sampler cache only. One audit row per request (`firewall.overview`, counts and unreachable ids only) instead of one per operation: a deliberate exception for this endpoint. The response is never cached by the service worker |
 | Rate limiting | All endpoints; stricter on login. The login limits (`POST /auth/login`, `POST /auth/login/mfa`, `LOGIN_RATE_LIMIT`, default 5/minute per IP) are counted in PostgreSQL, so they are exact across restarts and backend processes (ADR-0014). The general limit (`DEFAULT_RATE_LIMIT`) is in memory per process |
 | Network | Restrict to trusted networks or VPN |
 | Client | No credentials or firewall data in localStorage or service-worker caches |

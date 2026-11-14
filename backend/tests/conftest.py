@@ -116,10 +116,13 @@ def csrf_headers(client: httpx.AsyncClient) -> dict[str, str]:
 
 @pytest.fixture(autouse=True)
 def _reset_cpu_sampler() -> Iterator[None]:
+    from app.api import overview
     from app.opnsense import cpu_sampler, traffic_cache
 
     cpu_sampler.clear()
     traffic_cache.clear()
+    overview.clear()
     yield
     cpu_sampler.clear()
     traffic_cache.clear()
+    overview.clear()

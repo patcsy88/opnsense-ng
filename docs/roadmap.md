@@ -6,7 +6,7 @@
 | 2 | Interface monitoring, firewall rules, aliases | P0 |
 | 3 | NAT, firewall logs, traffic monitoring (done) | P1 |
 | 4 | VPN, DHCP, DNS, service management (read-only views done; changes and service control need their own ADRs) | P1 |
-| 5 | Audit logging, advanced security, multi-firewall | P2 |
+| 5 | Audit logging, advanced security, multi-firewall (done: audit viewer, TOTP MFA, user management, PostgreSQL login limits, multi-firewall overview) | P2 |
 | 6 | Analytics, notifications, automation | P2 |
 
 MVP: secure connection to OPNsense, health/interface/resource view, rule management, logs and blocked traffic, alias management with apply.
