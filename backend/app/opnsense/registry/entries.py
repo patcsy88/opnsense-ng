@@ -20,6 +20,10 @@ DNSMASQ_HOSTS_ADD = "dnsmasq.hosts.add"
 DNSMASQ_HOSTS_UPDATE = "dnsmasq.hosts.update"
 DNSMASQ_HOSTS_DELETE = "dnsmasq.hosts.delete"
 DNSMASQ_RECONFIGURE = "dnsmasq.reconfigure"
+DNSMASQ_DOMAINS_LIST = "dnsmasq.domains.list"
+DNSMASQ_DOMAINS_ADD = "dnsmasq.domains.add"
+DNSMASQ_DOMAINS_UPDATE = "dnsmasq.domains.update"
+DNSMASQ_DOMAINS_DELETE = "dnsmasq.domains.delete"
 SERVICES_START = "services.start"
 SERVICES_STOP = "services.stop"
 SERVICES_RESTART = "services.restart"
@@ -209,6 +213,48 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Restarts Dnsmasq to activate saved changes; DNS and DHCP pause briefly. Apply only.",
+    ),
+    Operation(
+        operation_id=DNSMASQ_DOMAINS_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/dnsmasq/settings/searchDomain",
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Domain overrides (ADR-0017). Verified on the lab. Body root key is domainoverride.",
+    ),
+    Operation(
+        operation_id=DNSMASQ_DOMAINS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/dnsmasq/settings/addDomain",
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Saves a domain override, not yet active. Reviewed apply only (ADR-0017).",
+    ),
+    Operation(
+        operation_id=DNSMASQ_DOMAINS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/dnsmasq/settings/setDomain/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Upsert, so apply confirms it exists first (ADR-0017). Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=DNSMASQ_DOMAINS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/dnsmasq/settings/delDomain/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Dnsmasq DNS/DHCP: Settings",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Deletes a domain override. Reviewed apply only (ADR-0017).",
     ),
     Operation(
         operation_id=DHCP_LEASES,

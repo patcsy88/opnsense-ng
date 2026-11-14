@@ -12,6 +12,8 @@ failed and says plainly that the change is saved on the firewall but not active.
 """
 
 import uuid
+from collections.abc import Callable
+from dataclasses import dataclass
 from typing import Any
 
 import anyio.from_thread
@@ -22,7 +24,7 @@ from starlette.requests import Request
 from app import audit
 from app.auth.deps import CurrentUser
 from app.changes import service
-from app.changes.dnsmasq_schemas import host_key
+from app.changes.dnsmasq_schemas import domain_key, host_key
 from app.changes.fingerprint import fingerprint
 from app.changes.forward_schemas import ForwardProposal
 from app.changes.rule_schemas import RuleProposal
@@ -35,9 +37,18 @@ from app.opnsense.client import OPNsenseClient
 from app.opnsense.errors import ConnectionStatus, FirewallError
 from app.opnsense.normalise import NatRule, normalise_aliases, normalise_nat, normalise_rules
 from app.opnsense.normalise.aliases import AliasInfo
-from app.opnsense.normalise.dnsmasq import HostInfo, normalise_hosts
+from app.opnsense.normalise.dnsmasq import (
+    DomainInfo,
+    HostInfo,
+    normalise_domains,
+    normalise_hosts,
+)
 from app.opnsense.normalise.rules import RuleInfo
 from app.opnsense.registry.entries import (
+    DNSMASQ_DOMAINS_ADD,
+    DNSMASQ_DOMAINS_DELETE,
+    DNSMASQ_DOMAINS_LIST,
+    DNSMASQ_DOMAINS_UPDATE,
     DNSMASQ_HOSTS_ADD,
     DNSMASQ_HOSTS_DELETE,
     DNSMASQ_HOSTS_LIST,
@@ -93,6 +104,11 @@ def _validation_message(reply: Any) -> str:
     message = reply.get("message") if isinstance(reply, dict) else None
     if isinstance(message, str) and message.strip():
         return "The firewall refused the change: " + " ".join(message.split())[:300]
+    if isinstance(reply, dict):
+        result = reply.get("result")
+        shown = str(result)[:40] if isinstance(result, str) else "none"
+        keys = ", ".join(sorted(str(k)[:30] for k in reply)[:8])
+        return f"The firewall did not complete the change (result: {shown}; reply fields: {keys})"
     return "The firewall did not complete the change"
 
 
@@ -136,7 +152,11 @@ def begin_apply(
     if cr.action != "create" and not cr.target_uuid:
         raise ApplyRefused(f"This request has no target {kind}")
     if cr.high_risk and confirm_name != cr.proposed.get(confirm_key):
-        what = {"alias": "alias name", "dnsmasq_host": "description"}.get(kind, "rule label")
+        what = {
+            "alias": "alias name",
+            "dnsmasq_host": "description",
+            "dnsmasq_domain": "description",
+        }.get(kind, "rule label")
         raise ApplyRefused(f"Type the {what} to confirm this high-risk change")
     fw = db.get(Firewall, cr.firewall_id)
     if fw is None:
@@ -917,6 +937,92 @@ def host_payload(proposed: dict[str, Any]) -> dict[str, Any]:
     }
 
 
+def read_domains(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[DomainInfo]:
+    """Read-only: the Dnsmasq domain overrides currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, DNSMASQ_DOMAINS_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_domains(raw).domains)
+
+
+def domain_conflict(
+    proposed: dict[str, Any], domains: list[DomainInfo], own: str | None
+) -> str | None:
+    """Only one override per domain, ignoring the entry being edited."""
+    key = domain_key(proposed.get("domain"))
+    for d in domains:
+        if d.uuid != own and domain_key(d.domain) == key:
+            return "An override for this domain already exists on the firewall"
+    return None
+
+
+def domain_payload(proposed: dict[str, Any]) -> dict[str, Any]:
+    """Body for addDomain/setDomain. Source IP, ipset and sequence stay at defaults."""
+    port = proposed.get("port")
+    return {
+        "domainoverride": {
+            "domain": proposed["domain"],
+            "ip": proposed["server"],
+            "port": str(port) if port else "",
+            "descr": proposed["description"],
+        }
+    }
+
+
+@dataclass(frozen=True)
+class DnsmasqSpec:
+    """What differs between static hosts and domain overrides in the shared apply procedure."""
+
+    kind: str
+    noun: str
+    list_op: str
+    add_op: str
+    update_op: str
+    delete_op: str
+    normalise: Callable[[Any], list[Any]]
+    conflict: Callable[[dict[str, Any], list[Any], str | None], str | None]
+    payload: Callable[[dict[str, Any]], dict[str, Any]]
+    same: Callable[[Any, dict[str, Any]], bool]
+
+
+HOST_SPEC = DnsmasqSpec(
+    kind="dnsmasq_host",
+    noun="host entry",
+    list_op=DNSMASQ_HOSTS_LIST,
+    add_op=DNSMASQ_HOSTS_ADD,
+    update_op=DNSMASQ_HOSTS_UPDATE,
+    delete_op=DNSMASQ_HOSTS_DELETE,
+    normalise=lambda raw: list(normalise_hosts(raw).hosts),
+    conflict=host_conflict,
+    payload=host_payload,
+    same=lambda h, p: host_key(h.host, h.domain) == host_key(p.get("host"), p.get("domain")),
+)
+
+DOMAIN_SPEC = DnsmasqSpec(
+    kind="dnsmasq_domain",
+    noun="domain override",
+    list_op=DNSMASQ_DOMAINS_LIST,
+    add_op=DNSMASQ_DOMAINS_ADD,
+    update_op=DNSMASQ_DOMAINS_UPDATE,
+    delete_op=DNSMASQ_DOMAINS_DELETE,
+    normalise=lambda raw: list(normalise_domains(raw).domains),
+    conflict=domain_conflict,
+    payload=domain_payload,
+    same=lambda d, p: domain_key(d.domain) == domain_key(p.get("domain")),
+)
+
+
 def apply_host_change(
     db: Session,
     *,
@@ -926,8 +1032,32 @@ def apply_host_change(
     request: Request,
     confirm_name: str | None,
 ) -> ChangeRequest:
-    """Dnsmasq static host apply (ADR-0017): stale check, save, `reconfigure`, read back. No
-    automatic rollback. Reconfigure restarts Dnsmasq, so DNS and DHCP pause briefly."""
+    return _apply_dnsmasq(HOST_SPEC, db, change_id, user, settings, request, confirm_name)
+
+
+def apply_domain_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    return _apply_dnsmasq(DOMAIN_SPEC, db, change_id, user, settings, request, confirm_name)
+
+
+def _apply_dnsmasq(
+    spec: DnsmasqSpec,
+    db: Session,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    """Dnsmasq apply (ADR-0017): stale check, save, `reconfigure`, read back. No automatic
+    rollback. Reconfigure restarts Dnsmasq, so DNS and DHCP pause briefly."""
     from app.api.firewalls import open_client  # local: avoids an import cycle with the router
 
     cr, fw = begin_apply(
@@ -935,7 +1065,7 @@ def apply_host_change(
         change_id=change_id,
         user=user,
         request=request,
-        kind="dnsmasq_host",
+        kind=spec.kind,
         actions=("create", "update", "delete"),
         confirm_name=confirm_name,
         confirm_key="label",
@@ -955,12 +1085,12 @@ def apply_host_change(
                 db, cr, Status.failed, user, request, "Stored credentials could not be decrypted"
             )
         try:
-            listing = _call(db, client, DNSMASQ_HOSTS_LIST, None, user, fw.id, request)
+            listing = _call(db, client, spec.list_op, None, user, fw.id, request)
         except FirewallError as exc:
             return _finish(db, cr, Status.failed, user, request, f"Check failed: {exc.message}")
-        hosts = normalise_hosts(listing).hosts
+        items = spec.normalise(listing)
         if action != "create":
-            current = next((h for h in hosts if h.uuid == target), None)
+            current = next((h for h in items if h.uuid == target), None)
             if current is None:
                 return _finish(
                     db,
@@ -968,7 +1098,7 @@ def apply_host_change(
                     Status.stale,
                     user,
                     request,
-                    "The host entry no longer exists on the firewall; nothing was changed",
+                    f"The {spec.noun} no longer exists on the firewall; nothing was changed",
                 )
             if fingerprint(current.model_dump()) != cr.base_fingerprint:
                 return _finish(
@@ -977,24 +1107,24 @@ def apply_host_change(
                     Status.stale,
                     user,
                     request,
-                    "The host entry was changed on the firewall after this request was made; "
+                    f"The {spec.noun} was changed on the firewall after this request was made; "
                     "nothing was changed. Create a new request.",
                 )
         if action != "delete":
-            clash = host_conflict(proposed, hosts, target if action == "update" else None)
+            clash = spec.conflict(proposed, items, target if action == "update" else None)
             if clash:
                 return _finish(db, cr, Status.stale, user, request, f"{clash}; nothing was changed")
 
         try:
             if action == "delete":
-                reply = _call(db, client, DNSMASQ_HOSTS_DELETE, {}, user, fw.id, request, params)
+                reply = _call(db, client, spec.delete_op, {}, user, fw.id, request, params)
                 want = "deleted"
             else:
                 reply = _call(
                     db,
                     client,
-                    DNSMASQ_HOSTS_UPDATE if action == "update" else DNSMASQ_HOSTS_ADD,
-                    host_payload(proposed),
+                    spec.update_op if action == "update" else spec.add_op,
+                    spec.payload(proposed),
                     user,
                     fw.id,
                     request,
@@ -1036,20 +1166,9 @@ def apply_host_change(
             return _finish(db, cr, Status.applied, user, request, None, None)
         snapshot: dict[str, Any] | None
         try:
-            after = normalise_hosts(
-                _call(db, client, DNSMASQ_HOSTS_LIST, None, user, fw.id, request)
-            ).hosts
+            after = spec.normalise(_call(db, client, spec.list_op, None, user, fw.id, request))
             match = next(
-                (
-                    h
-                    for h in after
-                    if (
-                        h.uuid == target
-                        if target
-                        else host_key(h.host, h.domain)
-                        == host_key(proposed.get("host"), proposed.get("domain"))
-                    )
-                ),
+                (h for h in after if (h.uuid == target if target else spec.same(h, proposed))),
                 None,
             )
             snapshot = match.model_dump() if match else None

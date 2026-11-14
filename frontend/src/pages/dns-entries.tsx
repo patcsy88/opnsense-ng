@@ -30,6 +30,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChangeStatusBadge } from "@/features/changes/status";
+import { DomainOverrides } from "@/features/changes/domain-overrides";
 import { HostForm, toHostProposal } from "@/features/changes/host-form";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
@@ -45,6 +46,7 @@ export function DnsEntriesPage() {
     queryFn: api.listFirewallOptions,
   });
   const [chosen, setChosen] = useState<string | null>(null);
+  const [tab, setTab] = useState<"hosts" | "domains">("hosts");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<DnsmasqHost | null>(null);
   const [deleting, setDeleting] = useState<DnsmasqHost | null>(null);
@@ -120,11 +122,34 @@ export function DnsEntriesPage() {
           onRetry={() => void options.refetch()}
         />
       )}
-      {q.isError && (
+      <div role="tablist" aria-label="Entry type" className="flex gap-2">
+        {(
+          [
+            ["hosts", "Static hosts"],
+            ["domains", "Domain overrides"],
+          ] as const
+        ).map(([id, label]) => (
+          <Button
+            key={id}
+            role="tab"
+            aria-selected={tab === id}
+            size="sm"
+            variant={tab === id ? "default" : "outline"}
+            onClick={() => setTab(id)}
+          >
+            {label}
+          </Button>
+        ))}
+      </div>
+
+      {tab === "domains" && selected && (
+        <DomainOverrides firewallId={selected} />
+      )}
+      {tab === "hosts" && q.isError && (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       )}
 
-      {selected && !q.isError && (
+      {tab === "hosts" && selected && !q.isError && (
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center justify-between gap-2">

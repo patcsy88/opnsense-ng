@@ -138,3 +138,59 @@ class HostProposal(BaseModel):
             firewall_addresses=firewall_addresses,
             firewall_hostname=firewall_hostname,
         )
+
+
+# Overrides for these would redirect name resolution for huge parts of the internet. The list is
+# deliberately short and static (no public suffix dependency); a single label is refused anyway.
+BROAD_SUFFIXES = frozenset(
+    {
+        "co.uk", "org.uk", "ac.uk", "gov.uk", "com.au", "net.au", "org.au", "co.nz", "co.jp",
+        "com.br", "co.in", "co.za", "com.cn", "com.mx", "in-addr.arpa", "ip6.arpa",
+    }
+)  # fmt: skip
+
+
+def domain_key(domain: str | None) -> str:
+    return (domain or "").lower().rstrip(".")
+
+
+class DomainProposal(BaseModel):
+    """A Dnsmasq domain override: ask one DNS server for one domain (ADR-0017). Source IP, ipset
+    and sequence stay at defaults. No wildcards."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    domain: str = Field(min_length=1, max_length=253)
+    server: str = Field(min_length=1, max_length=64)
+    port: int | None = Field(default=None, ge=1, le=65535)
+    description: str = Field(min_length=1, max_length=255)
+
+    @field_validator("domain")
+    @classmethod
+    def _domain(cls, v: str) -> str:
+        item = _name(v, "Domain")
+        if "." not in item:
+            raise ValueError("Use a domain with at least two labels, such as corp.example")
+        if item in BROAD_SUFFIXES:
+            raise ValueError("That domain is too broad to override")
+        return item
+
+    @field_validator("server")
+    @classmethod
+    def _server(cls, v: str) -> str:
+        return _ip(v)
+
+    @field_validator("description")
+    @classmethod
+    def _description(cls, v: str) -> str:
+        if any(ord(ch) < 32 or ord(ch) == 127 for ch in v):
+            raise ValueError("Description must not contain control characters")
+        item = v.strip()
+        if not item:
+            raise ValueError("A description is required; it identifies the entry")
+        return item
+
+    def risk_reasons(self) -> list[str]:
+        """Every override is high risk: it decides where a whole domain is resolved."""
+        where = f"{self.server}:{self.port}" if self.port else self.server
+        return [f"sends all lookups for {self.domain} to the DNS server {where}"]

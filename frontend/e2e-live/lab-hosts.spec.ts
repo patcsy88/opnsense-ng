@@ -7,6 +7,21 @@ const USER = process.env.E2E_LAB_USER ?? "";
 const PASSWORD = process.env.E2E_LAB_PASSWORD ?? "";
 const FIREWALL = process.env.E2E_LAB_FIREWALL ?? "OPNsense.test";
 
+test.describe.configure({ mode: "serial" });
+let page: Page;
+test.beforeAll(async ({ browser }) => {
+  if (!USER || !PASSWORD) return;
+  const context = await browser.newContext({
+    ignoreHTTPSErrors: true,
+    serviceWorkers: "block",
+  });
+  page = await context.newPage();
+  await signInAndEnrol(page);
+});
+test.afterAll(async () => {
+  await page?.context().close();
+});
+
 const HOST = "zz-adr17-test";
 const DOMAIN = "adr17.test";
 const DESCRIPTION = "ADR17 lab test host";
@@ -76,12 +91,8 @@ async function fill(page: Page, ips: string): Promise<void> {
   await page.getByLabel("Description", { exact: true }).fill(DESCRIPTION);
 }
 
-test("Dnsmasq static host: create, edit, delete on the lab firewall", async ({
-  page,
-}) => {
+test("Dnsmasq static host: create, edit, delete on the lab firewall", async () => {
   test.skip(!USER || !PASSWORD, "run through scripts/e2e-lab-hosts.sh");
-  await signInAndEnrol(page);
-
   const options = await (await page.request.get("/api/v1/firewalls")).json();
   const fw = options.find((f: { name: string }) => f.name === FIREWALL);
   expect(fw, `firewall ${FIREWALL} exists`).toBeTruthy();
@@ -122,4 +133,61 @@ test("Dnsmasq static host: create, edit, delete on the lab firewall", async ({
   await review(page, DESCRIPTION);
   await chooseFirewall(page);
   await expect(hostRow(page)).toHaveCount(0);
+});
+
+const OVERRIDE = "zz-adr17.test";
+const OVERRIDE_DESCRIPTION = "ADR17 lab test override";
+
+test("Dnsmasq domain override: create, edit, delete on the lab firewall", async () => {
+  test.skip(!USER || !PASSWORD, "run through scripts/e2e-lab-hosts.sh");
+  const options = await (await page.request.get("/api/v1/firewalls")).json();
+  const fw = options.find((f: { name: string }) => f.name === FIREWALL);
+  expect(fw?.allow_writes, `allow_writes is on for ${FIREWALL}`).toBe(true);
+
+  const overrideRow = () =>
+    page.getByRole("row", { name: new RegExp(OVERRIDE) });
+  const open = async () => {
+    await chooseFirewall(page);
+    await page.getByRole("tab", { name: "Domain overrides" }).click();
+  };
+  const submit = async (server: string) => {
+    await page.getByLabel("Domain", { exact: true }).fill(OVERRIDE);
+    await page.getByLabel("DNS server IP", { exact: true }).fill(server);
+    await page
+      .getByLabel("Description", { exact: true })
+      .fill(OVERRIDE_DESCRIPTION);
+    await page.getByRole("button", { name: "Create change request" }).click();
+    await page.waitForURL(/\/changes\//);
+  };
+
+  await open();
+  await expect(overrideRow()).toHaveCount(0);
+
+  await page.getByRole("button", { name: "New override" }).click();
+  await submit("192.0.2.53");
+  await review(page, OVERRIDE_DESCRIPTION);
+  await open();
+  await expect(overrideRow()).toContainText("192.0.2.53");
+
+  await page
+    .getByRole("button", { name: `Edit override ${OVERRIDE_DESCRIPTION}` })
+    .click();
+  await page.getByLabel("DNS server IP", { exact: true }).fill("192.0.2.54");
+  await page.getByRole("button", { name: "Create change request" }).click();
+  await page.waitForURL(/\/changes\//);
+  await review(page, OVERRIDE_DESCRIPTION);
+  await open();
+  await expect(overrideRow()).toContainText("192.0.2.54");
+
+  await page
+    .getByRole("button", { name: `Delete override ${OVERRIDE_DESCRIPTION}` })
+    .click();
+  await page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Create change request" })
+    .click();
+  await page.waitForURL(/\/changes\//);
+  await review(page, OVERRIDE_DESCRIPTION);
+  await open();
+  await expect(overrideRow()).toHaveCount(0);
 });

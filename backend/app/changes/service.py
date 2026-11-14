@@ -19,7 +19,7 @@ from app.changes.states import Status, can_transition
 from app.db.models import ChangeRequest, ChangeRequestEvent, Firewall, Role
 
 MANAGE_ROLES = frozenset({Role.admin, Role.network_admin})
-KINDS = frozenset({"alias", "rule", "nat_forward", "dnsmasq_host"})
+KINDS = frozenset({"alias", "rule", "nat_forward", "dnsmasq_host", "dnsmasq_domain"})
 ACTIONS = frozenset({"create", "update", "delete", "toggle"})
 NOTE_MAX = 500
 

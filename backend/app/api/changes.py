@@ -15,7 +15,7 @@ from app import audit
 from app.auth.deps import ALL_ROLES, CurrentUser, get_db, require_roles
 from app.changes import apply as apply_changes
 from app.changes import service
-from app.changes.dnsmasq_schemas import HostProposal
+from app.changes.dnsmasq_schemas import DomainProposal, HostProposal
 from app.changes.forward_schemas import ForwardProposal, forward_risk
 from app.changes.rule_schemas import RuleProposal
 from app.changes.schemas import AliasProposal
@@ -1176,6 +1176,7 @@ def apply_change(
             "rule": apply_changes.apply_rule_change,
             "nat_forward": apply_changes.apply_forward_change,
             "dnsmasq_host": apply_changes.apply_host_change,
+            "dnsmasq_domain": apply_changes.apply_domain_change,
         }.get(cr.kind, apply_changes.apply_alias_change)
         cr = run(
             db,
@@ -1398,5 +1399,177 @@ def stage_host_delete(
 ) -> ChangeDetailOut:
     """Stage deleting a Dnsmasq static host. Always high risk."""
     return _stage_host(
+        request, body.firewall_id, user, db, settings, action="delete", target=target
+    )
+
+
+class DomainCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    override: DomainProposal
+
+
+def _stage_domain(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+    *,
+    action: str,
+    target: str | None,
+    proposal: DomainProposal | None = None,
+) -> ChangeDetailOut:
+    """Shared staging for create, update and delete of a Dnsmasq domain override (ADR-0017).
+    Every override is high risk. Reads the overrides read-only; nothing is written."""
+    audit_action = f"change.stage_domain_{action}"
+    if target is not None and not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid override id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_domains(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the domain overrides from the firewall") from None
+
+    current = next((d for d in rows if d.uuid == target), None) if target else None
+    if target is not None and current is None:
+        raise refuse("That domain override was not found on the firewall")
+
+    proposed: dict[str, Any]
+    if proposal is not None:
+        clash = apply_changes.domain_conflict(proposal.model_dump(), rows, target)
+        if clash:
+            raise refuse(clash)
+        proposed = {
+            **proposal.model_dump(),
+            "label": proposal.description,
+            "risk": proposal.risk_reasons(),
+        }
+        if action == "update" and current is not None:
+            proposed["label"] = (current.description or current.domain or "override")[:64]
+    elif action == "delete" and current is not None:
+        proposed = {
+            "label": (current.description or current.domain or "override")[:64],
+            "domain": current.domain,
+            "description": current.description or "",
+            "risk": [f"removes the override for {current.domain}"],
+        }
+    else:
+        raise refuse("Unsupported request")
+
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "dnsmasq_domain",
+            ChangeRequest.status.in_(OPEN_STATES),
+            (
+                ChangeRequest.proposed["domain"].astext == proposed["domain"]
+                if action == "create"
+                else ChangeRequest.target_uuid == target
+            ),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already changes this domain override", duplicate)
+
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="dnsmasq_domain",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump() if current is not None else None,
+            high_risk=True,
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post("/dnsmasq-domains", response_model=ChangeDetailOut, status_code=201)
+def stage_domain_create(
+    request: Request,
+    body: DomainCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new Dnsmasq domain override. Always high risk."""
+    return _stage_domain(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="create",
+        target=None,
+        proposal=body.override,
+    )
+
+
+@router.post("/dnsmasq-domains/{target}/update", response_model=ChangeDetailOut, status_code=201)
+def stage_domain_update(
+    request: Request,
+    target: str,
+    body: DomainCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing a Dnsmasq domain override. Always high risk."""
+    return _stage_domain(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="update",
+        target=target,
+        proposal=body.override,
+    )
+
+
+@router.post("/dnsmasq-domains/{target}/delete", response_model=ChangeDetailOut, status_code=201)
+def stage_domain_delete(
+    request: Request,
+    target: str,
+    body: HostDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting a Dnsmasq domain override. Always high risk."""
+    return _stage_domain(
         request, body.firewall_id, user, db, settings, action="delete", target=target
     )

@@ -101,9 +101,28 @@ function currentHostRows(s: Record<string, unknown>): [string, string][] {
   ];
 }
 
+function domainRows(p: Record<string, unknown>): [string, string][] {
+  if (p.server === undefined) return [["Domain override", String(p.label ?? "—")], ...risk(p)];
+  return [
+    ["Description", String(p.description ?? "—")],
+    ["Domain", String(p.domain)],
+    ["DNS server", `${String(p.server)}${p.port ? `:${String(p.port)}` : ""}`],
+    ...risk(p),
+  ];
+}
+
+function currentDomainRows(s: Record<string, unknown>): [string, string][] {
+  return [
+    ["Domain", String(s.domain ?? "—")],
+    ["DNS server", `${String(s.server ?? "—")}${s.port ? `:${String(s.port)}` : ""}`],
+    ["Description", String(s.description ?? "—")],
+  ];
+}
+
 function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
   if (kind === "dnsmasq_host") return hostRows(p);
+  if (kind === "dnsmasq_domain") return domainRows(p);
   if (kind === "nat_forward") return forwardRows(p);
   if (kind === "rule" && p.action !== undefined) {
     const ports = (v: unknown) => (v ? `:${String(v)}` : "");
@@ -209,7 +228,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : "Alias"} to delete` : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -233,6 +252,8 @@ export function ChangeDetailPage() {
                   ? "This port forward will be deleted. See the current forward below."
                   : c.kind === "dnsmasq_host"
                     ? "This host entry will be deleted. See the current entry below."
+                    : c.kind === "dnsmasq_domain"
+                    ? "This domain override will be deleted. See the current override below."
                     : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
@@ -300,6 +321,27 @@ export function ChangeDetailPage() {
           <CardContent>
             <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
               {ruleRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "dnsmasq_domain" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current domain override</CardTitle>
+            <CardDescription>
+              The override as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {currentDomainRows(c.base_snapshot).map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>

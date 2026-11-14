@@ -32,12 +32,13 @@ export function ChangeStatusBadge({ status }: { status: string }) {
 }
 
 export function targetName(c: ChangeRequest): string | undefined {
-  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" ? "label" : "name";
+  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" || c.kind === "dnsmasq_domain" ? "label" : "name";
   const value = c.proposed?.[key];
   return typeof value === "string" ? value : undefined;
 }
 
 export function describeChange(c: ChangeRequest): string {
+  if (c.kind === "dnsmasq_domain") return `${c.action} DNS domain override ${targetName(c) ?? "?"}`;
   if (c.kind === "dnsmasq_host") return `${c.action} DNS/DHCP host ${targetName(c) ?? "?"}`;
   if (c.kind === "nat_forward") {
     const name = targetName(c) ?? "?";
@@ -56,6 +57,10 @@ export function describeChange(c: ChangeRequest): string {
 
 export function describeEffect(c: ChangeRequest, firewall: string): string {
   const name = targetName(c) ?? "?";
+  if (c.kind === "dnsmasq_domain") {
+    const verb = c.action === "create" ? "creates" : c.action === "update" ? "changes" : "deletes";
+    return `This ${verb} the domain override "${name}" on ${firewall} and restarts Dnsmasq. It decides which DNS server answers for that domain, and DNS and DHCP pause for a moment.`;
+  }
   if (c.kind === "dnsmasq_host") {
     const verb = c.action === "create" ? "creates" : c.action === "update" ? "changes" : "deletes";
     return `This ${verb} the static host "${name}" on ${firewall} and restarts Dnsmasq. DNS and DHCP pause for a moment; existing DHCP leases are kept.`;

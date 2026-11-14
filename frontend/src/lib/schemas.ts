@@ -380,6 +380,28 @@ export interface HostProposalInput {
   description: string;
 }
 
+export const dnsmasqDomainSchema = z.object({
+  uuid: z.string().nullable(),
+  domain: z.string().nullable(),
+  server: z.string().nullable(),
+  port: z.string().nullable(),
+  description: z.string().nullable(),
+});
+export type DnsmasqDomain = z.infer<typeof dnsmasqDomainSchema>;
+
+export const dnsmasqDomainsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  domains: z.array(dnsmasqDomainSchema),
+  registry_verified: z.boolean(),
+});
+
+export interface DomainProposalInput {
+  domain: string;
+  server: string;
+  port: number | null;
+  description: string;
+}
+
 export const servicesResponseSchema = z.object({
   firewall_id: z.uuid(),
   services: z.array(serviceSchema),

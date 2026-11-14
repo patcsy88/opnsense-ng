@@ -71,3 +71,41 @@ def normalise_hosts(raw: Any) -> HostsResult:
             )
         )
     return HostsResult(hosts=out, truncated=len(rows) > MAX_HOSTS)
+
+
+class DomainInfo(BaseModel):
+    uuid: str | None = None
+    domain: str | None = None
+    server: str | None = None
+    port: str | None = None
+    description: str | None = None
+
+
+class DomainsResult(BaseModel):
+    domains: list[DomainInfo] = []
+    truncated: bool = False
+
+
+def normalise_domains(raw: Any) -> DomainsResult:
+    """Tolerant mapping of `rows` for domain overrides. Rows without a uuid are skipped."""
+    rows = raw.get("rows") if isinstance(raw, dict) else None
+    if not isinstance(rows, list):
+        return DomainsResult()
+    out: list[DomainInfo] = []
+    for row in rows[:MAX_HOSTS]:
+        if not isinstance(row, dict):
+            continue
+        uuid = _text(row.get("uuid"), 64)
+        if uuid is None:
+            continue
+        port = row.get("port")
+        out.append(
+            DomainInfo(
+                uuid=uuid,
+                domain=_text(row.get("domain"), 255),
+                server=_text(row.get("ip"), 64),
+                port=_text(str(port) if isinstance(port, int) else port, 5),
+                description=_text(row.get("descr"), 255),
+            )
+        )
+    return DomainsResult(domains=out, truncated=len(rows) > MAX_HOSTS)

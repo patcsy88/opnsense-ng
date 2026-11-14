@@ -5,6 +5,7 @@ import {
   firewallListSchema,
   firewallOptionListSchema,
   serviceActionSchema,
+  dnsmasqDomainsResponseSchema,
   dnsmasqHostsResponseSchema,
   overviewSchema,
   firewallSchema,
@@ -35,6 +36,7 @@ import {
   userSchema,
   type AliasProposalInput,
   type ForwardProposalInput,
+  type DomainProposalInput,
   type HostProposalInput,
   type RuleProposalInput,
   type FirewallCreateInput,
@@ -346,6 +348,25 @@ export const api = {
   dnsmasqHosts: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dnsmasq/hosts`, {
       schema: dnsmasqHostsResponseSchema,
+    }),
+  dnsmasqDomains: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dnsmasq/domains`, {
+      schema: dnsmasqDomainsResponseSchema,
+    }),
+  stageDomain: (firewallId: string, override: DomainProposalInput) =>
+    request("POST", `${base}/changes/dnsmasq-domains`, {
+      body: { firewall_id: firewallId, override },
+      schema: changeDetailSchema,
+    }),
+  stageDomainUpdate: (firewallId: string, uuid: string, override: DomainProposalInput) =>
+    request("POST", `${base}/changes/dnsmasq-domains/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, override },
+      schema: changeDetailSchema,
+    }),
+  stageDomainDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/dnsmasq-domains/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
     }),
   stageHost: (firewallId: string, host: HostProposalInput) =>
     request("POST", `${base}/changes/dnsmasq-hosts`, {

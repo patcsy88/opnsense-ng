@@ -1,6 +1,13 @@
 from app.opnsense.normalise.aliases import AliasesResult, AliasInfo, normalise_aliases
 from app.opnsense.normalise.dns import DnsResult, TopDomain, normalise_dns
-from app.opnsense.normalise.dnsmasq import HostInfo, HostsResult, normalise_hosts
+from app.opnsense.normalise.dnsmasq import (
+    DomainInfo,
+    DomainsResult,
+    HostInfo,
+    HostsResult,
+    normalise_domains,
+    normalise_hosts,
+)
 from app.opnsense.normalise.interfaces import InterfaceInfo, normalise_interfaces
 from app.opnsense.normalise.leases import LeaseInfo, LeasesResult, normalise_leases
 from app.opnsense.normalise.logs import (
@@ -27,6 +34,8 @@ __all__ = [
     "AliasInfo",
     "AliasesResult",
     "DnsResult",
+    "DomainInfo",
+    "DomainsResult",
     "HostInfo",
     "HostsResult",
     "InterfaceInfo",
@@ -52,6 +61,7 @@ __all__ = [
     "normalise_aliases",
     "normalise_cpu_events",
     "normalise_dns",
+    "normalise_domains",
     "normalise_hosts",
     "normalise_interfaces",
     "normalise_leases",
