@@ -20,6 +20,7 @@ from app.changes.forward_schemas import ForwardProposal, forward_risk
 from app.changes.rule_schemas import RuleProposal
 from app.changes.schemas import AliasProposal
 from app.changes.states import Status
+from app.changes.unbound_schemas import UnboundHostProposal
 from app.core.config import Settings, get_settings
 from app.core.crypto import CredentialDecryptionError
 from app.db.models import ChangeRequest, Firewall, Role
@@ -1177,6 +1178,7 @@ def apply_change(
             "nat_forward": apply_changes.apply_forward_change,
             "dnsmasq_host": apply_changes.apply_host_change,
             "dnsmasq_domain": apply_changes.apply_domain_change,
+            "unbound_host": apply_changes.apply_unbound_host_change,
         }.get(cr.kind, apply_changes.apply_alias_change)
         cr = run(
             db,
@@ -1571,5 +1573,219 @@ def stage_domain_delete(
 ) -> ChangeDetailOut:
     """Stage deleting a Dnsmasq domain override. Always high risk."""
     return _stage_domain(
+        request, body.firewall_id, user, db, settings, action="delete", target=target
+    )
+
+
+class UnboundHostCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    host: UnboundHostProposal
+
+
+def _unbound_label(h: Any) -> str:
+    return (h.description or h.hostname or str(h.uuid)[:8])[:64]
+
+
+def _stage_unbound_host(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+    *,
+    action: str,
+    target: str | None,
+    proposal: UnboundHostProposal | None = None,
+    enabled: bool | None = None,
+) -> ChangeDetailOut:
+    """Shared staging for create, update, toggle and delete of an Unbound host override
+    (ADR-0018). Reads the hosts read-only; nothing is written to the firewall."""
+    audit_action = f"change.stage_unbound_host_{action}"
+    if target is not None and not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid host id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_unbound_hosts(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the host overrides from the firewall") from None
+
+    current = next((h for h in rows if h.uuid == target), None) if target else None
+    if target is not None and current is None:
+        raise refuse("That host override was not found on the firewall")
+    if current is not None and not current.editable:
+        raise refuse(f"{current.rr} records cannot be changed here; use OPNsense")
+    addresses, hostname = firewall_identity(fw)
+
+    proposed: dict[str, Any]
+    if proposal is not None:
+        clash = apply_changes.unbound_host_conflict(proposal.model_dump(), rows, target)
+        if clash:
+            raise refuse(clash)
+        reasons = proposal.risk_reasons(addresses, hostname)
+        proposed = {**proposal.model_dump(), "label": proposal.description, "risk": reasons}
+        if action == "update" and current is not None:
+            proposed["label"] = _unbound_label(current)
+    elif action == "toggle" and current is not None and enabled is not None:
+        if current.enabled == enabled:
+            raise refuse("The host override is already " + ("enabled" if enabled else "disabled"))
+        reasons = []
+        proposed = {
+            "label": _unbound_label(current),
+            "enabled": enabled,
+            "hostname": current.hostname,
+            "domain": current.domain,
+            "description": current.description or "",
+            "risk": reasons,
+        }
+    elif action == "delete" and current is not None:
+        reasons = ["deletes a host override"]
+        proposed = {
+            "label": _unbound_label(current),
+            "hostname": current.hostname,
+            "domain": current.domain,
+            "description": current.description or "",
+            "risk": reasons,
+        }
+    else:
+        raise refuse("Unsupported request")
+
+    if action == "create":
+        same = ChangeRequest.proposed["description"].astext == proposed["description"]
+    else:
+        same = ChangeRequest.target_uuid == target
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "unbound_host",
+            ChangeRequest.status.in_(OPEN_STATES),
+            same,
+            *([ChangeRequest.action == "create"] if action == "create" else []),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already changes this host override", duplicate)
+
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="unbound_host",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump() if current is not None else None,
+            high_risk=bool(reasons) or action == "delete",
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post("/unbound-hosts", response_model=ChangeDetailOut, status_code=201)
+def stage_unbound_host_create(
+    request: Request,
+    body: UnboundHostCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new Unbound host override (A or AAAA)."""
+    return _stage_unbound_host(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="create",
+        target=None,
+        proposal=body.host,
+    )
+
+
+@router.post("/unbound-hosts/{target}/update", response_model=ChangeDetailOut, status_code=201)
+def stage_unbound_host_update(
+    request: Request,
+    target: str,
+    body: UnboundHostCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing an Unbound host override."""
+    return _stage_unbound_host(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="update",
+        target=target,
+        proposal=body.host,
+    )
+
+
+@router.post("/unbound-hosts/{target}/toggle", response_model=ChangeDetailOut, status_code=201)
+def stage_unbound_host_toggle(
+    request: Request,
+    target: str,
+    body: ForwardToggleCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage enabling or disabling an Unbound host override."""
+    return _stage_unbound_host(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="toggle",
+        target=target,
+        enabled=body.enabled,
+    )
+
+
+@router.post("/unbound-hosts/{target}/delete", response_model=ChangeDetailOut, status_code=201)
+def stage_unbound_host_delete(
+    request: Request,
+    target: str,
+    body: HostDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting an Unbound host override. Always high risk."""
+    return _stage_unbound_host(
         request, body.firewall_id, user, db, settings, action="delete", target=target
     )

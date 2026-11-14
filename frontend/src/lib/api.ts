@@ -7,6 +7,7 @@ import {
   serviceActionSchema,
   dnsmasqDomainsResponseSchema,
   dnsmasqHostsResponseSchema,
+  unboundHostsResponseSchema,
   overviewSchema,
   firewallSchema,
   loginResponseSchema,
@@ -38,6 +39,7 @@ import {
   type ForwardProposalInput,
   type DomainProposalInput,
   type HostProposalInput,
+  type UnboundHostProposalInput,
   type RuleProposalInput,
   type FirewallCreateInput,
   type FirewallUpdateInput,
@@ -365,6 +367,30 @@ export const api = {
     }),
   stageDomainDelete: (firewallId: string, uuid: string) =>
     request("POST", `${base}/changes/dnsmasq-domains/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
+    }),
+  unboundHosts: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/unbound/hosts`, {
+      schema: unboundHostsResponseSchema,
+    }),
+  stageUnboundHost: (firewallId: string, host: UnboundHostProposalInput) =>
+    request("POST", `${base}/changes/unbound-hosts`, {
+      body: { firewall_id: firewallId, host },
+      schema: changeDetailSchema,
+    }),
+  stageUnboundHostUpdate: (firewallId: string, uuid: string, host: UnboundHostProposalInput) =>
+    request("POST", `${base}/changes/unbound-hosts/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, host },
+      schema: changeDetailSchema,
+    }),
+  stageUnboundHostToggle: (firewallId: string, uuid: string, enabled: boolean) =>
+    request("POST", `${base}/changes/unbound-hosts/${encodeURIComponent(uuid)}/toggle`, {
+      body: { firewall_id: firewallId, enabled },
+      schema: changeDetailSchema,
+    }),
+  stageUnboundHostDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/unbound-hosts/${encodeURIComponent(uuid)}/delete`, {
       body: { firewall_id: firewallId },
       schema: changeDetailSchema,
     }),

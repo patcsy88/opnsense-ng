@@ -15,6 +15,7 @@ from app.core.crypto import CredentialDecryptionError
 from app.db.models import Firewall, Role
 from app.opnsense.errors import FirewallError
 from app.opnsense.normalise.dnsmasq import DomainInfo, HostInfo
+from app.opnsense.normalise.unbound import UnboundHostInfo
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["dnsmasq"])
 
@@ -84,4 +85,39 @@ def list_domains(
         firewall_id=firewall_id,
         domains=domains,
         registry_verified=get_operation(DNSMASQ_DOMAINS_LIST).verified,
+    )
+
+
+class UnboundHostsOut(BaseModel):
+    firewall_id: uuid.UUID
+    hosts: list[UnboundHostInfo]
+    registry_verified: bool
+
+
+@router.get("/{firewall_id}/unbound/hosts", response_model=UnboundHostsOut)
+def list_unbound_hosts(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(Role.admin, Role.network_admin)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> UnboundHostsOut:
+    """Unbound host overrides (ADR-0018). Admin and network_admin only."""
+    from app.opnsense.registry.entries import UNBOUND_HOSTS_LIST, get_operation
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Firewall not found")
+    try:
+        hosts = apply_changes.read_unbound_hosts(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except CredentialDecryptionError:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error") from None
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    return UnboundHostsOut(
+        firewall_id=firewall_id,
+        hosts=hosts,
+        registry_verified=get_operation(UNBOUND_HOSTS_LIST).verified,
     )

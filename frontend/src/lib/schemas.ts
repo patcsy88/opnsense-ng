@@ -402,6 +402,35 @@ export interface DomainProposalInput {
   description: string;
 }
 
+export const unboundHostSchema = z.object({
+  uuid: z.string().nullable(),
+  enabled: z.boolean(),
+  hostname: z.string().nullable(),
+  domain: z.string().nullable(),
+  rr: z.string().nullable(),
+  server: z.string().nullable(),
+  ttl: z.string().nullable(),
+  description: z.string().nullable(),
+  editable: z.boolean(),
+});
+export type UnboundHost = z.infer<typeof unboundHostSchema>;
+
+export const unboundHostsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  hosts: z.array(unboundHostSchema),
+  registry_verified: z.boolean(),
+});
+
+export interface UnboundHostProposalInput {
+  hostname: string;
+  domain: string;
+  rr: "A" | "AAAA";
+  server: string;
+  ttl: number | null;
+  description: string;
+  enabled: boolean;
+}
+
 export const servicesResponseSchema = z.object({
   firewall_id: z.uuid(),
   services: z.array(serviceSchema),

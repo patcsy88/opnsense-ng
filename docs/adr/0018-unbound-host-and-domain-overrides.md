@@ -165,4 +165,4 @@ visible to `admin` and `network_admin` only; (5) hosts first, then a lab test, t
 
 ## Build status
 
-Not started. Step 1 (shared apply generalisation and host overrides) is next.
+Step 1 (shared apply generalisation and host overrides) is built and tested but not yet lab-verified; the `unbound.hosts.*` and `unbound.reconfigure` registry entries stay unverified until then. Step 2 is the lab test. Step 3 (domain forwards, and the rule that a host inside a forwarded domain is high risk) is not started.

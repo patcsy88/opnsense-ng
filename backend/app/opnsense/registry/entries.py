@@ -24,6 +24,13 @@ DNSMASQ_DOMAINS_LIST = "dnsmasq.domains.list"
 DNSMASQ_DOMAINS_ADD = "dnsmasq.domains.add"
 DNSMASQ_DOMAINS_UPDATE = "dnsmasq.domains.update"
 DNSMASQ_DOMAINS_DELETE = "dnsmasq.domains.delete"
+UNBOUND_HOSTS_LIST = "unbound.hosts.list"
+UNBOUND_HOSTS_ADD = "unbound.hosts.add"
+UNBOUND_HOSTS_UPDATE = "unbound.hosts.update"
+UNBOUND_HOSTS_DELETE = "unbound.hosts.delete"
+UNBOUND_HOSTS_ENABLE = "unbound.hosts.enable"
+UNBOUND_HOSTS_DISABLE = "unbound.hosts.disable"
+UNBOUND_RECONFIGURE = "unbound.reconfigure"
 SERVICES_START = "services.start"
 SERVICES_STOP = "services.stop"
 SERVICES_RESTART = "services.restart"
@@ -277,6 +284,80 @@ _ENTRIES = (
         verified=True,
         notes="WireGuard tunnel and peer status (ADR-0009). The privilege also covers service "
         "control; no write operation is registered. Verified on the lab.",
+    ),
+    Operation(
+        operation_id=UNBOUND_HOSTS_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/unbound/settings/searchHostOverride",
+        required_privilege="Services: Unbound",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Unbound host overrides (ADR-0018). Unverified until lab.",
+    ),
+    Operation(
+        operation_id=UNBOUND_HOSTS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/addHostOverride",
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Saves a host override, not yet active. Reviewed apply only (ADR-0018).",
+    ),
+    Operation(
+        operation_id=UNBOUND_HOSTS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/setHostOverride/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Upsert, so apply confirms it exists first (ADR-0018). Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=UNBOUND_HOSTS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/delHostOverride/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Deletes a host override and its aliases. Reviewed apply only (ADR-0018).",
+    ),
+    Operation(
+        operation_id=UNBOUND_HOSTS_ENABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/toggleHostOverride/{uuid}/1",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Enables a host override with an explicit state. Reviewed apply only (ADR-0018).",
+    ),
+    Operation(
+        operation_id=UNBOUND_HOSTS_DISABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/settings/toggleHostOverride/{uuid}/0",
+        path_params=("uuid",),
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Disables a host override with an explicit state. Reviewed apply only (ADR-0018).",
+    ),
+    Operation(
+        operation_id=UNBOUND_RECONFIGURE,
+        method=HttpMethod.POST,
+        endpoint="/api/unbound/service/reconfigure",
+        required_privilege="Services: Unbound",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Restarts Unbound to activate saved changes; DNS pauses for all clients. Apply only.",
     ),
     Operation(
         operation_id=DNS_STATS,

@@ -29,6 +29,7 @@ from app.changes.fingerprint import fingerprint
 from app.changes.forward_schemas import ForwardProposal
 from app.changes.rule_schemas import RuleProposal
 from app.changes.states import Status
+from app.changes.unbound_schemas import unbound_host_key
 from app.core.config import Settings
 from app.core.crypto import CredentialDecryptionError
 from app.core.logging import get_logger
@@ -44,6 +45,7 @@ from app.opnsense.normalise.dnsmasq import (
     normalise_hosts,
 )
 from app.opnsense.normalise.rules import RuleInfo
+from app.opnsense.normalise.unbound import UnboundHostInfo, normalise_unbound_hosts
 from app.opnsense.registry.entries import (
     DNSMASQ_DOMAINS_ADD,
     DNSMASQ_DOMAINS_DELETE,
@@ -72,6 +74,13 @@ from app.opnsense.registry.entries import (
     FORWARDS_DISABLE,
     FORWARDS_ENABLE,
     FORWARDS_UPDATE,
+    UNBOUND_HOSTS_ADD,
+    UNBOUND_HOSTS_DELETE,
+    UNBOUND_HOSTS_DISABLE,
+    UNBOUND_HOSTS_ENABLE,
+    UNBOUND_HOSTS_LIST,
+    UNBOUND_HOSTS_UPDATE,
+    UNBOUND_RECONFIGURE,
 )
 
 log = get_logger("changes.apply")
@@ -156,6 +165,7 @@ def begin_apply(
             "alias": "alias name",
             "dnsmasq_host": "description",
             "dnsmasq_domain": "description",
+            "unbound_host": "description",
         }.get(kind, "rule label")
         raise ApplyRefused(f"Type the {what} to confirm this high-risk change")
     fw = db.get(Firewall, cr.firewall_id)
@@ -981,8 +991,9 @@ def domain_payload(proposed: dict[str, Any]) -> dict[str, Any]:
 
 
 @dataclass(frozen=True)
-class DnsmasqSpec:
-    """What differs between static hosts and domain overrides in the shared apply procedure."""
+class ResolverSpec:
+    """What differs between the Dnsmasq and Unbound kinds in the shared apply procedure
+    (ADR-0017, ADR-0018)."""
 
     kind: str
     noun: str
@@ -994,9 +1005,12 @@ class DnsmasqSpec:
     conflict: Callable[[dict[str, Any], list[Any], str | None], str | None]
     payload: Callable[[dict[str, Any]], dict[str, Any]]
     same: Callable[[Any, dict[str, Any]], bool]
+    reconfigure_op: str = DNSMASQ_RECONFIGURE
+    toggle_on: str | None = None
+    toggle_off: str | None = None
 
 
-HOST_SPEC = DnsmasqSpec(
+HOST_SPEC = ResolverSpec(
     kind="dnsmasq_host",
     noun="host entry",
     list_op=DNSMASQ_HOSTS_LIST,
@@ -1009,7 +1023,7 @@ HOST_SPEC = DnsmasqSpec(
     same=lambda h, p: host_key(h.host, h.domain) == host_key(p.get("host"), p.get("domain")),
 )
 
-DOMAIN_SPEC = DnsmasqSpec(
+DOMAIN_SPEC = ResolverSpec(
     kind="dnsmasq_domain",
     noun="domain override",
     list_op=DNSMASQ_DOMAINS_LIST,
@@ -1023,6 +1037,85 @@ DOMAIN_SPEC = DnsmasqSpec(
 )
 
 
+def read_unbound_hosts(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[UnboundHostInfo]:
+    """Read-only: the Unbound host overrides currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, UNBOUND_HOSTS_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_unbound_hosts(raw).hosts)
+
+
+def unbound_host_conflict(
+    proposed: dict[str, Any], hosts: list[UnboundHostInfo], own: str | None
+) -> str | None:
+    """Same name, domain and record type already present, ignoring the entry being edited."""
+    key = unbound_host_key(proposed.get("hostname"), proposed.get("domain"), proposed.get("rr"))
+    for h in hosts:
+        if h.uuid != own and unbound_host_key(h.hostname, h.domain, h.rr) == key:
+            return "A host override with this name, domain and record type already exists"
+    return None
+
+
+def unbound_host_payload(proposed: dict[str, Any]) -> dict[str, Any]:
+    """Body for addHostOverride/setHostOverride. Reverse record, MX and TXT fields stay at their
+    defaults on create and untouched on update."""
+    ttl = proposed.get("ttl")
+    return {
+        "host": {
+            "enabled": "1" if proposed.get("enabled", True) else "0",
+            "hostname": proposed["hostname"],
+            "domain": proposed["domain"],
+            "rr": proposed["rr"],
+            "server": proposed["server"],
+            "ttl": str(ttl) if ttl is not None else "",
+            "description": proposed["description"],
+        }
+    }
+
+
+UNBOUND_HOST_SPEC = ResolverSpec(
+    kind="unbound_host",
+    noun="host override",
+    list_op=UNBOUND_HOSTS_LIST,
+    add_op=UNBOUND_HOSTS_ADD,
+    update_op=UNBOUND_HOSTS_UPDATE,
+    delete_op=UNBOUND_HOSTS_DELETE,
+    normalise=lambda raw: list(normalise_unbound_hosts(raw).hosts),
+    conflict=unbound_host_conflict,
+    payload=unbound_host_payload,
+    same=lambda h, p: (
+        unbound_host_key(h.hostname, h.domain, h.rr)
+        == unbound_host_key(p.get("hostname"), p.get("domain"), p.get("rr"))
+    ),
+    reconfigure_op=UNBOUND_RECONFIGURE,
+    toggle_on=UNBOUND_HOSTS_ENABLE,
+    toggle_off=UNBOUND_HOSTS_DISABLE,
+)
+
+
+def apply_unbound_host_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    return _apply_resolver(UNBOUND_HOST_SPEC, db, change_id, user, settings, request, confirm_name)
+
+
 def apply_host_change(
     db: Session,
     *,
@@ -1032,7 +1125,7 @@ def apply_host_change(
     request: Request,
     confirm_name: str | None,
 ) -> ChangeRequest:
-    return _apply_dnsmasq(HOST_SPEC, db, change_id, user, settings, request, confirm_name)
+    return _apply_resolver(HOST_SPEC, db, change_id, user, settings, request, confirm_name)
 
 
 def apply_domain_change(
@@ -1044,11 +1137,11 @@ def apply_domain_change(
     request: Request,
     confirm_name: str | None,
 ) -> ChangeRequest:
-    return _apply_dnsmasq(DOMAIN_SPEC, db, change_id, user, settings, request, confirm_name)
+    return _apply_resolver(DOMAIN_SPEC, db, change_id, user, settings, request, confirm_name)
 
 
-def _apply_dnsmasq(
-    spec: DnsmasqSpec,
+def _apply_resolver(
+    spec: ResolverSpec,
     db: Session,
     change_id: uuid.UUID,
     user: CurrentUser,
@@ -1056,8 +1149,8 @@ def _apply_dnsmasq(
     request: Request,
     confirm_name: str | None,
 ) -> ChangeRequest:
-    """Dnsmasq apply (ADR-0017): stale check, save, `reconfigure`, read back. No automatic
-    rollback. Reconfigure restarts Dnsmasq, so DNS and DHCP pause briefly."""
+    """Resolver apply (ADR-0017, ADR-0018): stale check, save, `reconfigure`, read back. No
+    automatic rollback. Reconfigure restarts the resolver, so DNS pauses briefly."""
     from app.api.firewalls import open_client  # local: avoids an import cycle with the router
 
     cr, fw = begin_apply(
@@ -1066,7 +1159,7 @@ def _apply_dnsmasq(
         user=user,
         request=request,
         kind=spec.kind,
-        actions=("create", "update", "delete"),
+        actions=("create", "update", "delete") + (("toggle",) if spec.toggle_on else ()),
         confirm_name=confirm_name,
         confirm_key="label",
     )
@@ -1110,13 +1203,26 @@ def _apply_dnsmasq(
                     f"The {spec.noun} was changed on the firewall after this request was made; "
                     "nothing was changed. Create a new request.",
                 )
-        if action != "delete":
+        if action in ("create", "update"):
             clash = spec.conflict(proposed, items, target if action == "update" else None)
             if clash:
                 return _finish(db, cr, Status.stale, user, request, f"{clash}; nothing was changed")
 
         try:
-            if action == "delete":
+            if action == "toggle":
+                enabling = bool(proposed.get("enabled"))
+                reply = _call(
+                    db,
+                    client,
+                    (spec.toggle_on if enabling else spec.toggle_off) or "",
+                    {},
+                    user,
+                    fw.id,
+                    request,
+                    params,
+                )
+                want = "Enabled" if enabling else "Disabled"
+            elif action == "delete":
                 reply = _call(db, client, spec.delete_op, {}, user, fw.id, request, params)
                 want = "deleted"
             else:
@@ -1133,15 +1239,16 @@ def _apply_dnsmasq(
                 want = "saved"
         except FirewallError as exc:
             return _finish(db, cr, Status.failed, user, request, f"Not saved: {exc.message}")
-        if not isinstance(reply, dict) or reply.get("result") != want:
+        got = reply.get("result") if isinstance(reply, dict) else None
+        if not isinstance(got, str) or got.lower() != want.lower():
             return _finish(db, cr, Status.failed, user, request, _validation_message(reply))
         saved = True
         if action == "create":
-            new_id = reply.get("uuid")
+            new_id = reply.get("uuid") if isinstance(reply, dict) else None
             target = new_id if isinstance(new_id, str) else None
 
         try:
-            result = _call(db, client, DNSMASQ_RECONFIGURE, {}, user, fw.id, request)
+            result = _call(db, client, spec.reconfigure_op, {}, user, fw.id, request)
         except FirewallError as exc:
             return _finish(
                 db,
