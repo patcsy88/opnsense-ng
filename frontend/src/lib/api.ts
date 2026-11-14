@@ -229,6 +229,7 @@ export const api = {
     request("POST", `${base}/users/${encodeURIComponent(id)}/reset-mfa`, {
       body: { password, ...(code ? { code } : {}) },
       schema: userRowSchema,
+      skipUnauthorizedHandler: true,
     }),
   mfaStatus: () => request("GET", `${base}/auth/mfa`, { schema: mfaStatusSchema }),
   mfaEnrolStart: (password: string) =>

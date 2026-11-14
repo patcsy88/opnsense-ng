@@ -1,0 +1,62 @@
+# Disposable stack for the live end-to-end tests (see scripts/e2e-live.sh).
+# Separate project, database, subnet and port from the lab stack. All secrets come from the
+# environment that the script generates for each run; nothing here is a real credential.
+name: opnsense-e2e
+
+services:
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: e2e
+      POSTGRES_DB: e2e
+      POSTGRES_PASSWORD: ${E2E_DB_PASSWORD:?run scripts/e2e-live.sh}
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U e2e -d e2e"]
+      interval: 3s
+      timeout: 3s
+      retries: 20
+    networks:
+      - internal
+
+  backend:
+    build: ../backend
+    depends_on:
+      postgres:
+        condition: service_healthy
+    environment:
+      DATABASE_URL: postgresql+psycopg://e2e:${E2E_DB_PASSWORD}@postgres:5432/e2e
+      SESSION_SECRET: ${E2E_SESSION_SECRET:?run scripts/e2e-live.sh}
+      CREDENTIAL_ENCRYPTION_KEY: ${E2E_FERNET_KEY:?run scripts/e2e-live.sh}
+      SESSION_TTL_MINUTES: "60"
+      # The scripted journey signs in far more often than a person would.
+      LOGIN_RATE_LIMIT: "100/minute"
+      ALLOWED_HOSTS: localhost
+      ALLOWED_ORIGINS: https://localhost:${E2E_PORT:-18443}
+      TRUSTED_PROXIES: 172.31.77.0/24
+      AUDIT_RETENTION_DAYS: "365"
+      MFA_REQUIRED_ROLES: admin,network_admin,security_admin,read_only
+    networks:
+      - internal
+
+  frontend:
+    build: ../frontend
+    networks:
+      - internal
+
+  caddy:
+    image: caddy:2
+    depends_on:
+      - backend
+      - frontend
+    ports:
+      - "127.0.0.1:${E2E_PORT:-18443}:8443"
+    volumes:
+      - ./Caddyfile:/etc/caddy/Caddyfile:ro
+    networks:
+      - internal
+
+networks:
+  internal:
+    ipam:
+      config:
+        - subnet: 172.31.77.0/24

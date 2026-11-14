@@ -328,6 +328,7 @@ function ChangePassword({ mfaEnabled, forced }: { mfaEnabled: boolean; forced: b
     onSuccess: async () => {
       setDone(true);
       await qc.invalidateQueries({ queryKey: ME_KEY });
+      await qc.invalidateQueries({ queryKey: ["mfa"] });
     },
     onError: (e) => setError(describeError(e).message),
   });
