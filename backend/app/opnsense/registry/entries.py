@@ -372,7 +372,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Unbound domain forwards, DoT rows filtered out (ADR-0018).",
     ),
     Operation(
@@ -382,7 +382,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Saves a forward, not yet active. Reviewed apply only (ADR-0018).",
     ),
     Operation(
@@ -393,7 +393,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Upsert, so apply confirms it exists first. Reviewed apply only.",
     ),
     Operation(
@@ -404,7 +404,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Deletes a forward. Reviewed apply only (ADR-0018).",
     ),
     Operation(
@@ -415,7 +415,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Enables a forward with an explicit state. Reviewed apply only.",
     ),
     Operation(
@@ -426,7 +426,7 @@ _ENTRIES = (
         required_privilege="Services: Unbound",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Disables a forward with an explicit state. Reviewed apply only.",
     ),
     Operation(

@@ -165,4 +165,4 @@ visible to `admin` and `network_admin` only; (5) hosts first, then a lab test, t
 
 ## Build status
 
-Step 1 (shared apply generalisation and host overrides) is built and lab-verified (create, edit, disable, enable, delete; body root key `host` confirmed; "Services: Unbound" allows writes). Step 3 (domain forwards, and the rule that a host inside a forwarded domain is high risk) is not started.
+Step 1 (shared apply generalisation and host overrides) is built and lab-verified (create, edit, disable, enable, delete; body root key `host` confirmed; "Services: Unbound" allows writes). Step 3 (domain forwards, enable and disable, and the rule that a host inside a forwarded domain is high risk) is built and lab-verified. The ADR is fully implemented.
