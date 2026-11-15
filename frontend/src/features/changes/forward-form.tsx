@@ -174,7 +174,7 @@ export function ForwardForm({ initial, pending, error, onSubmit, onCancel }: Pro
           {fieldError ?? error}
         </p>
       )}
-      <DialogFooter>
+      <DialogFooter variant="bare" className="px-0 pb-0">
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>

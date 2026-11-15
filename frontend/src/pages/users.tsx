@@ -397,9 +397,9 @@ export function UsersPage() {
           }
         }}
       >
-        <DialogContent>
+        <DialogContent className="p-6">
           <form onSubmit={submitMfa} className="space-y-3">
-            <DialogHeader>
+            <DialogHeader className="p-0 pb-3">
               <DialogTitle>Reset MFA?</DialogTitle>
               <DialogDescription>
                 This removes the authenticator and recovery codes for{" "}
@@ -425,7 +425,7 @@ export function UsersPage() {
                 {describeError(mfa.error).message}
               </p>
             )}
-            <DialogFooter>
+            <DialogFooter variant="bare" className="px-0 pb-0">
               <Button
                 type="button"
                 variant="outline"
@@ -447,8 +447,8 @@ export function UsersPage() {
       </Dialog>
 
       <Dialog open={issued !== null} onOpenChange={(o) => !o && closeIssued()}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>{issued?.heading}</DialogTitle>
             <DialogDescription>
               Temporary password for <strong>{issued?.username}</strong>. It is
@@ -462,7 +462,7 @@ export function UsersPage() {
           >
             {issued?.password}
           </p>
-          <DialogFooter>
+          <DialogFooter variant="bare" className="px-0 pb-0">
             <Button variant="outline" onClick={() => void copy()}>
               {copied ? "Copied" : "Copy"}
             </Button>

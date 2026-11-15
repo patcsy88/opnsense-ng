@@ -1,17 +1,10 @@
-import { LogOut, LogOutIcon, Menu, UserRound } from "lucide-react";
+import { LogOut, LogOutIcon, Menu as MenuIcon, UserRound } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuLabel,
-  DropdownMenuSeparator,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
-import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
+import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
+import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/features/auth/auth";
 import { FirewallPicker, SelectedFirewallProvider } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
@@ -59,31 +52,29 @@ function UserMenu() {
   };
   if (!user) return null;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="sm" aria-label="User menu">
-          <UserRound className="h-4 w-4" />
-          <span className="hidden sm:inline">{user.username}</span>
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        <DropdownMenuLabel>
-          {user.username} · {user.role}
-        </DropdownMenuLabel>
-        <DropdownMenuSeparator />
-        <DropdownMenuItem asChild>
-          <Link to="/account">
-            <UserRound className="h-4 w-4" /> Account and MFA
-          </Link>
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void end(api.logout)}>
+    <Menu>
+      <MenuTrigger render={<Button variant="ghost" size="sm" aria-label="User menu" />}>
+        <UserRound className="h-4 w-4" />
+        <span className="hidden sm:inline">{user.username}</span>
+      </MenuTrigger>
+      <MenuPopup align="end">
+        <MenuGroup>
+          <MenuGroupLabel>
+            {user.username} · {user.role}
+          </MenuGroupLabel>
+        </MenuGroup>
+        <MenuSeparator />
+        <MenuItem render={<Link to="/account" />}>
+          <UserRound className="h-4 w-4" /> Account and MFA
+        </MenuItem>
+        <MenuItem onClick={() => void end(api.logout)}>
           <LogOut className="h-4 w-4" /> Sign out
-        </DropdownMenuItem>
-        <DropdownMenuItem onSelect={() => void end(api.logoutAll)}>
+        </MenuItem>
+        <MenuItem onClick={() => void end(api.logoutAll)}>
           <LogOutIcon className="h-4 w-4" /> Sign out everywhere
-        </DropdownMenuItem>
-      </DropdownMenuContent>
-    </DropdownMenu>
+        </MenuItem>
+      </MenuPopup>
+    </Menu>
   );
 }
 
@@ -107,19 +98,15 @@ export function AppLayout() {
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center gap-2 border-b border-border bg-card px-4">
           <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger asChild>
-              <Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation">
-                <Menu className="h-5 w-5" />
-              </Button>
+            <SheetTrigger
+              render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation" />}
+            >
+              <MenuIcon className="h-5 w-5" />
             </SheetTrigger>
-            <SheetContent>
+            <SheetContent side="left">
               <SheetTitle className="mb-4 px-3 text-sm font-semibold">OPNsense Manager</SheetTitle>
               <SheetDescription className="sr-only">Site navigation</SheetDescription>
-              <SheetClose asChild>
-                <span>
-                  <NavLinks onNavigate={() => setOpen(false)} />
-                </span>
-              </SheetClose>
+              <NavLinks onNavigate={() => setOpen(false)} className="px-2" />
             </SheetContent>
           </Sheet>
           <div className="flex-1 text-sm font-semibold md:hidden">OPNsense Manager</div>

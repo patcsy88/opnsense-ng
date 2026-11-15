@@ -264,8 +264,8 @@ export function AuditPage() {
       />
 
       <Dialog open={selected !== null} onOpenChange={(o) => !o && setSelected(null)}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>{selected?.action}</DialogTitle>
             <DialogDescription>{selected ? new Date(selected.timestamp).toLocaleString() : ""}</DialogDescription>
           </DialogHeader>

@@ -156,8 +156,8 @@ export function ChangesPage() {
           }
         }}
       >
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>{creating === "rule" ? "New rule" : "New alias"}</DialogTitle>
             <DialogDescription>
               {creating === "rule"

@@ -218,8 +218,8 @@ export function WireguardTunnels({ firewallId }: { firewallId: string }) {
         open={creating || editable !== null}
         onOpenChange={(o) => !o && close()}
       >
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>
               {editing ? `Change tunnel ${editing.name}` : "New tunnel"}
             </DialogTitle>

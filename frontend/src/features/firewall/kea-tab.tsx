@@ -279,8 +279,8 @@ function Reservations({ id }: { id: string }) {
         open={creating || editable !== null}
         onOpenChange={(o) => !o && close()}
       >
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>
               {editing
                 ? `Change reservation ${editing.ip_address}`

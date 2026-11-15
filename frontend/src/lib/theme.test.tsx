@@ -13,7 +13,7 @@ function setup() {
 
 async function choose(label: string) {
   const trigger = screen.getByRole("button", { name: /theme/i });
-  fireEvent.keyDown(trigger, { key: "Enter" });
+  fireEvent.click(trigger);
   fireEvent.click(await screen.findByText(label));
 }
 

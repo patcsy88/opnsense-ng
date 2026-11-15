@@ -160,8 +160,8 @@ export function FirewallConnectionsPage() {
       </Card>
 
       <Dialog open={editing !== null} onOpenChange={(o) => !o && close()}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>{editing?.mode === "edit" ? "Edit firewall" : "Add firewall"}</DialogTitle>
             <DialogDescription>Credentials are encrypted by the backend and cannot be read back.</DialogDescription>
           </DialogHeader>

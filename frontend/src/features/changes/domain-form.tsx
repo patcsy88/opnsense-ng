@@ -172,7 +172,7 @@ export function DomainForm({
           {fieldError ?? error}
         </p>
       )}
-      <DialogFooter>
+      <DialogFooter variant="bare" className="px-0 pb-0">
         <Button
           type="button"
           variant="outline"

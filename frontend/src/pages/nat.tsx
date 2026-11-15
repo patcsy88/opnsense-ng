@@ -215,8 +215,8 @@ export function NatPage() {
         </Card>
       )}
       <Dialog open={creating || editing !== null} onOpenChange={(o) => !o && close()}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>{editing ? `Change port forward ${editing.description}` : "New port forward"}</DialogTitle>
             <DialogDescription>
               Creates a change request. Nothing is sent to the firewall until it is reviewed, approved and applied.

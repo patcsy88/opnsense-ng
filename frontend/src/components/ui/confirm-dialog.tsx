@@ -1,6 +1,13 @@
 import { useState, type ReactNode } from "react";
 import { Button } from "./button";
-import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from "./dialog";
+import {
+  AlertDialog,
+  AlertDialogDescription,
+  AlertDialogFooter,
+  AlertDialogHeader,
+  AlertDialogPopup,
+  AlertDialogTitle,
+} from "./alert-dialog";
 import { Input } from "./input";
 
 export interface ConfirmDialogProps {
@@ -32,20 +39,18 @@ export function ConfirmDialog({
   const [typed, setTyped] = useState("");
   const blocked = pending || (requireText !== undefined && typed !== requireText);
   return (
-    <Dialog
+    <AlertDialog
       open={open}
       onOpenChange={(o) => {
         if (!o) setTyped("");
         onOpenChange(o);
       }}
     >
-      <DialogContent role="alertdialog">
-        <DialogHeader>
-          <DialogTitle>{title}</DialogTitle>
-          <DialogDescription asChild>
-            <div>{description}</div>
-          </DialogDescription>
-        </DialogHeader>
+      <AlertDialogPopup>
+        <AlertDialogHeader>
+          <AlertDialogTitle>{title}</AlertDialogTitle>
+          <AlertDialogDescription render={<div />}>{description}</AlertDialogDescription>
+        </AlertDialogHeader>
         {requireText !== undefined && (
           <div className="space-y-1">
             <label htmlFor="confirm-text" className="text-sm">
@@ -59,15 +64,15 @@ export function ConfirmDialog({
             {error}
           </p>
         )}
-        <DialogFooter>
+        <AlertDialogFooter>
           <Button variant="outline" onClick={() => onOpenChange(false)} disabled={pending}>
             Cancel
           </Button>
           <Button variant={destructive ? "destructive" : "default"} onClick={onConfirm} disabled={blocked}>
             {pending ? "Working…" : confirmLabel}
           </Button>
-        </DialogFooter>
-      </DialogContent>
-    </Dialog>
+        </AlertDialogFooter>
+      </AlertDialogPopup>
+    </AlertDialog>
   );
 }

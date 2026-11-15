@@ -1,11 +1,6 @@
 import { Monitor, Moon, Sun } from "lucide-react";
 import { Button } from "@/components/ui/button";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
+import { Menu, MenuPopup, MenuRadioGroup, MenuRadioItem, MenuTrigger } from "@/components/ui/menu";
 import { useTheme, type ThemePreference } from "@/lib/theme";
 
 const OPTIONS: { value: ThemePreference; label: string; Icon: typeof Sun }[] = [
@@ -18,21 +13,20 @@ export function ThemeToggle() {
   const { preference, resolved, setPreference } = useTheme();
   const Current = resolved === "dark" ? Moon : Sun;
   return (
-    <DropdownMenu>
-      <DropdownMenuTrigger asChild>
-        <Button variant="ghost" size="icon" aria-label={`Theme: ${preference}`}>
-          <Current className="h-4 w-4" />
-        </Button>
-      </DropdownMenuTrigger>
-      <DropdownMenuContent>
-        {OPTIONS.map(({ value, label, Icon }) => (
-          <DropdownMenuItem key={value} onSelect={() => setPreference(value)} aria-checked={preference === value} role="menuitemradio">
-            <Icon className="h-4 w-4" />
-            {label}
-            {preference === value && <span className="ml-auto text-xs">✓</span>}
-          </DropdownMenuItem>
-        ))}
-      </DropdownMenuContent>
-    </DropdownMenu>
+    <Menu>
+      <MenuTrigger render={<Button variant="ghost" size="icon" aria-label={`Theme: ${preference}`} />}>
+        <Current className="h-4 w-4" />
+      </MenuTrigger>
+      <MenuPopup align="end">
+        <MenuRadioGroup value={preference} onValueChange={(v) => setPreference(v as ThemePreference)}>
+          {OPTIONS.map(({ value, label, Icon }) => (
+            <MenuRadioItem key={value} value={value}>
+              <Icon className="h-4 w-4" />
+              {label}
+            </MenuRadioItem>
+          ))}
+        </MenuRadioGroup>
+      </MenuPopup>
+    </Menu>
   );
 }

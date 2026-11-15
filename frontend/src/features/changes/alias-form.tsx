@@ -115,7 +115,7 @@ export function AliasForm({ initial, pending, error, onSubmit, onCancel }: Props
           {fieldError ?? error}
         </p>
       )}
-      <DialogFooter>
+      <DialogFooter variant="bare" className="px-0 pb-0">
         <Button variant="outline" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>

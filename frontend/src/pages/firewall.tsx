@@ -123,8 +123,8 @@ function AliasesCard({ firewallId }: { firewallId: string }) {
         )}
       </CardContent>
       <Dialog open={editing !== null} onOpenChange={(o) => !o && close()}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>Change alias {editing?.name}</DialogTitle>
             <DialogDescription>
               This creates a change request. Nothing is sent to the firewall until it is reviewed,
@@ -314,8 +314,8 @@ export function FirewallPage() {
       )}
       {selected && <AliasesCard firewallId={selected} />}
       <Dialog open={editingRule !== null} onOpenChange={(o) => !o && closeRule()}>
-        <DialogContent>
-          <DialogHeader>
+        <DialogContent className="p-6">
+          <DialogHeader className="p-0 pb-3">
             <DialogTitle>Change rule {editingRule?.description}</DialogTitle>
             <DialogDescription>
               Creates a change request. Nothing is sent to the firewall until it is reviewed, approved and

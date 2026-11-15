@@ -202,7 +202,7 @@ export function RuleForm({ initial, pending, error, onSubmit, onCancel }: Props)
           {fieldError ?? error}
         </p>
       )}
-      <DialogFooter>
+      <DialogFooter variant="bare" className="px-0 pb-0">
         <Button type="button" variant="outline" onClick={onCancel} disabled={pending}>
           Cancel
         </Button>
