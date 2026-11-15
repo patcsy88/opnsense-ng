@@ -91,7 +91,7 @@ export function EngineTabs<T extends string>({
       <Tabs value={value} onValueChange={(v) => onChange(v as T)}>
         <TabsList aria-label={label}>
           {tabs.map((t) => (
-            <TabsTab key={t.id} value={t.id}>
+            <TabsTab key={t.id} value={t.id} onClick={() => onChange(t.id)}>
               {t.name}
             </TabsTab>
           ))}

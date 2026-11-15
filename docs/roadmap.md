@@ -8,6 +8,7 @@
 | 4 | VPN, DHCP, DNS, service management (read-only views done; service start, stop and restart built per ADR-0016 and lab-verified; Dnsmasq static hosts and domain overrides built per ADR-0017 and lab-verified; Unbound host overrides and domain forwards built per ADR-0018 and lab-verified; WireGuard peers and tunnels built per ADR-0019 and lab-verified; Kea DHCPv4 leases, reservations and subnets read-only per ADR-0020, subnets and reservations lab-verified, leases still unverified; Kea reservation create, update and delete built per ADR-0021 and lab-verified) | P1 |
 | 5 | Audit logging, advanced security, multi-firewall (done: audit viewer, TOTP MFA, user management, PostgreSQL login limits, multi-firewall overview) | P2 |
 | 6 | Analytics, notifications, automation | P2 |
+| UI | Move the UI from shadcn/Radix to coss ui on Base UI per ADR-0022 (done: tokens and fonts, primitives, overlays, tabs and selects, layout, lazy-loaded pages; live specs rerun on the lab) | P2 |
 
 MVP: secure connection to OPNsense, health/interface/resource view, rule management, logs and blocked traffic, alias management with apply.
 

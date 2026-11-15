@@ -50,6 +50,8 @@ async function signInAndEnrol(page: Page): Promise<void> {
 async function chooseFirewall(page: Page): Promise<void> {
   await page.goto("/dhcp");
   await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
+  // The page opens on Kea when Dnsmasq is stopped, so pick the engine explicitly.
+  await page.getByRole("tab", { name: "Dnsmasq" }).click();
   await page.getByRole("tab", { name: "Static hosts" }).click();
 }
 

@@ -1,6 +1,6 @@
 # ADR-0022: Move the UI to coss ui (Base UI)
 
-- Status: accepted (answers and dependencies approved by project owner on 2026-11-15)
+- Status: accepted and implemented (answers and dependencies approved by project owner on 2026-11-15; phases A-E built the same day)
 - Date: 2026-11-15
 - Deciders: project owner
 
@@ -40,3 +40,10 @@ Owner decisions (2026-11-15): full migration, `@base-ui/react` may be added, ado
 - Look only: keep Radix and restyle with coss tokens. Cheapest, but it is not "coss ui" and leaves two design systems in mind.
 - Pilot one area first: lower risk, but the surface is small enough that phased full migration gives the same safety.
 - shadcn/ui on Base UI: closer to what we have, but not what was asked for.
+
+## Outcome
+
+- All phases are done and `radix-ui` is removed. Local deviations from coss are marked in the files: `Badge` defaults to `secondary`, `CardTitle` renders an `h3`.
+- Base UI opens selects on pointer down, so unit tests use `chooseOption` (`src/test/utils.tsx`) and live specs use `pick` (`e2e-live/select.ts`).
+- Pages are lazy-loaded. The main chunk fell from 1,260 kB to 352 kB, and charts load only on Traffic.
+- Lab runs: `lab-hosts`, `lab-kea`, `kea-write` and `users` pass. The engine tabs now set the engine on click, because the previous check relied on a value change that did not fire when the tab was already selected by default.
