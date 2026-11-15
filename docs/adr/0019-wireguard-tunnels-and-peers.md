@@ -177,4 +177,4 @@ may create, edit, disable and delete a throwaway peer and tunnel; (8) lists are 
 
 ## Build status
 
-Step 1 (peers backend: registry, normaliser, schema, staging, apply and list endpoints, with tests) is built and not yet lab-verified. Next: the peers frontend, the lab test, then tunnel writes.
+Step 2 (peers tab in the VPN page, with tests) is built too. Step 1 (peers backend: registry, normaliser, schema, staging, apply and list endpoints, with tests) is built and not yet lab-verified. Next: the peers frontend, the lab test, then tunnel writes.

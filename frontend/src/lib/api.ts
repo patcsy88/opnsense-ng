@@ -9,6 +9,8 @@ import {
   dnsmasqHostsResponseSchema,
   unboundHostsResponseSchema,
   unboundForwardsResponseSchema,
+  wireguardPeersResponseSchema,
+  wireguardTunnelsResponseSchema,
   overviewSchema,
   firewallSchema,
   loginResponseSchema,
@@ -42,6 +44,7 @@ import {
   type HostProposalInput,
   type UnboundHostProposalInput,
   type UnboundForwardProposalInput,
+  type WireguardPeerProposalInput,
   type RuleProposalInput,
   type FirewallCreateInput,
   type FirewallUpdateInput,
@@ -417,6 +420,34 @@ export const api = {
     }),
   stageUnboundForwardDelete: (firewallId: string, uuid: string) =>
     request("POST", `${base}/changes/unbound-forwards/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
+    }),
+  wireguardPeers: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/wireguard/peers`, {
+      schema: wireguardPeersResponseSchema,
+    }),
+  wireguardTunnels: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/wireguard/tunnels`, {
+      schema: wireguardTunnelsResponseSchema,
+    }),
+  stageWireguardPeer: (firewallId: string, peer: WireguardPeerProposalInput) =>
+    request("POST", `${base}/changes/wireguard-peers`, {
+      body: { firewall_id: firewallId, peer },
+      schema: changeDetailSchema,
+    }),
+  stageWireguardPeerUpdate: (firewallId: string, uuid: string, peer: WireguardPeerProposalInput) =>
+    request("POST", `${base}/changes/wireguard-peers/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, peer },
+      schema: changeDetailSchema,
+    }),
+  stageWireguardPeerToggle: (firewallId: string, uuid: string, enabled: boolean) =>
+    request("POST", `${base}/changes/wireguard-peers/${encodeURIComponent(uuid)}/toggle`, {
+      body: { firewall_id: firewallId, enabled },
+      schema: changeDetailSchema,
+    }),
+  stageWireguardPeerDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/wireguard-peers/${encodeURIComponent(uuid)}/delete`, {
       body: { firewall_id: firewallId },
       schema: changeDetailSchema,
     }),

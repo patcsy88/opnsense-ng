@@ -174,12 +174,44 @@ function currentUnboundHostRows(s: Record<string, unknown>): [string, string][] 
   ];
 }
 
+function wireguardPeerRows(p: Record<string, unknown>): [string, string][] {
+  if (p.pubkey === undefined) {
+    return [
+      ["Peer", String(p.label ?? "—")],
+      ...(p.enabled === undefined ? [] : ([["Enabled", p.enabled ? "Yes" : "No"]] as [string, string][])),
+      ...risk(p),
+    ];
+  }
+  const list = (v: unknown) => (Array.isArray(v) ? v.join(", ") : "—");
+  return [
+    ["Name", String(p.name ?? "—")],
+    ["Public key", String(p.pubkey)],
+    ["Tunnel address", list(p.tunneladdress)],
+    ["Endpoint", p.serveraddress ? `${String(p.serveraddress)}${p.serverport ? `:${String(p.serverport)}` : ""}` : "—"],
+    ["Keepalive", p.keepalive === null || p.keepalive === undefined ? "—" : String(p.keepalive)],
+    ["Enabled", p.enabled === false ? "No" : "Yes"],
+    ...risk(p),
+  ];
+}
+
+function currentWireguardPeerRows(s: Record<string, unknown>): [string, string][] {
+  const list = (v: unknown) => (Array.isArray(v) && v.length ? v.join(", ") : "—");
+  return [
+    ["Name", String(s.name ?? "—")],
+    ["Public key", String(s.pubkey ?? "—")],
+    ["Tunnel address", list(s.tunneladdress)],
+    ["Enabled", s.enabled === false ? "No" : "Yes"],
+    ["Preshared key", s.has_psk ? "Set (not shown)" : "Not set"],
+  ];
+}
+
 function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
   if (kind === "dnsmasq_host") return hostRows(p);
   if (kind === "dnsmasq_domain") return domainRows(p);
   if (kind === "unbound_host") return unboundHostRows(p);
   if (kind === "unbound_forward") return unboundForwardRows(p);
+  if (kind === "wireguard_peer") return wireguardPeerRows(p);
   if (kind === "nat_forward") return forwardRows(p);
   if (kind === "rule" && p.action !== undefined) {
     const ports = (v: unknown) => (v ? `:${String(v)}` : "");
@@ -285,7 +317,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : c.kind === "unbound_forward" ? "Forward" : "Alias"} to delete` : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : c.kind === "unbound_forward" ? "Forward" : c.kind === "wireguard_peer" ? "VPN peer" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -315,6 +347,8 @@ export function ChangeDetailPage() {
                     ? "This host override will be deleted. See the current override below."
                     : c.kind === "unbound_forward"
                     ? "This forward will be deleted. See the current forward below."
+                    : c.kind === "wireguard_peer"
+                    ? "This VPN peer will be deleted. See the current peer below."
                     : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
@@ -403,6 +437,27 @@ export function ChangeDetailPage() {
           <CardContent>
             <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
               {currentUnboundForwardRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "wireguard_peer" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current peer</CardTitle>
+            <CardDescription>
+              The peer as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {currentWireguardPeerRows(c.base_snapshot).map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>

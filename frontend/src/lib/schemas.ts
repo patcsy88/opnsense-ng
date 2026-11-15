@@ -455,6 +455,56 @@ export interface UnboundForwardProposalInput {
   enabled: boolean;
 }
 
+export const wireguardPeerSchema = z.object({
+  uuid: z.string().nullable(),
+  enabled: z.boolean(),
+  name: z.string().nullable(),
+  pubkey: z.string().nullable(),
+  tunneladdress: z.array(z.string()),
+  serveraddress: z.string().nullable(),
+  serverport: z.string().nullable(),
+  keepalive: z.string().nullable(),
+  servers: z.array(z.string()),
+  has_psk: z.boolean(),
+});
+export type WireguardPeer = z.infer<typeof wireguardPeerSchema>;
+
+export const wireguardPeersResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  peers: z.array(wireguardPeerSchema),
+  registry_verified: z.boolean(),
+});
+
+export const wireguardTunnelSchema = z.object({
+  uuid: z.string().nullable(),
+  enabled: z.boolean(),
+  name: z.string().nullable(),
+  pubkey: z.string().nullable(),
+  port: z.string().nullable(),
+  tunneladdress: z.array(z.string()),
+  mtu: z.string().nullable(),
+  disableroutes: z.boolean(),
+  peers: z.array(z.string()),
+});
+export type WireguardTunnel = z.infer<typeof wireguardTunnelSchema>;
+
+export const wireguardTunnelsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  tunnels: z.array(wireguardTunnelSchema),
+  registry_verified: z.boolean(),
+});
+
+export interface WireguardPeerProposalInput {
+  name: string;
+  pubkey: string;
+  tunneladdress: string[];
+  servers: string[];
+  serveraddress: string | null;
+  serverport: number | null;
+  keepalive: number | null;
+  enabled: boolean;
+}
+
 export const servicesResponseSchema = z.object({
   firewall_id: z.uuid(),
   services: z.array(serviceSchema),

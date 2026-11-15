@@ -9,6 +9,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import {
@@ -19,6 +20,9 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { useAuth } from "@/features/auth/auth";
+import { WireguardPeers } from "@/features/changes/wireguard-peers";
+import { WireguardTunnels } from "@/features/changes/wireguard-tunnels";
 import { api } from "@/lib/api";
 import type { WireguardRecord } from "@/lib/schemas";
 
@@ -51,6 +55,9 @@ export function VpnPage() {
     queryKey: ["firewalls", "options"],
     queryFn: api.listFirewallOptions,
   });
+  const { hasRole } = useAuth();
+  const canManage = hasRole("admin") || hasRole("network_admin");
+  const [tab, setTab] = useState<"status" | "peers" | "tunnels">("status");
   const [chosen, setChosen] = useState<string | null>(null);
   const [text, setText] = useState("");
   const firewalls = options.data ?? [];
@@ -125,11 +132,40 @@ export function VpnPage() {
           </CardContent>
         </Card>
       )}
-      {q.isError && (
+      {tab === "status" && q.isError && (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       )}
 
-      {selected && !q.isError && (
+      {canManage && (
+        <div role="tablist" aria-label="VPN section" className="flex gap-2">
+          {(
+            [
+              ["status", "Status"],
+              ["peers", "Peers"],
+              ["tunnels", "Tunnels"],
+            ] as const
+          ).map(([id, label]) => (
+            <Button
+              key={id}
+              role="tab"
+              aria-selected={tab === id}
+              size="sm"
+              variant={tab === id ? "default" : "outline"}
+              onClick={() => setTab(id)}
+            >
+              {label}
+            </Button>
+          ))}
+        </div>
+      )}
+      {canManage && tab === "peers" && selected && (
+        <WireguardPeers firewallId={selected} />
+      )}
+      {canManage && tab === "tunnels" && selected && (
+        <WireguardTunnels firewallId={selected} />
+      )}
+
+      {tab === "status" && selected && !q.isError && (
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2">
@@ -137,8 +173,7 @@ export function VpnPage() {
               {q.data && !q.data.registry_verified && <UnverifiedBadge />}
             </CardTitle>
             <CardDescription>
-              Read-only status. Keys are not shown, and tunnels and peers cannot
-              be changed here. Refreshes every 30 seconds.
+              Read-only status. Keys are not shown. Refreshes every 30 seconds.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
