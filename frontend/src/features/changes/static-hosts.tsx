@@ -30,20 +30,17 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { ChangeStatusBadge } from "@/features/changes/status";
-import { DomainOverrides } from "@/features/changes/domain-overrides";
 import { HostForm, toHostProposal } from "@/features/changes/host-form";
-import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { DnsmasqHost, HostProposalInput } from "@/lib/schemas";
 
 const OPEN = new Set(["draft", "validated", "in_review", "approved"]);
 
-export function DnsEntriesPage() {
+export function StaticHosts({ firewallId }: { firewallId: string }) {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const { options, selected } = useSelectedFirewall();
-  const [tab, setTab] = useState<"hosts" | "domains">("hosts");
+  const selected = firewallId;
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<DnsmasqHost | null>(null);
   const [deleting, setDeleting] = useState<DnsmasqHost | null>(null);
@@ -86,49 +83,11 @@ export function DnsEntriesPage() {
 
   return (
     <div className="space-y-4">
-      <p className="text-sm">
-        <Link className="text-primary underline" to="/dhcp">
-          ← DHCP
-        </Link>
-      </p>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">DNS and DHCP entries</h1>
-      </div>
-
-      {options.isError && (
-        <ErrorState
-          error={options.error}
-          onRetry={() => void options.refetch()}
-        />
-      )}
-      <div role="tablist" aria-label="Entry type" className="flex gap-2">
-        {(
-          [
-            ["hosts", "Static hosts"],
-            ["domains", "Domain overrides"],
-          ] as const
-        ).map(([id, label]) => (
-          <Button
-            key={id}
-            role="tab"
-            aria-selected={tab === id}
-            size="sm"
-            variant={tab === id ? "default" : "outline"}
-            onClick={() => setTab(id)}
-          >
-            {label}
-          </Button>
-        ))}
-      </div>
-
-      {tab === "domains" && selected && (
-        <DomainOverrides firewallId={selected} />
-      )}
-      {tab === "hosts" && q.isError && (
+      {q.isError && (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       )}
 
-      {tab === "hosts" && selected && !q.isError && (
+      {!q.isError && (
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center justify-between gap-2">

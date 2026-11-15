@@ -87,11 +87,50 @@ function page(
     ),
     http.get("/api/v1/changes", () => HttpResponse.json(open)),
     http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(change())),
+    http.get(`/api/v1/firewalls/${FW.id}/services`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        services: [
+          {
+            id: "dnsmasq",
+            name: "dnsmasq",
+            description: null,
+            running: true,
+            locked: false,
+          },
+          {
+            id: "unbound",
+            name: "unbound",
+            description: null,
+            running: true,
+            locked: false,
+          },
+        ],
+        truncated: false,
+        registry_verified: true,
+      }),
+    ),
+    http.get(`/api/v1/firewalls/${FW.id}/dhcp/leases`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        leases: [],
+        truncated: false,
+        registry_verified: true,
+      }),
+    ),
+    http.get(`/api/v1/firewalls/${FW.id}/dns`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        stats_available: false,
+        totals_available: false,
+        registry_verified: true,
+      }),
+    ),
   );
 }
 
 async function openTab() {
-  fireEvent.click(await screen.findByRole("tab", { name: "Domain overrides" }));
+  fireEvent.click(await screen.findByRole("tab", { name: "Dnsmasq" }));
 }
 
 beforeEach(() => {
@@ -101,7 +140,7 @@ beforeEach(() => {
 describe("Dnsmasq domain overrides", () => {
   it("lists overrides on their own tab and flags the unverified capability", async () => {
     page(NETADMIN, [domain({ port: "5353" })]);
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dns");
     await openTab();
     expect(await screen.findByText("corp.example")).toBeInTheDocument();
     expect(screen.getByText("10.0.0.53:5353")).toBeInTheDocument();
@@ -120,7 +159,7 @@ describe("Dnsmasq domain overrides", () => {
         }),
       ],
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dns");
     await openTab();
     expect(await screen.findAllByText(/create Lab DNS/)).toHaveLength(1);
   });
@@ -134,7 +173,7 @@ describe("Dnsmasq domain overrides", () => {
         return HttpResponse.json(change(), { status: 201 });
       }),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dns");
     await openTab();
     fireEvent.click(
       await screen.findByRole("button", { name: "New override" }),
@@ -179,7 +218,7 @@ describe("Dnsmasq domain overrides", () => {
         return HttpResponse.json(change(), { status: 201 });
       }),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dns");
     await openTab();
     fireEvent.click(
       await screen.findByRole("button", { name: "New override" }),
@@ -225,7 +264,7 @@ describe("Dnsmasq domain overrides", () => {
         },
       ),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dns");
     await openTab();
     fireEvent.click(
       await screen.findByRole("button", {
@@ -253,7 +292,7 @@ describe("Dnsmasq domain overrides", () => {
         return HttpResponse.json(change({ action: "delete" }), { status: 201 });
       }),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dns");
     await openTab();
     fireEvent.click(
       await screen.findByRole("button", {
@@ -281,7 +320,7 @@ describe("Dnsmasq domain overrides", () => {
         ),
       ),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dns");
     await openTab();
     fireEvent.click(
       await screen.findByRole("button", { name: "New override" }),

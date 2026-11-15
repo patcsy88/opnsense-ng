@@ -89,14 +89,57 @@ function entriesPage(
     ),
     http.get("/api/v1/changes", () => HttpResponse.json(open)),
     http.get(`/api/v1/changes/${CID}`, () => HttpResponse.json(change())),
+    http.get(`/api/v1/firewalls/${FW.id}/services`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        services: [
+          {
+            id: "dnsmasq",
+            name: "dnsmasq",
+            description: null,
+            running: true,
+            locked: false,
+          },
+          {
+            id: "unbound",
+            name: "unbound",
+            description: null,
+            running: true,
+            locked: false,
+          },
+        ],
+        truncated: false,
+        registry_verified: true,
+      }),
+    ),
+    http.get(`/api/v1/firewalls/${FW.id}/dhcp/leases`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        leases: [],
+        truncated: false,
+        registry_verified: true,
+      }),
+    ),
+    http.get(`/api/v1/firewalls/${FW.id}/dns`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        stats_available: false,
+        totals_available: false,
+        registry_verified: true,
+      }),
+    ),
   );
+}
+
+async function openHosts() {
+  fireEvent.click(await screen.findByRole("tab", { name: "Static hosts" }));
 }
 
 beforeEach(() => {
   document.cookie = "csrf_token=tok; path=/";
 });
 
-describe("DNS and DHCP static hosts", () => {
+describe("DHCP static hosts", () => {
   it("lists hosts with MAC addresses and flags the unverified capability", async () => {
     entriesPage(NETADMIN, [
       host(),
@@ -107,19 +150,18 @@ describe("DNS and DHCP static hosts", () => {
         hwaddrs: ["aa:bb:cc:dd:ee:09"],
       }),
     ]);
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dhcp");
+    await openHosts();
     expect(await screen.findByText("aa:bb:cc:dd:ee:01")).toBeInTheDocument();
     expect(screen.getByText("ignored")).toBeInTheDocument();
     expect(screen.getByText(/unverified/i)).toBeInTheDocument();
   });
 
   it("is closed to view-only roles and the DHCP page links to it only for managers", async () => {
-    for (const user of [READER, SECADMIN]) {
-      entriesPage(user);
-      const { unmount } = renderApp(<App />, "/dhcp/entries");
-      expect(await screen.findByText(/not permitted/i)).toBeInTheDocument();
-      unmount();
-    }
+    entriesPage(READER);
+    const { unmount } = renderApp(<App />, "/dhcp");
+    expect(await screen.findByText(/not permitted/i)).toBeInTheDocument();
+    unmount();
     server.use(
       http.get(`/api/v1/firewalls/${FW.id}/dhcp/leases`, () =>
         HttpResponse.json({
@@ -134,7 +176,7 @@ describe("DNS and DHCP static hosts", () => {
     renderApp(<App />, "/dhcp");
     await screen.findByRole("heading", { name: "DHCP" });
     expect(
-      screen.queryByRole("link", { name: "Manage static hosts" }),
+      screen.queryByRole("tab", { name: "Static hosts" }),
     ).not.toBeInTheDocument();
   });
 
@@ -147,7 +189,8 @@ describe("DNS and DHCP static hosts", () => {
         change({ id: "88888888-8888-4888-8888-888888888888", kind: "alias" }),
       ],
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dhcp");
+    await openHosts();
     expect(
       await screen.findByText(/create Office scanner/),
     ).toBeInTheDocument();
@@ -162,7 +205,8 @@ describe("DNS and DHCP static hosts", () => {
         return HttpResponse.json(change(), { status: 201 });
       }),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dhcp");
+    await openHosts();
     fireEvent.click(await screen.findByRole("button", { name: "New host" }));
     fireEvent.change(await screen.findByLabelText("Host name"), {
       target: { value: "Scanner" },
@@ -210,7 +254,8 @@ describe("DNS and DHCP static hosts", () => {
         return HttpResponse.json(change(), { status: 201 });
       }),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dhcp");
+    await openHosts();
     fireEvent.click(await screen.findByRole("button", { name: "New host" }));
     fireEvent.click(
       await screen.findByRole("button", { name: "Create change request" }),
@@ -244,7 +289,8 @@ describe("DNS and DHCP static hosts", () => {
         },
       ),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dhcp");
+    await openHosts();
     fireEvent.click(
       await screen.findByRole("button", { name: "Edit Office printer" }),
     );
@@ -272,7 +318,8 @@ describe("DNS and DHCP static hosts", () => {
         );
       }),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dhcp");
+    await openHosts();
     fireEvent.click(
       await screen.findByRole("button", { name: "Delete Office printer" }),
     );
@@ -297,7 +344,8 @@ describe("DNS and DHCP static hosts", () => {
         ),
       ),
     );
-    renderApp(<App />, "/dhcp/entries");
+    renderApp(<App />, "/dhcp");
+    await openHosts();
     fireEvent.click(await screen.findByRole("button", { name: "New host" }));
     fireEvent.change(await screen.findByLabelText("Host name"), {
       target: { value: "printer" },

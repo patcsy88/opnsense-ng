@@ -47,8 +47,9 @@ async function signInAndEnrol(page: Page): Promise<void> {
 }
 
 async function chooseFirewall(page: Page): Promise<void> {
-  await page.goto("/dhcp/entries");
+  await page.goto("/dhcp");
   await page.locator("select").selectOption({ label: FIREWALL });
+  await page.getByRole("tab", { name: "Static hosts" }).click();
 }
 
 async function settle(page: Page): Promise<string> {
@@ -147,8 +148,9 @@ test("Dnsmasq domain override: create, edit, delete on the lab firewall", async 
   const overrideRow = () =>
     page.getByRole("row", { name: new RegExp(OVERRIDE) });
   const open = async () => {
-    await chooseFirewall(page);
-    await page.getByRole("tab", { name: "Domain overrides" }).click();
+    await page.goto("/dns");
+    await page.locator("select").selectOption({ label: FIREWALL });
+    await page.getByRole("tab", { name: "Dnsmasq" }).click();
   };
   const submit = async (server: string) => {
     await page.getByLabel("Domain", { exact: true }).fill(OVERRIDE);
@@ -161,6 +163,24 @@ test("Dnsmasq domain override: create, edit, delete on the lab firewall", async 
   };
 
   await open();
+  await expect(
+    page.getByRole("button", { name: "New override" }),
+  ).toBeVisible();
+  await expect(page.getByText("Loading…")).toHaveCount(0);
+  if ((await overrideRow().count()) > 0) {
+    // A throwaway left by an interrupted run: remove it through the same reviewed flow.
+    await page
+      .getByRole("button", { name: /^Delete override / })
+      .first()
+      .click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Create change request" })
+      .click();
+    await page.waitForURL(/\/changes\//);
+    await review(page, OVERRIDE_DESCRIPTION);
+    await open();
+  }
   await expect(overrideRow()).toHaveCount(0);
 
   await page.getByRole("button", { name: "New override" }).click();

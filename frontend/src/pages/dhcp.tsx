@@ -1,13 +1,35 @@
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
-import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
+import {
+  Card,
+  CardContent,
+  CardDescription,
+  CardHeader,
+  CardTitle,
+} from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
-import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import {
+  Table,
+  TableBody,
+  TableCell,
+  TableHead,
+  TableHeader,
+  TableRow,
+} from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth";
+import { StaticHosts } from "@/features/changes/static-hosts";
+import {
+  EngineTabs,
+  type EngineTab,
+  InactiveNotice,
+  engineLabel,
+  firstRunning,
+  useEngines,
+} from "@/features/firewall/engines";
 import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 
@@ -17,15 +39,11 @@ function expiry(value: string | null): string {
   return Number.isNaN(date.getTime()) ? "—" : date.toLocaleString();
 }
 
-export function DhcpPage() {
-  const { hasRole } = useAuth();
-  const { options, firewalls, selected } = useSelectedFirewall();
+function DhcpLeases({ firewallId }: { firewallId: string }) {
   const [text, setText] = useState("");
-
   const q = useQuery({
-    queryKey: ["firewalls", selected, "dhcp-leases"],
-    queryFn: () => api.dhcpLeases(selected as string),
-    enabled: selected !== null,
+    queryKey: ["firewalls", firewallId, "dhcp-leases"],
+    queryFn: () => api.dhcpLeases(firewallId),
     refetchInterval: 30_000,
   });
 
@@ -44,38 +62,29 @@ export function DhcpPage() {
   }, [q.data, text]);
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">DHCP</h1>
-        {hasRole("admin", "network_admin") && (
-          <Link className="text-sm text-primary underline" to="/dhcp/entries">
-            Manage static hosts
-          </Link>
-        )}
-      </div>
-
-      {options.isError && <ErrorState error={options.error} onRetry={() => void options.refetch()} />}
-      {options.isSuccess && firewalls.length === 0 && (
-        <Card>
-          <CardContent className="pt-4 text-sm">No firewalls configured.</CardContent>
-        </Card>
+    <>
+      {q.isError && (
+        <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       )}
-      {q.isError && <ErrorState error={q.error} onRetry={() => void q.refetch()} />}
 
-      {selected && !q.isError && (
+      {!q.isError && (
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2">
-              DHCP leases {q.data && !q.data.registry_verified && <UnverifiedBadge />}
+              DHCP leases{" "}
+              {q.data && !q.data.registry_verified && <UnverifiedBadge />}
             </CardTitle>
             <CardDescription>
-              Read-only list of Dnsmasq leases. MAC addresses are not shown. Refreshes every 30 seconds.
+              Read-only list of Dnsmasq leases. MAC addresses are not shown.
+              Refreshes every 30 seconds.
               {q.data && ` ${q.data.leases.length} leases.`}
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-3">
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+              <p role="status" className="text-sm text-muted-foreground">
+                Loading…
+              </p>
             ) : (
               <>
                 <Input
@@ -86,7 +95,9 @@ export function DhcpPage() {
                   className="max-w-sm"
                 />
                 {shown.length === 0 ? (
-                  <p className="text-sm text-muted-foreground">No leases match.</p>
+                  <p className="text-sm text-muted-foreground">
+                    No leases match.
+                  </p>
                 ) : (
                   <Table>
                     <TableHeader>
@@ -102,12 +113,22 @@ export function DhcpPage() {
                     <TableBody>
                       {shown.map((l, i) => (
                         <TableRow key={`${l.address}-${i}`}>
-                          <TableCell className="font-mono text-xs sm:text-sm">{l.address}</TableCell>
+                          <TableCell className="font-mono text-xs sm:text-sm">
+                            {l.address}
+                          </TableCell>
                           <TableCell>{l.hostname ?? "—"}</TableCell>
                           <TableCell>{l.interface ?? "—"}</TableCell>
                           <TableCell>
                             {l.lease_type ? (
-                              <Badge variant={l.lease_type === "static" ? "success" : "default"}>{l.lease_type}</Badge>
+                              <Badge
+                                variant={
+                                  l.lease_type === "static"
+                                    ? "success"
+                                    : "default"
+                                }
+                              >
+                                {l.lease_type}
+                              </Badge>
                             ) : (
                               "—"
                             )}
@@ -120,12 +141,108 @@ export function DhcpPage() {
                   </Table>
                 )}
                 {q.data?.truncated && (
-                  <p className="text-xs text-muted-foreground">The list was cut off at 1000 leases.</p>
+                  <p className="text-xs text-muted-foreground">
+                    The list was cut off at 1000 leases.
+                  </p>
                 )}
               </>
             )}
           </CardContent>
         </Card>
+      )}
+    </>
+  );
+}
+
+type Engine = "dnsmasq" | "kea";
+
+export function DhcpPage() {
+  const { hasRole } = useAuth();
+  const canManage = hasRole("admin", "network_admin");
+  const { options, firewalls, selected } = useSelectedFirewall();
+  const engines = useEngines(selected);
+  const [chosen, setChosen] = useState<Engine | null>(null);
+  const [section, setSection] = useState<"leases" | "hosts">("leases");
+
+  const tabs = [
+    { id: "dnsmasq", name: "Dnsmasq", state: engines.dnsmasq },
+    { id: "kea", name: "Kea", state: engines.kea },
+  ] as EngineTab<Engine>[];
+  const engine = tabs.some((t) => t.id === chosen)
+    ? (chosen as Engine)
+    : firstRunning(tabs);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold">DHCP</h1>
+
+      {options.isError && (
+        <ErrorState
+          error={options.error}
+          onRetry={() => void options.refetch()}
+        />
+      )}
+      {options.isSuccess && firewalls.length === 0 && (
+        <Card>
+          <CardContent className="pt-4 text-sm">
+            No firewalls configured.
+          </CardContent>
+        </Card>
+      )}
+
+      {selected && (
+        <>
+          <EngineTabs
+            label="DHCP engine"
+            tabs={tabs}
+            value={engine}
+            onChange={setChosen}
+          />
+          {engine === "dnsmasq" && (
+            <>
+              <InactiveNotice name="Dnsmasq" state={engines.dnsmasq} />
+              {canManage && (
+                <div
+                  role="tablist"
+                  aria-label="DHCP section"
+                  className="flex gap-2"
+                >
+                  {(
+                    [
+                      ["leases", "Leases"],
+                      ["hosts", "Static hosts"],
+                    ] as const
+                  ).map(([id, text]) => (
+                    <Button
+                      key={id}
+                      role="tab"
+                      aria-selected={section === id}
+                      size="sm"
+                      variant={section === id ? "default" : "outline"}
+                      onClick={() => setSection(id)}
+                    >
+                      {text}
+                    </Button>
+                  ))}
+                </div>
+              )}
+              {canManage && section === "hosts" ? (
+                <StaticHosts firewallId={selected} />
+              ) : (
+                <DhcpLeases firewallId={selected} />
+              )}
+            </>
+          )}
+          {engine === "kea" && (
+            <Card>
+              <CardContent className="pt-4 text-sm">
+                Kea is {engineLabel[engines.kea]} on this firewall. Viewing and
+                managing Kea leases and reservations is planned and not
+                available yet. Start and stop it under Services.
+              </CardContent>
+            </Card>
+          )}
+        </>
       )}
     </div>
   );

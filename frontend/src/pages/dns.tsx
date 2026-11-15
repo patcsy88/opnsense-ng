@@ -18,9 +18,17 @@ import {
   TableHeader,
   TableRow,
 } from "@/components/ui/table";
+import { DomainOverrides } from "@/features/changes/domain-overrides";
 import { UnboundForwards } from "@/features/changes/unbound-forwards";
 import { UnboundHosts } from "@/features/changes/unbound-hosts";
 import { useAuth } from "@/features/auth/auth";
+import {
+  EngineTabs,
+  type EngineTab,
+  InactiveNotice,
+  firstRunning,
+  useEngines,
+} from "@/features/firewall/engines";
 import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import type { TopDomain } from "@/lib/schemas";
@@ -90,39 +98,18 @@ function TopTable({
   );
 }
 
-export function DnsPage() {
-  const { options, firewalls, selected } = useSelectedFirewall();
-  const { hasRole } = useAuth();
-  const canManage = hasRole("admin") || hasRole("network_admin");
+function UnboundSection({ selected, canManage }: { selected: string; canManage: boolean }) {
   const [tab, setTab] = useState<"overview" | "hosts" | "forwards">("overview");
 
   const q = useQuery({
     queryKey: ["firewalls", selected, "dns"],
     queryFn: () => api.dns(selected as string),
-    enabled: selected !== null,
     refetchInterval: 30_000,
   });
   const d = q.data;
 
   return (
     <div className="space-y-4">
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <h1 className="text-2xl font-semibold">DNS</h1>
-      </div>
-
-      {options.isError && (
-        <ErrorState
-          error={options.error}
-          onRetry={() => void options.refetch()}
-        />
-      )}
-      {options.isSuccess && firewalls.length === 0 && (
-        <Card>
-          <CardContent className="pt-4 text-sm">
-            No firewalls configured.
-          </CardContent>
-        </Card>
-      )}
       {canManage && (
         <div role="tablist" aria-label="DNS section" className="flex gap-2">
           {(
@@ -146,17 +133,17 @@ export function DnsPage() {
         </div>
       )}
 
-      {canManage && tab === "hosts" && selected && (
+      {canManage && tab === "hosts" && (
         <UnboundHosts firewallId={selected} />
       )}
-      {canManage && tab === "forwards" && selected && (
+      {canManage && tab === "forwards" && (
         <UnboundForwards firewallId={selected} />
       )}
       {tab === "overview" && q.isError && (
         <ErrorState error={q.error} onRetry={() => void q.refetch()} />
       )}
 
-      {tab === "overview" && selected && !q.isError && (
+      {tab === "overview" && !q.isError && (
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2">
@@ -236,6 +223,61 @@ export function DnsPage() {
             )}
           </CardContent>
         </Card>
+      )}
+    </div>
+  );
+}
+
+type Engine = "unbound" | "dnsmasq";
+
+export function DnsPage() {
+  const { hasRole } = useAuth();
+  const canManage = hasRole("admin") || hasRole("network_admin");
+  const { options, firewalls, selected } = useSelectedFirewall();
+  const engines = useEngines(selected);
+  const [chosen, setChosen] = useState<Engine | null>(null);
+
+  const tabs = [
+    { id: "unbound", name: "Unbound", state: engines.unbound },
+    { id: "dnsmasq", name: "Dnsmasq", state: engines.dnsmasq },
+  ] as EngineTab<Engine>[];
+  const engine = tabs.some((t) => t.id === chosen) ? (chosen as Engine) : firstRunning(tabs);
+
+  return (
+    <div className="space-y-4">
+      <h1 className="text-2xl font-semibold">DNS</h1>
+      {options.isError && (
+        <ErrorState error={options.error} onRetry={() => void options.refetch()} />
+      )}
+      {options.isSuccess && firewalls.length === 0 && (
+        <Card>
+          <CardContent className="pt-4 text-sm">No firewalls configured.</CardContent>
+        </Card>
+      )}
+      {selected && (
+        <>
+          <EngineTabs label="DNS engine" tabs={tabs} value={engine} onChange={setChosen} />
+          {engine === "unbound" && (
+            <>
+              <InactiveNotice name="Unbound" state={engines.unbound} />
+              <UnboundSection selected={selected} canManage={canManage} />
+            </>
+          )}
+          {engine === "dnsmasq" && (
+            <>
+              <InactiveNotice name="Dnsmasq" state={engines.dnsmasq} />
+              {canManage ? (
+                <DomainOverrides firewallId={selected} />
+              ) : (
+                <Card>
+                  <CardContent className="pt-4 text-sm">
+                    Dnsmasq domain overrides are managed by administrators.
+                  </CardContent>
+                </Card>
+              )}
+            </>
+          )}
+        </>
       )}
     </div>
   );
