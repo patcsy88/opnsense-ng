@@ -17,6 +17,11 @@ from app.changes import apply as apply_changes
 from app.changes import service
 from app.changes.dnsmasq_schemas import DomainProposal, HostProposal
 from app.changes.forward_schemas import ForwardProposal, forward_risk
+from app.changes.kea_schemas import (
+    KeaReservationProposal,
+    kea_reservation_conflict,
+    subnet_problem,
+)
 from app.changes.rule_schemas import RuleProposal
 from app.changes.schemas import AliasProposal
 from app.changes.states import Status
@@ -103,13 +108,13 @@ def _detail(db: Session, cr: ChangeRequest) -> ChangeDetailOut:
 
 def _visible[T: ChangeOut](out: T, user: CurrentUser) -> T:
     """MAC addresses in Dnsmasq host requests are only for admin and network_admin (ADR-0017)."""
-    if out.kind != "dnsmasq_host" or user.role in MANAGERS:
+    if out.kind not in ("dnsmasq_host", "kea_reservation") or user.role in MANAGERS:
         return out
 
     def strip(data: dict[str, Any] | None) -> dict[str, Any] | None:
         if data is None:
             return None
-        return {k: v for k, v in data.items() if k not in ("hwaddrs",)}
+        return {k: v for k, v in data.items() if k not in ("hwaddrs", "hw_address")}
 
     out.proposed = strip(out.proposed)
     out.base_snapshot = strip(out.base_snapshot)
@@ -1192,6 +1197,7 @@ def apply_change(
             "unbound_host": apply_changes.apply_unbound_host_change,
             "unbound_forward": apply_changes.apply_unbound_forward_change,
             "wireguard_peer": apply_changes.apply_wireguard_peer_change,
+            "kea_reservation": apply_changes.apply_kea_reservation_change,
             "wireguard_tunnel": apply_changes.apply_wireguard_tunnel_change,
         }.get(cr.kind, apply_changes.apply_alias_change)
         cr = run(
@@ -2237,6 +2243,190 @@ def stage_wireguard_peer_delete(
 ) -> ChangeDetailOut:
     """Stage deleting a WireGuard peer. Always high risk."""
     return _stage_wireguard_peer(
+        request, body.firewall_id, user, db, settings, action="delete", target=target
+    )
+
+
+class KeaReservationCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    reservation: KeaReservationProposal
+
+
+def _stage_kea_reservation(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+    *,
+    action: str,
+    target: str | None,
+    proposal: KeaReservationProposal | None = None,
+) -> ChangeDetailOut:
+    """Shared staging for create, update and delete of a Kea reservation (ADR-0021). Reads only.
+    Deleting, or changing the MAC or IP, is high risk; creating or editing text is normal."""
+    audit_action = f"change.stage_kea_reservation_{action}"
+    if target is not None and not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid reservation id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_kea_reservations(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+        subnets = (
+            apply_changes.read_kea_subnets(
+                db, firewall=fw, user=user, settings=settings, request=request
+            )
+            if proposal is not None
+            else []
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the Kea configuration from the firewall") from None
+
+    current = next((r for r in rows if r.uuid == target), None) if target else None
+    if target is not None and current is None:
+        raise refuse("That reservation was not found on the firewall")
+
+    proposed: dict[str, Any]
+    reasons: list[str]
+    if proposal is not None:
+        subnet = next((s for s in subnets if s.uuid == proposal.subnet), None)
+        if subnet is None:
+            raise refuse("The chosen subnet does not exist on the firewall")
+        problem = subnet_problem(proposal.ip_address, subnet)
+        if problem:
+            raise refuse(problem)
+        clash = kea_reservation_conflict(proposal.model_dump(), rows, target)
+        if clash:
+            raise refuse(clash)
+        reasons = proposal.risk_changes(current)
+        proposed = {**proposal.model_dump(), "label": proposal.ip_address, "risk": reasons}
+        if action == "update" and current is not None:
+            proposed["label"] = current.ip_address
+    elif action == "delete" and current is not None:
+        reasons = ["deletes the reservation, so the device loses its fixed address"]
+        proposed = {
+            "label": current.ip_address,
+            "ip_address": current.ip_address,
+            "risk": reasons,
+        }
+    else:
+        raise refuse("Unsupported request")
+
+    if action == "create":
+        same = ChangeRequest.proposed["ip_address"].astext == proposed["ip_address"]
+    else:
+        same = ChangeRequest.target_uuid == target
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "kea_reservation",
+            ChangeRequest.status.in_(OPEN_STATES),
+            same,
+            *([ChangeRequest.action == "create"] if action == "create" else []),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already changes this reservation", duplicate)
+
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="kea_reservation",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump() if current is not None else None,
+            high_risk=bool(reasons) or action == "delete",
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post("/kea-reservations", response_model=ChangeDetailOut, status_code=201)
+def stage_kea_reservation_create(
+    request: Request,
+    body: KeaReservationCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new Kea DHCPv4 reservation."""
+    return _stage_kea_reservation(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="create",
+        target=None,
+        proposal=body.reservation,
+    )
+
+
+@router.post("/kea-reservations/{target}/update", response_model=ChangeDetailOut, status_code=201)
+def stage_kea_reservation_update(
+    request: Request,
+    target: str,
+    body: KeaReservationCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing a Kea reservation."""
+    return _stage_kea_reservation(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="update",
+        target=target,
+        proposal=body.reservation,
+    )
+
+
+@router.post("/kea-reservations/{target}/delete", response_model=ChangeDetailOut, status_code=201)
+def stage_kea_reservation_delete(
+    request: Request,
+    target: str,
+    body: HostDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting a Kea reservation. Always high risk."""
+    return _stage_kea_reservation(
         request, body.firewall_id, user, db, settings, action="delete", target=target
     )
 

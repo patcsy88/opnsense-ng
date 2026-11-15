@@ -30,6 +30,7 @@ KINDS = frozenset(
         "unbound_forward",
         "wireguard_peer",
         "wireguard_tunnel",
+        "kea_reservation",
     }
 )
 ACTIONS = frozenset({"create", "update", "delete", "toggle"})

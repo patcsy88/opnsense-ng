@@ -27,6 +27,7 @@ from app.changes import service
 from app.changes.dnsmasq_schemas import domain_key, host_key
 from app.changes.fingerprint import fingerprint
 from app.changes.forward_schemas import ForwardProposal
+from app.changes.kea_schemas import kea_reservation_conflict
 from app.changes.rule_schemas import RuleProposal
 from app.changes.states import Status
 from app.changes.unbound_schemas import unbound_host_key
@@ -44,6 +45,11 @@ from app.opnsense.normalise.dnsmasq import (
     HostInfo,
     normalise_domains,
     normalise_hosts,
+)
+from app.opnsense.normalise.kea import (
+    KeaSubnet,
+    normalise_kea_reservations,
+    normalise_kea_subnets,
 )
 from app.opnsense.normalise.rules import RuleInfo
 from app.opnsense.normalise.unbound import (
@@ -86,6 +92,12 @@ from app.opnsense.registry.entries import (
     FORWARDS_DISABLE,
     FORWARDS_ENABLE,
     FORWARDS_UPDATE,
+    KEA_RECONFIGURE,
+    KEA_RESERVATIONS,
+    KEA_RESERVATIONS_ADD,
+    KEA_RESERVATIONS_DELETE,
+    KEA_RESERVATIONS_UPDATE,
+    KEA_SUBNETS,
     UNBOUND_FORWARDS_ADD,
     UNBOUND_FORWARDS_DELETE,
     UNBOUND_FORWARDS_DISABLE,
@@ -200,6 +212,7 @@ def begin_apply(
             "unbound_host": "description",
             "unbound_forward": "description",
             "wireguard_peer": "peer name",
+            "kea_reservation": "IP address",
             "wireguard_tunnel": "tunnel name",
         }.get(kind, "rule label")
         raise ApplyRefused(f"Type the {what} to confirm this high-risk change")
@@ -1315,6 +1328,86 @@ def apply_wireguard_peer_change(
 ) -> ChangeRequest:
     return _apply_resolver(
         WIREGUARD_PEER_SPEC, db, change_id, user, settings, request, confirm_name
+    )
+
+
+def read_kea_reservations(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[Any]:
+    """Read-only: the Kea DHCPv4 reservations currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, KEA_RESERVATIONS, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_kea_reservations(raw).reservations)
+
+
+def read_kea_subnets(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[KeaSubnet]:
+    """Read-only: the Kea DHCPv4 subnets currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, KEA_SUBNETS, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_kea_subnets(raw).subnets)
+
+
+def kea_reservation_payload(proposed: dict[str, Any]) -> dict[str, Any]:
+    """Body for addReservation/setReservation. Client id, options and DDNS are never sent."""
+    return {
+        "reservation": {
+            "subnet": proposed["subnet"],
+            "ip_address": proposed["ip_address"],
+            "hw_address": proposed["hw_address"],
+            "hostname": proposed.get("hostname") or "",
+            "description": proposed.get("description") or "",
+        }
+    }
+
+
+KEA_RESERVATION_SPEC = ResolverSpec(
+    kind="kea_reservation",
+    noun="reservation",
+    list_op=KEA_RESERVATIONS,
+    add_op=KEA_RESERVATIONS_ADD,
+    update_op=KEA_RESERVATIONS_UPDATE,
+    delete_op=KEA_RESERVATIONS_DELETE,
+    normalise=lambda raw: list(normalise_kea_reservations(raw).reservations),
+    conflict=kea_reservation_conflict,
+    payload=kea_reservation_payload,
+    same=lambda r, p: r.ip_address == p.get("ip_address"),
+    reconfigure_op=KEA_RECONFIGURE,
+)
+
+
+def apply_kea_reservation_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    return _apply_resolver(
+        KEA_RESERVATION_SPEC, db, change_id, user, settings, request, confirm_name
     )
 
 

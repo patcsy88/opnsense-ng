@@ -44,6 +44,10 @@ DHCP_LEASES = "dhcp.leases"
 KEA_LEASES = "kea.leases4.list"
 KEA_RESERVATIONS = "kea.reservations4.list"
 KEA_SUBNETS = "kea.subnets4.list"
+KEA_RESERVATIONS_ADD = "kea.reservations4.add"
+KEA_RESERVATIONS_UPDATE = "kea.reservations4.update"
+KEA_RESERVATIONS_DELETE = "kea.reservations4.delete"
+KEA_RECONFIGURE = "kea.reconfigure"
 WIREGUARD_STATUS = "wireguard.status"
 WIREGUARD_PEERS_LIST = "wireguard.peers.list"
 WIREGUARD_PEERS_ADD = "wireguard.peers.add"
@@ -328,6 +332,48 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Kea DHCPv4 subnets (ADR-0020). Verified on the lab.",
+    ),
+    Operation(
+        operation_id=KEA_RESERVATIONS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/kea/dhcpv4/addReservation",
+        required_privilege="Services: Kea DHCP",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Saves a reservation, not yet active. Reviewed apply only (ADR-0021).",
+    ),
+    Operation(
+        operation_id=KEA_RESERVATIONS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/kea/dhcpv4/setReservation/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Kea DHCP",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Edits a reservation, not yet active. Reviewed apply only (ADR-0021).",
+    ),
+    Operation(
+        operation_id=KEA_RESERVATIONS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/kea/dhcpv4/delReservation/{uuid}",
+        path_params=("uuid",),
+        required_privilege="Services: Kea DHCP",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Deletes a reservation. Reviewed apply only (ADR-0021).",
+    ),
+    Operation(
+        operation_id=KEA_RECONFIGURE,
+        method=HttpMethod.POST,
+        endpoint="/api/kea/service/reconfigure",
+        required_privilege="Services: Kea DHCP",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Activates saved Kea changes; Kea may restart and DHCP may pause. Apply only.",
     ),
     Operation(
         operation_id=WIREGUARD_STATUS,

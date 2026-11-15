@@ -29,6 +29,7 @@ class KeaLeasesResult(BaseModel):
 class KeaReservation(BaseModel):
     uuid: str
     subnet: str | None = None
+    subnet_id: str | None = None
     ip_address: str
     hw_address: str | None = None
     hostname: str | None = None
@@ -122,6 +123,7 @@ def normalise_kea_reservations(raw: Any) -> KeaReservationsResult:
             KeaReservation(
                 uuid=uuid,
                 subnet=_text(row.get("%subnet"), 64) or _text(row.get("subnet"), 64),
+                subnet_id=_text(row.get("subnet"), 64),
                 ip_address=address,
                 hw_address=_text(row.get("hw_address"), 32),
                 hostname=_text(row.get("hostname"), 255),

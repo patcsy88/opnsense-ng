@@ -1,6 +1,6 @@
 # ADR-0021: Kea DHCPv4 reservation changes (staged)
 
-- Status: proposed (needs owner approval before any code)
+- Status: accepted (owner approved 2026-11-15, all proposals as written)
 - Date: 2026-11-15
 - Deciders: project owner
 
