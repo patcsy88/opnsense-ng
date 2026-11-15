@@ -6,7 +6,7 @@ export type HealthLevel = "healthy" | "warning" | "critical";
 const CONFIG = {
   healthy: { variant: "success", Icon: CheckCircle2, label: "Healthy" },
   warning: { variant: "warning", Icon: AlertTriangle, label: "Warning" },
-  critical: { variant: "critical", Icon: XCircle, label: "Critical" },
+  critical: { variant: "error", Icon: XCircle, label: "Critical" },
 } as const;
 
 /** Colour is never the only signal: each level has its own icon and text. */

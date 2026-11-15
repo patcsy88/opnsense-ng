@@ -22,7 +22,7 @@ const EDITABLE_TYPES = ["host", "network", "port"];
 
 function actionBadge(r: RuleInfo) {
   if (!r.action) return <Badge>—</Badge>;
-  return <Badge variant={r.action === "pass" ? "success" : "critical"}>{r.action}</Badge>;
+  return <Badge variant={r.action === "pass" ? "success" : "error"}>{r.action}</Badge>;
 }
 
 function AliasesCard({ firewallId }: { firewallId: string }) {

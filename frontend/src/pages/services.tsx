@@ -186,7 +186,7 @@ export function ServicesPage() {
                           </TableCell>
                           <TableCell>{s.description ?? "—"}</TableCell>
                           <TableCell>
-                            <Badge variant={s.running ? "success" : "critical"}>
+                            <Badge variant={s.running ? "success" : "error"}>
                               {s.running ? "Running" : "Stopped"}
                             </Badge>
                             {s.locked && (

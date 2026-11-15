@@ -357,7 +357,7 @@ export function ChangeDetailPage() {
       <div className="flex flex-wrap items-center gap-3">
         <h1 className="text-2xl font-semibold">{describeChange(c)}</h1>
         <ChangeStatusBadge status={c.status} />
-        {c.high_risk && <Badge variant="critical">High risk</Badge>}
+        {c.high_risk && <Badge variant="error">High risk</Badge>}
         {c.self_approved && <Badge variant="warning">Self-approved</Badge>}
       </div>
 

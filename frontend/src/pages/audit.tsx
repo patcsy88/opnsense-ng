@@ -29,7 +29,7 @@ const EMPTY: Filters = { username: "", action: "", outcome: "", since: "", until
 function outcomeVariant(outcome: string) {
   if (outcome === "success") return "success" as const;
   if (outcome === "denied") return "warning" as const;
-  return "critical" as const;
+  return "error" as const;
 }
 
 function toIso(local: string): string | undefined {

@@ -14,13 +14,13 @@ const LABELS: Record<string, string> = {
   stale: "Stale",
 };
 
-const VARIANTS: Record<string, "default" | "success" | "warning" | "critical"> = {
+const VARIANTS: Record<string, "secondary" | "success" | "warning" | "error"> = {
   applied: "success",
   approved: "warning",
   applying: "warning",
-  failed: "critical",
-  stale: "critical",
-  rejected: "critical",
+  failed: "error",
+  stale: "error",
+  rejected: "error",
 };
 
 export function statusLabel(status: string): string {
@@ -28,7 +28,7 @@ export function statusLabel(status: string): string {
 }
 
 export function ChangeStatusBadge({ status }: { status: string }) {
-  return <Badge variant={VARIANTS[status] ?? "default"}>{statusLabel(status)}</Badge>;
+  return <Badge variant={VARIANTS[status] ?? "secondary"}>{statusLabel(status)}</Badge>;
 }
 
 export function targetName(c: ChangeRequest): string | undefined {

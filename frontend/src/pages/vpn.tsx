@@ -48,7 +48,7 @@ function handshake(value: string | null): string {
 function statusVariant(status: string | null) {
   if (status === "online" || status === "up") return "success" as const;
   if (status === "stale") return "warning" as const;
-  return "critical" as const;
+  return "error" as const;
 }
 
 export function VpnPage() {

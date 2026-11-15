@@ -22,7 +22,7 @@ function endpoint(host: string | null, port: number | null) {
 
 function actionBadge(action: string | null) {
   if (!action) return <Badge>—</Badge>;
-  return <Badge variant={action === "pass" ? "success" : action === "block" ? "critical" : "default"}>{action}</Badge>;
+  return <Badge variant={action === "pass" ? "success" : action === "block" ? "error" : "secondary"}>{action}</Badge>;
 }
 
 function matches(e: LogEntry, action: string, text: string): boolean {
