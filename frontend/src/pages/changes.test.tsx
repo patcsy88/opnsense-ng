@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { App } from "@/App";
 import { server } from "@/test/server";
-import { ADMIN, FW, READER, renderApp } from "@/test/utils";
+import { ADMIN, FW, READER, chooseOption, renderApp } from "@/test/utils";
 
 const NETADMIN = { id: "55555555-5555-4555-8555-555555555555", username: "carol", role: "network_admin" } as const;
 const CID = "66666666-6666-4666-8666-666666666666";
@@ -550,7 +550,7 @@ describe("New rule", () => {
     fireEvent.click(newRule);
     fireEvent.change(await screen.findByLabelText("Description"), { target: { value: "Block telnet" } });
     fireEvent.change(screen.getByLabelText("Interface"), { target: { value: "lan" } });
-    fireEvent.change(screen.getByLabelText("Protocol"), { target: { value: "TCP" } });
+    await chooseOption(screen.getByLabelText("Protocol"), "TCP");
     fireEvent.change(await screen.findByLabelText("Destination port"), { target: { value: "23" } });
     fireEvent.click(screen.getByLabelText(/log matching/i));
     fireEvent.click(screen.getByRole("button", { name: "Create request" }));

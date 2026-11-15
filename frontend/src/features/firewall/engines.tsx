@@ -1,3 +1,4 @@
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { api } from "@/lib/api";
 
@@ -87,25 +88,15 @@ export function EngineTabs<T extends string>({
 }) {
   return (
     <div className="space-y-1">
-      <div role="tablist" aria-label={label} className="flex flex-wrap gap-2">
-        {tabs.map((t) => (
-          <button
-            key={t.id}
-            role="tab"
-            type="button"
-            aria-selected={value === t.id}
-            onClick={() => onChange(t.id)}
-            className={
-              "rounded-md border px-3 py-1.5 text-sm " +
-              (value === t.id
-                ? "border-primary bg-primary text-primary-foreground"
-                : "border-border bg-card hover:bg-muted")
-            }
-          >
-            {t.name}
-          </button>
-        ))}
-      </div>
+      <Tabs value={value} onValueChange={(v) => onChange(v as T)}>
+        <TabsList aria-label={label}>
+          {tabs.map((t) => (
+            <TabsTab key={t.id} value={t.id}>
+              {t.name}
+            </TabsTab>
+          ))}
+        </TabsList>
+      </Tabs>
       <p className="text-xs text-muted-foreground">
         {tabs.map((t) => `${t.name}: ${engineLabel[t.state]}`).join(" · ")}
       </p>

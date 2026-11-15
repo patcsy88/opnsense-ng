@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { pick } from "./select";
 import { Totp } from "./totp";
 
 // Lab-only. Writes ONE throwaway Kea reservation (ADR-0021) through the staged flow: create, edit
@@ -80,7 +81,7 @@ test("Kea reservation: create, edit, delete on the lab firewall", async ({
   const row = () => page.getByRole("row", { name: new RegExp(IP) });
   const open = async () => {
     await page.goto("/dhcp");
-    await page.locator("select").selectOption({ label: FIREWALL });
+    await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
     await page.getByRole("tab", { name: "Kea", exact: true }).click();
     await page.getByRole("tab", { name: "Reservations" }).click();
     await expect(page.getByText("Loading…")).toHaveCount(0);

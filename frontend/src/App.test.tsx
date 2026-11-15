@@ -1,4 +1,4 @@
-import { fireEvent, screen } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { App } from "./App";
@@ -132,7 +132,7 @@ describe("role-based rendering", () => {
     );
     renderApp(<App />, "/");
     expect(await screen.findByText("Firewall is unreachable")).toBeInTheDocument();
-    expect(await screen.findByRole("option", { name: "edge-1" })).toBeInTheDocument();
+    await waitFor(() => expect(screen.getByLabelText("Firewall")).toHaveTextContent("edge-1"));
     expect(screen.queryByText("tls_error")).not.toBeInTheDocument();
     expect(detailedListCalled).toBe(false);
   });

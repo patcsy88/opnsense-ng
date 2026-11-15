@@ -1,4 +1,5 @@
 import { expect, test, type Browser, type Page } from "@playwright/test";
+import { pick } from "./select";
 import { Totp } from "./totp";
 
 const ADMIN = "e2e-admin";
@@ -71,7 +72,7 @@ test("user management, start to finish", async ({ browser }) => {
   // Create a user and read the one-time password.
   await admin.goto("/administration/users");
   await admin.getByLabel("Username", { exact: true }).fill(USER);
-  await admin.locator("form select").selectOption("read_only");
+  await pick(admin, admin.getByRole("combobox", { name: "Role", exact: true }), "read_only");
   await admin.getByRole("button", { name: "Create user" }).click();
   const temp = (await admin.getByTestId("temp-password").innerText()).trim();
   expect(temp).toHaveLength(20);
@@ -96,10 +97,8 @@ test("user management, start to finish", async ({ browser }) => {
 
   // A role change ends the user's session.
   await admin.reload();
-  await row(admin, USER)
-    .getByLabel(`Role for ${USER}`)
-    .selectOption("network_admin");
-  await expect(row(admin, USER).getByLabel(`Role for ${USER}`)).toHaveValue(
+  await pick(admin, row(admin, USER).getByLabel(`Role for ${USER}`), "network_admin");
+  await expect(row(admin, USER).getByLabel(`Role for ${USER}`)).toHaveText(
     "network_admin",
   );
   await expect
@@ -134,11 +133,9 @@ test("user management, start to finish", async ({ browser }) => {
   await dialog.getByRole("button", { name: "Deactivate" }).click();
   await expect(dialog.getByRole("alert")).toContainText(/own account/);
   await dialog.getByRole("button", { name: "Cancel" }).click();
-  await row(admin, ADMIN)
-    .getByLabel(`Role for ${ADMIN}`)
-    .selectOption("read_only");
+  await pick(admin, row(admin, ADMIN).getByLabel(`Role for ${ADMIN}`), "read_only");
   await expect(admin.getByRole("alert").first()).toContainText(/own account/);
-  await expect(row(admin, ADMIN).getByLabel(`Role for ${ADMIN}`)).toHaveValue(
+  await expect(row(admin, ADMIN).getByLabel(`Role for ${ADMIN}`)).toHaveText(
     "admin",
   );
 

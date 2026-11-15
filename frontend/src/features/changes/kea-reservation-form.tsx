@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -9,8 +10,6 @@ import type {
   KeaSubnet,
 } from "@/lib/schemas";
 
-const SELECT =
-  "h-9 w-full rounded-md border border-border bg-card px-2 text-sm";
 const MAC = /^[0-9a-f]{2}([:-][0-9a-f]{2}){5}$/i;
 const IPV4 = /^(\d{1,3})\.(\d{1,3})\.(\d{1,3})\.(\d{1,3})$/;
 
@@ -134,19 +133,15 @@ export function KeaReservationForm({
       <div className="grid grid-cols-2 gap-3">
         <div className="col-span-2 space-y-1">
           <Label htmlFor="kea-subnet">Subnet</Label>
-          <select
+          <SelectField
             id="kea-subnet"
             name="subnet"
-            className={SELECT}
             defaultValue={initial?.subnet ?? subnets[0]?.uuid ?? ""}
-          >
-            {subnets.map((s) => (
-              <option key={s.uuid} value={s.uuid}>
-                {s.subnet}
-                {s.description ? ` (${s.description})` : ""}
-              </option>
-            ))}
-          </select>
+            options={subnets.map((s) => ({
+              value: s.uuid,
+              label: `${s.subnet}${s.description ? ` (${s.description})` : ""}`,
+            }))}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="kea-ip">IP address</Label>

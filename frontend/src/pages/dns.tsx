@@ -1,7 +1,7 @@
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { ErrorState } from "@/components/error-state";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -111,26 +111,21 @@ function UnboundSection({ selected, canManage }: { selected: string; canManage: 
   return (
     <div className="space-y-4">
       {canManage && (
-        <div role="tablist" aria-label="DNS section" className="flex gap-2">
-          {(
-            [
-              ["overview", "Overview"],
-              ["hosts", "Host overrides"],
-              ["forwards", "Domain forwards"],
-            ] as const
-          ).map(([id, text]) => (
-            <Button
-              key={id}
-              role="tab"
-              aria-selected={tab === id}
-              size="sm"
-              variant={tab === id ? "default" : "outline"}
-              onClick={() => setTab(id)}
-            >
-              {text}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList aria-label="DNS section">
+            {(
+              [
+                ["overview", "Overview"],
+                ["hosts", "Host overrides"],
+                ["forwards", "Domain forwards"],
+              ] as const
+            ).map(([id, text]) => (
+              <TabsTab key={id} value={id}>
+                {text}
+              </TabsTab>
+            ))}
+          </TabsList>
+        </Tabs>
       )}
 
       {canManage && tab === "hosts" && (

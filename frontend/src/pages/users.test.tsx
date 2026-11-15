@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { App } from "@/App";
 import { server } from "@/test/server";
-import { ADMIN, READER, renderApp } from "@/test/utils";
+import { ADMIN, READER, chooseOption, renderApp } from "@/test/utils";
 
 const ANN = "33333333-3333-4333-8333-333333333333";
 
@@ -69,9 +69,7 @@ describe("Users page", () => {
     fireEvent.change(await screen.findByLabelText("Username"), {
       target: { value: "ann" },
     });
-    fireEvent.change(screen.getByLabelText("Role"), {
-      target: { value: "network_admin" },
-    });
+await chooseOption(screen.getByLabelText("Role"), "network_admin");
     fireEvent.click(screen.getByRole("button", { name: "Create user" }));
     expect(await screen.findByTestId("temp-password")).toHaveTextContent(
       "Abcd2345Efgh6789Jklm",
@@ -93,9 +91,7 @@ describe("Users page", () => {
       }),
     );
     renderApp(<App />, "/administration/users");
-    fireEvent.change(await screen.findByLabelText("Role for ann"), {
-      target: { value: "security_admin" },
-    });
+await chooseOption(await screen.findByLabelText("Role for ann"), "security_admin");
     await waitFor(() => expect(sent).toEqual({ role: "security_admin" }));
   });
 

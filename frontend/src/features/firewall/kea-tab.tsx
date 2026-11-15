@@ -1,3 +1,4 @@
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -391,20 +392,15 @@ export function KeaTab({
   const shown = sections.some(([s]) => s === section) ? section : "leases";
   return (
     <>
-      <div role="tablist" aria-label="Kea section" className="flex gap-2">
-        {sections.map(([id, text]) => (
-          <Button
-            key={id}
-            role="tab"
-            aria-selected={shown === id}
-            size="sm"
-            variant={shown === id ? "default" : "outline"}
-            onClick={() => setSection(id)}
-          >
-            {text}
-          </Button>
-        ))}
-      </div>
+      <Tabs value={shown} onValueChange={(v) => setSection(v as typeof section)}>
+        <TabsList aria-label="Kea section">
+          {sections.map(([id, text]) => (
+            <TabsTab key={id} value={id}>
+              {text}
+            </TabsTab>
+          ))}
+        </TabsList>
+      </Tabs>
       {shown === "leases" && <Leases id={firewallId} />}
       {shown === "reservations" && <Reservations id={firewallId} />}
       {shown === "subnets" && <Subnets id={firewallId} />}

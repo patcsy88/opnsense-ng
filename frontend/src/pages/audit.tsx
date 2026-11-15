@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
@@ -111,17 +112,11 @@ export function AuditPage() {
             </label>
             <label className="space-y-1 text-sm">
               Outcome
-              <select
-                className="h-9 w-full rounded-md border border-border bg-card px-2"
+              <SelectField
                 value={draft.outcome}
-                onChange={(e) => setDraft({ ...draft, outcome: e.target.value })}
-              >
-                {OUTCOMES.map((o) => (
-                  <option key={o} value={o}>
-                    {o === "" ? "Any" : o}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => setDraft({ ...draft, outcome: v })}
+                options={OUTCOMES.map((o) => ({ value: o, label: o === "" ? "Any" : o }))}
+              />
             </label>
             <label className="space-y-1 text-sm">
               From

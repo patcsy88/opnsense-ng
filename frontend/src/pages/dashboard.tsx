@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/error-state";
@@ -29,17 +30,11 @@ export function DashboardPage() {
         <div className="flex flex-wrap items-center gap-3 text-sm">
           <label className="flex items-center gap-2">
             Refresh
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
-              value={pollMs}
-              onChange={(e) => setPollMs(Number(e.target.value))}
-            >
-              {POLL_OPTIONS.map((o) => (
-                <option key={o.ms} value={o.ms}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <SelectField
+              value={String(pollMs)}
+              onValueChange={(v) => setPollMs(Number(v))}
+              options={POLL_OPTIONS.map((o) => ({ value: String(o.ms), label: o.label }))}
+            />
           </label>
         </div>
       </div>

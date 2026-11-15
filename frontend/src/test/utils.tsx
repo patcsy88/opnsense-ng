@@ -1,5 +1,5 @@
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
-import { render } from "@testing-library/react";
+import { fireEvent, render, screen } from "@testing-library/react";
 import type { ReactElement } from "react";
 import { MemoryRouter } from "react-router-dom";
 import { AuthProvider } from "@/features/auth/auth";
@@ -32,3 +32,17 @@ export const FW = {
   allow_writes: false,
   created_at: "2026-11-10T00:00:00Z",
 };
+
+function press(el: HTMLElement) {
+  fireEvent.pointerDown(el, { button: 0, pointerType: "mouse" });
+  fireEvent.mouseDown(el, { button: 0 });
+  fireEvent.pointerUp(el, { button: 0, pointerType: "mouse" });
+  fireEvent.mouseUp(el, { button: 0 });
+  fireEvent.click(el, { button: 0 });
+}
+
+/** Opens a coss Select and picks an option by its visible name. Base UI opens on pointer down, so a bare click is not enough. */
+export async function chooseOption(trigger: HTMLElement, name: string | RegExp) {
+  press(trigger);
+  press(await screen.findByRole("option", { name }));
+}

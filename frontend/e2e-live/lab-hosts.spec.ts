@@ -1,4 +1,5 @@
 import { expect, test, type Page } from "@playwright/test";
+import { pick } from "./select";
 import { Totp } from "./totp";
 
 // Lab-only: creates, edits and deletes one throwaway Dnsmasq static host on the lab firewall.
@@ -48,7 +49,7 @@ async function signInAndEnrol(page: Page): Promise<void> {
 
 async function chooseFirewall(page: Page): Promise<void> {
   await page.goto("/dhcp");
-  await page.locator("select").selectOption({ label: FIREWALL });
+  await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
   await page.getByRole("tab", { name: "Static hosts" }).click();
 }
 
@@ -149,7 +150,7 @@ test("Dnsmasq domain override: create, edit, delete on the lab firewall", async 
     page.getByRole("row", { name: new RegExp(OVERRIDE) });
   const open = async () => {
     await page.goto("/dns");
-    await page.locator("select").selectOption({ label: FIREWALL });
+    await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
     await page.getByRole("tab", { name: "Dnsmasq" }).click();
   };
   const submit = async (server: string) => {
@@ -225,7 +226,7 @@ test("Unbound host override: create, edit, disable, delete on the lab firewall",
   const row = () => page.getByRole("row", { name: new RegExp(UNBOUND_HOST) });
   const open = async () => {
     await page.goto("/dns");
-    await page.locator("select").selectOption({ label: FIREWALL });
+    await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
     await page.getByRole("tab", { name: "Host overrides" }).click();
   };
   const stageDialogAction = async (name: string) => {
@@ -296,7 +297,7 @@ test("Unbound domain forward: create, edit, disable, enable, delete on the lab f
   const row = () => page.getByRole("row", { name: new RegExp(FORWARD_DOMAIN) });
   const open = async () => {
     await page.goto("/dns");
-    await page.locator("select").selectOption({ label: FIREWALL });
+    await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
     await page.getByRole("tab", { name: "Domain forwards" }).click();
   };
   const stageDialogAction = async (name: string) => {
@@ -367,7 +368,7 @@ test("WireGuard tunnel and peer: create, edit, toggle, delete on the lab firewal
   const peerRow = () => page.getByRole("row", { name: new RegExp(PEER) });
   const open = async (tab: "Peers" | "Tunnels") => {
     await page.goto("/vpn");
-    await page.locator("select").selectOption({ label: FIREWALL });
+    await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
     await page.getByRole("tab", { name: tab }).click();
   };
   const stageDialogAction = async (name: string) => {

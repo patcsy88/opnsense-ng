@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -14,7 +15,6 @@ interface Props {
   onCancel: () => void;
 }
 
-const SELECT = "h-9 w-full rounded-md border border-border bg-card px-2 text-sm";
 const PROTOCOLS = ["TCP", "UDP", "TCP/UDP"];
 const IP_VERSIONS = ["inet", "inet6"];
 
@@ -107,18 +107,24 @@ export function ForwardForm({ initial, pending, error, onSubmit, onCancel }: Pro
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label htmlFor="fwd-ipproto">IP version</Label>
-          <select id="fwd-ipproto" name="ip_protocol" className={SELECT} defaultValue={initial?.ip_protocol ?? "inet"}>
-            <option value="inet">IPv4</option>
-            <option value="inet6">IPv6</option>
-          </select>
+          <SelectField
+            id="fwd-ipproto"
+            name="ip_protocol"
+            defaultValue={initial?.ip_protocol ?? "inet"}
+            options={[
+              { value: "inet", label: "IPv4" },
+              { value: "inet6", label: "IPv6" },
+            ]}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="fwd-protocol">Protocol</Label>
-          <select id="fwd-protocol" name="protocol" className={SELECT} defaultValue={initial?.protocol ?? "TCP"}>
-            <option value="TCP">TCP</option>
-            <option value="UDP">UDP</option>
-            <option value="TCP/UDP">TCP/UDP</option>
-          </select>
+          <SelectField
+            id="fwd-protocol"
+            name="protocol"
+            defaultValue={initial?.protocol ?? "TCP"}
+            options={["TCP", "UDP", "TCP/UDP"].map((v) => ({ value: v, label: v }))}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="fwd-source">Source</Label>

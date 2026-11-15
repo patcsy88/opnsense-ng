@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -65,19 +66,13 @@ export function AliasForm({ initial, pending, error, onSubmit, onCancel }: Props
       </div>
       <div className="space-y-1">
         <Label htmlFor="alias-type">Type</Label>
-        <select
+        <SelectField
           id="alias-type"
-          className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm"
+          options={ALIAS_TYPES.map((t) => ({ value: t, label: t }))}
           value={type}
           disabled={editing}
-          onChange={(e) => setType(e.target.value as (typeof ALIAS_TYPES)[number])}
-        >
-          {ALIAS_TYPES.map((t) => (
-            <option key={t} value={t}>
-              {t}
-            </option>
-          ))}
-        </select>
+          onValueChange={(v) => setType(v as (typeof ALIAS_TYPES)[number])}
+        />
       </div>
       <div className="space-y-1">
         <Label htmlFor="alias-content">Content</Label>

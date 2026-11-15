@@ -3,7 +3,7 @@ import { http, HttpResponse } from "msw";
 import { describe, expect, it } from "vitest";
 import { App } from "@/App";
 import { server } from "@/test/server";
-import { ADMIN, READER, renderApp } from "@/test/utils";
+import { ADMIN, READER, chooseOption, renderApp } from "@/test/utils";
 
 const SECURITY = { ...ADMIN, id: "9b2a9a40-6f5d-4f1c-8d55-4b2f2b9f4d11", username: "sec", role: "security_admin" };
 
@@ -61,7 +61,7 @@ describe("Audit log page", () => {
     renderApp(<App />, "/administration/audit");
     await screen.findByText("firewall.dns.stats");
     fireEvent.change(screen.getByLabelText("User"), { target: { value: "bob" } });
-    fireEvent.change(screen.getByLabelText("Outcome"), { target: { value: "failure" } });
+    await chooseOption(screen.getByLabelText("Outcome"), "failure");
     fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
     await waitFor(() => expect(seen.some((s) => s.includes("username=bob") && s.includes("outcome=failure"))).toBe(true));
   });

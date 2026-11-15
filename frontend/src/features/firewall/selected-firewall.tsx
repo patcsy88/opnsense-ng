@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useQuery, type UseQueryResult } from "@tanstack/react-query";
 import {
   createContext,
@@ -74,18 +75,13 @@ export function FirewallPicker() {
   return (
     <label className="flex items-center gap-2 text-sm">
       <span className="hidden sm:inline">Firewall</span>
-      <select
+      <SelectField
         aria-label="Firewall"
-        className="h-9 max-w-[10rem] rounded-md border border-border bg-card px-2 sm:max-w-[14rem]"
+        className="max-w-[10rem] sm:max-w-[14rem]"
         value={selected ?? ""}
-        onChange={(e) => select(e.target.value)}
-      >
-        {firewalls.map((f) => (
-          <option key={f.id} value={f.id}>
-            {f.name}
-          </option>
-        ))}
-      </select>
+        onValueChange={select}
+        options={firewalls.map((f) => ({ value: f.id, label: f.name }))}
+      />
     </label>
   );
 }

@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -15,7 +16,6 @@ interface Props {
 }
 
 const PORT_PROTOCOLS = ["TCP", "UDP", "TCP/UDP"];
-const SELECT = "h-9 w-full rounded-md border border-border bg-card px-2 text-sm";
 
 const ACTIONS = ["pass", "block", "reject"];
 const DIRECTIONS = ["in", "out"];
@@ -112,11 +112,16 @@ export function RuleForm({ initial, pending, error, onSubmit, onCancel }: Props)
       <div className="grid grid-cols-2 gap-3">
         <div className="space-y-1">
           <Label htmlFor="rule-action">Action</Label>
-          <select id="rule-action" name="action" className={SELECT} defaultValue={initial?.action ?? "block"}>
-            <option value="pass">Pass</option>
-            <option value="block">Block</option>
-            <option value="reject">Reject</option>
-          </select>
+          <SelectField
+            id="rule-action"
+            name="action"
+            defaultValue={initial?.action ?? "block"}
+            options={[
+              { value: "pass", label: "Pass" },
+              { value: "block", label: "Block" },
+              { value: "reject", label: "Reject" },
+            ]}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="rule-interface">Interface</Label>
@@ -132,32 +137,36 @@ export function RuleForm({ initial, pending, error, onSubmit, onCancel }: Props)
         </div>
         <div className="space-y-1">
           <Label htmlFor="rule-direction">Direction</Label>
-          <select id="rule-direction" name="direction" className={SELECT} defaultValue={initial?.direction ?? "in"}>
-            <option value="in">In</option>
-            <option value="out">Out</option>
-          </select>
+          <SelectField
+            id="rule-direction"
+            name="direction"
+            defaultValue={initial?.direction ?? "in"}
+            options={[
+              { value: "in", label: "In" },
+              { value: "out", label: "Out" },
+            ]}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="rule-ipproto">IP version</Label>
-          <select id="rule-ipproto" name="ip_protocol" className={SELECT} defaultValue={initial?.ip_protocol ?? "inet"}>
-            <option value="inet">IPv4</option>
-            <option value="inet6">IPv6</option>
-          </select>
+          <SelectField
+            id="rule-ipproto"
+            name="ip_protocol"
+            defaultValue={initial?.ip_protocol ?? "inet"}
+            options={[
+              { value: "inet", label: "IPv4" },
+              { value: "inet6", label: "IPv6" },
+            ]}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="rule-protocol">Protocol</Label>
-          <select
+          <SelectField
             id="rule-protocol"
-            className={SELECT}
             value={protocol}
-            onChange={(e) => setProtocol(e.target.value as RuleProposalInput["protocol"])}
-          >
-            <option value="any">any</option>
-            <option value="TCP">TCP</option>
-            <option value="UDP">UDP</option>
-            <option value="TCP/UDP">TCP/UDP</option>
-            <option value="ICMP">ICMP</option>
-          </select>
+            onValueChange={(v) => setProtocol(v as RuleProposalInput["protocol"])}
+            options={["any", "TCP", "UDP", "TCP/UDP", "ICMP"].map((v) => ({ value: v, label: v }))}
+          />
         </div>
       </div>
       <div className="grid grid-cols-2 gap-3">

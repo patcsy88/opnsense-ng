@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 import { useState } from "react";
@@ -66,18 +67,14 @@ export function ChangesPage() {
         <div className="flex flex-wrap items-center gap-3">
           <label className="flex items-center gap-2 text-sm">
             Status
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
+            <SelectField
               value={status}
-              onChange={(e) => setStatus(e.target.value)}
-            >
-              <option value="">All</option>
-              {CHANGE_STATUSES.map((s) => (
-                <option key={s} value={s}>
-                  {statusLabel(s)}
-                </option>
-              ))}
-            </select>
+              onValueChange={setStatus}
+              options={[
+                { value: "", label: "All" },
+                ...CHANGE_STATUSES.map((s) => ({ value: s, label: statusLabel(s) })),
+              ]}
+            />
           </label>
           {canManage && (
             <>

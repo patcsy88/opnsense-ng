@@ -1,3 +1,4 @@
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ErrorState } from "@/components/error-state";
@@ -9,7 +10,6 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import {
@@ -116,26 +116,21 @@ export function VpnPage() {
       )}
 
       {canManage && (
-        <div role="tablist" aria-label="VPN section" className="flex gap-2">
-          {(
-            [
-              ["status", "Status"],
-              ["peers", "Peers"],
-              ["tunnels", "Tunnels"],
-            ] as const
-          ).map(([id, label]) => (
-            <Button
-              key={id}
-              role="tab"
-              aria-selected={tab === id}
-              size="sm"
-              variant={tab === id ? "default" : "outline"}
-              onClick={() => setTab(id)}
-            >
-              {label}
-            </Button>
-          ))}
-        </div>
+        <Tabs value={tab} onValueChange={(v) => setTab(v as typeof tab)}>
+          <TabsList aria-label="VPN section">
+            {(
+              [
+                ["status", "Status"],
+                ["peers", "Peers"],
+                ["tunnels", "Tunnels"],
+              ] as const
+            ).map(([id, label]) => (
+              <TabsTab key={id} value={id}>
+                {label}
+              </TabsTab>
+            ))}
+          </TabsList>
+        </Tabs>
       )}
       {canManage && tab === "peers" && selected && (
         <WireguardPeers firewallId={selected} />

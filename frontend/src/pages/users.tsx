@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
 import { Link } from "react-router-dom";
@@ -176,17 +177,11 @@ export function UsersPage() {
             </label>
             <label className="space-y-1 text-sm">
               Role
-              <select
-                className="h-9 w-full rounded-md border border-border bg-card px-2"
+              <SelectField
                 value={newRole}
-                onChange={(e) => setNewRole(e.target.value as Role)}
-              >
-                {ROLES.map((r) => (
-                  <option key={r} value={r}>
-                    {r}
-                  </option>
-                ))}
-              </select>
+                onValueChange={(v) => setNewRole(v as Role)}
+                options={ROLES.map((r) => ({ value: r, label: r }))}
+              />
             </label>
             <Button
               type="submit"
@@ -248,24 +243,16 @@ export function UsersPage() {
                         {u.username}
                       </TableCell>
                       <TableCell>
-                        <select
+                        <SelectField
                           aria-label={`Role for ${u.username}`}
-                          className="h-8 rounded-md border border-border bg-card px-2 text-sm"
+                          size="sm"
                           value={u.role}
                           disabled={role.isPending}
-                          onChange={(e) =>
-                            role.mutate({
-                              id: u.id,
-                              role: e.target.value as Role,
-                            })
+                          onValueChange={(v) =>
+                            role.mutate({ id: u.id, role: v as Role })
                           }
-                        >
-                          {ROLES.map((r) => (
-                            <option key={r} value={r}>
-                              {r}
-                            </option>
-                          ))}
-                        </select>
+                          options={ROLES.map((r) => ({ value: r, label: r }))}
+                        />
                       </TableCell>
                       <TableCell className="space-x-1">
                         <Badge variant={u.is_active ? "success" : "warning"}>

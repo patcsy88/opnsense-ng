@@ -1,3 +1,4 @@
+import { SelectField } from "@/components/ui/select-field";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -132,15 +133,15 @@ export function UnboundHostForm({
         </div>
         <div className="space-y-1">
           <Label htmlFor="uh-rr">Record type</Label>
-          <select
+          <SelectField
             id="uh-rr"
             name="rr"
             defaultValue={initial?.rr ?? "A"}
-            className="h-9 w-full rounded-md border border-border bg-card px-2 text-sm"
-          >
-            <option value="A">A (IPv4)</option>
-            <option value="AAAA">AAAA (IPv6)</option>
-          </select>
+            options={[
+              { value: "A", label: "A (IPv4)" },
+              { value: "AAAA", label: "AAAA (IPv6)" },
+            ]}
+          />
         </div>
         <div className="space-y-1">
           <Label htmlFor="uh-server">IP address</Label>

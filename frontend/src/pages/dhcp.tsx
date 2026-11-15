@@ -1,8 +1,8 @@
+import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -202,29 +202,23 @@ export function DhcpPage() {
             <>
               <InactiveNotice name="Dnsmasq" state={engines.dnsmasq} />
               {canManage && (
-                <div
-                  role="tablist"
-                  aria-label="DHCP section"
-                  className="flex gap-2"
+                <Tabs
+                  value={section}
+                  onValueChange={(v) => setSection(v as typeof section)}
                 >
-                  {(
-                    [
-                      ["leases", "Leases"],
-                      ["hosts", "Static hosts"],
-                    ] as const
-                  ).map(([id, text]) => (
-                    <Button
-                      key={id}
-                      role="tab"
-                      aria-selected={section === id}
-                      size="sm"
-                      variant={section === id ? "default" : "outline"}
-                      onClick={() => setSection(id)}
-                    >
-                      {text}
-                    </Button>
-                  ))}
-                </div>
+                  <TabsList aria-label="DHCP section">
+                    {(
+                      [
+                        ["leases", "Leases"],
+                        ["hosts", "Static hosts"],
+                      ] as const
+                    ).map(([id, text]) => (
+                      <TabsTab key={id} value={id}>
+                        {text}
+                      </TabsTab>
+                    ))}
+                  </TabsList>
+                </Tabs>
               )}
               {canManage && section === "hosts" ? (
                 <StaticHosts firewallId={selected} />
