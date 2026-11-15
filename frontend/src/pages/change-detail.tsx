@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link, useParams } from "react-router-dom";
@@ -330,7 +331,7 @@ export function ChangeDetailPage() {
     },
   });
 
-  if (q.isPending) return <p role="status" className="text-sm text-muted-foreground">Loading…</p>;
+  if (q.isPending) return <Loading />;
   if (q.isError) return <ErrorState error={q.error} onRetry={() => void q.refetch()} />;
 
   const c = q.data;

@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useQuery } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { StatusBadge, UnverifiedBadge } from "@/components/ui/status-badge";
@@ -89,7 +90,7 @@ export function SystemStatusCard({ firewallId, intervalMs }: { firewallId: strin
       </CardHeader>
       <CardContent>
         {q.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+          <Loading />
         ) : q.isError ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : (

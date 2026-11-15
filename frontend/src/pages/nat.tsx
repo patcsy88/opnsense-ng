@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -192,7 +193,7 @@ export function NatPage() {
               )}
             </div>
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+              <Loading />
             ) : q.isError ? (
               <ErrorState error={q.error} onRetry={() => void q.refetch()} />
             ) : q.data.rules.length === 0 ? (

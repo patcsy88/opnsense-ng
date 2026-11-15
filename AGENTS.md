@@ -5,7 +5,7 @@ OpenCode is a development-time tool only. It is not a runtime dependency.
 
 ## Architecture (non-negotiable)
 
-- **Frontend:** React + TypeScript, Vite PWA/Workbox, Tailwind CSS + shadcn/ui. Located in `frontend/`.
+- **Frontend:** React + TypeScript, Vite PWA/Workbox, Tailwind CSS + coss ui (Base UI, ADR-0022). Located in `frontend/`.
 - **Backend:** Python + FastAPI. Located in `backend/`. This is the security boundary.
 - **Database:** PostgreSQL (users, sessions, audit log, encrypted firewall credentials).
 - **Realtime:** SSE preferred, WebSocket where bidirectional is required.

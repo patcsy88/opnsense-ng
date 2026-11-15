@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ErrorState } from "@/components/error-state";
@@ -205,7 +206,7 @@ export function LogsPage() {
               </Button>
             </div>
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+              <Loading />
             ) : q.isError ? (
               <ErrorState error={q.error} onRetry={() => void q.refetch()} />
             ) : all.length === 0 ? (

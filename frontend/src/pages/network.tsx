@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useQuery } from "@tanstack/react-query";
 import { ErrorState } from "@/components/error-state";
 import { Badge } from "@/components/ui/badge";
@@ -49,7 +50,7 @@ export function NetworkPage() {
           </CardHeader>
           <CardContent>
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+              <Loading />
             ) : q.isError ? (
               <ErrorState error={q.error} onRetry={() => void q.refetch()} />
             ) : q.data.interfaces.length === 0 ? (

@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { SelectField } from "@/components/ui/select-field";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent } from "react";
@@ -218,9 +219,7 @@ export function UsersPage() {
               </p>
             )}
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                Loading…
-              </p>
+              <Loading />
             ) : (
               <Table>
                 <TableHeader>

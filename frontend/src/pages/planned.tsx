@@ -9,7 +9,7 @@ export function PlannedPage({ title }: { title: string }) {
       <Card>
         <CardHeader>
           <CardTitle className="flex items-center gap-2">
-            <Construction className="h-4 w-4" aria-hidden /> <Badge>Planned</Badge>
+            <Construction className="h-4 w-4" aria-hidden /> <Badge variant="info">Planned</Badge>
           </CardTitle>
           <CardDescription>This section is not implemented yet.</CardDescription>
         </CardHeader>

@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, ShieldAlert, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -87,7 +88,7 @@ export function FirewallConnectionsPage() {
       <Card>
         <CardContent className="pt-4">
           {list.isPending ? (
-            <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+            <Loading />
           ) : list.isError ? (
             <ErrorState error={list.error} onRetry={() => void list.refetch()} />
           ) : list.data.length === 0 ? (

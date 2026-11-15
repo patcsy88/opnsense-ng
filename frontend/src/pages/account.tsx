@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState, type FormEvent, type ReactNode } from "react";
 import { ErrorState } from "@/components/error-state";
@@ -448,9 +449,7 @@ export function AccountPage() {
           <Enrol onCodes={setCodes} />
         )
       ) : (
-        <p role="status" className="text-sm text-muted-foreground">
-          Loading…
-        </p>
+        <Loading />
       )}
     </div>
   );

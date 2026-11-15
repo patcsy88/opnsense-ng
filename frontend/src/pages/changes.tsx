@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { SelectField } from "@/components/ui/select-field";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
@@ -105,7 +106,7 @@ export function ChangesPage() {
         <Card>
           <CardContent className="pt-4">
             {list.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+              <Loading />
             ) : list.isError ? (
               <ErrorState error={list.error} onRetry={() => void list.refetch()} />
             ) : list.data.length === 0 ? (

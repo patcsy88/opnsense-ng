@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -67,7 +68,7 @@ function AliasesCard({ firewallId }: { firewallId: string }) {
       </CardHeader>
       <CardContent>
         {q.isPending ? (
-          <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+          <Loading />
         ) : q.isError ? (
           <ErrorState error={q.error} onRetry={() => void q.refetch()} />
         ) : q.data.aliases.length === 0 ? (
@@ -241,7 +242,7 @@ export function FirewallPage() {
           </CardHeader>
           <CardContent>
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+              <Loading />
             ) : q.isError ? (
               <ErrorState error={q.error} onRetry={() => void q.refetch()} />
             ) : q.data.rules.length === 0 ? (

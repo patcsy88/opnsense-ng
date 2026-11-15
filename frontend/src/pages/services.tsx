@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
 import { ErrorState } from "@/components/error-state";
@@ -152,9 +153,7 @@ export function ServicesPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                Loading…
-              </p>
+              <Loading />
             ) : (
               <>
                 <Input

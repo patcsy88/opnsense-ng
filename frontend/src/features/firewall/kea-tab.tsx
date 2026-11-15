@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Trash2 } from "lucide-react";
@@ -84,9 +85,7 @@ function Panel({
       <CardContent>
         {before}
         {loading ? (
-          <p role="status" className="text-sm text-muted-foreground">
-            Loading…
-          </p>
+          <Loading />
         ) : empty ? (
           <p className="text-sm text-muted-foreground">Nothing to show.</p>
         ) : (

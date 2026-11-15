@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { Tabs, TabsList, TabsTab } from "@/components/ui/tabs";
 import { useQuery } from "@tanstack/react-query";
 import { useMemo, useState } from "react";
@@ -152,9 +153,7 @@ export function VpnPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                Loading…
-              </p>
+              <Loading />
             ) : (
               <>
                 <Input

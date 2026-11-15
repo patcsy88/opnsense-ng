@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
 import { Pencil, Plus, Power, Trash2 } from "lucide-react";
 import { useState } from "react";
@@ -127,9 +128,7 @@ export function UnboundHosts({ firewallId }: { firewallId: string }) {
             </div>
           )}
           {q.isPending ? (
-            <p role="status" className="text-sm text-muted-foreground">
-              Loading…
-            </p>
+            <Loading />
           ) : q.data.hosts.length === 0 ? (
             <p className="text-sm text-muted-foreground">
               The firewall has no host overrides.

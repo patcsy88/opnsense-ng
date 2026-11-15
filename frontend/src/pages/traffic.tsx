@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
@@ -74,7 +75,7 @@ export function TrafficPage() {
           </CardHeader>
           <CardContent className="space-y-4">
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">Loading…</p>
+              <Loading />
             ) : series.length === 0 ? (
               <p className="text-sm text-muted-foreground">No interface counters reported.</p>
             ) : (

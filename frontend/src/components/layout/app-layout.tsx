@@ -24,8 +24,8 @@ function NavLinks({ onNavigate, className }: { onNavigate?: () => void; classNam
           onClick={onNavigate}
           className={({ isActive }) =>
             cn(
-              "flex items-center gap-3 rounded-md px-3 py-2 text-sm hover:bg-muted",
-              isActive && "bg-muted font-medium text-primary",
+              "flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-sidebar-foreground transition-colors hover:bg-sidebar-accent hover:text-sidebar-accent-foreground",
+              isActive && "bg-sidebar-accent font-medium text-sidebar-accent-foreground",
             )
           }
         >
@@ -91,12 +91,12 @@ export function AppLayout() {
   return (
     <SelectedFirewallProvider>
     <div className="min-h-screen md:flex">
-      <aside className="hidden w-60 shrink-0 border-r border-border bg-card p-4 md:block">
-        <div className="mb-6 px-3 text-sm font-semibold">OPNsense Manager</div>
+      <aside className="hidden w-60 shrink-0 border-r border-sidebar-border bg-sidebar p-4 md:block">
+        <div className="mb-6 px-3 font-heading text-sm font-semibold tracking-tight">OPNsense Manager</div>
         <NavLinks />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center gap-2 border-b border-border bg-card px-4">
+        <header className="flex h-14 items-center gap-2 border-b border-border bg-background px-4">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
               render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation" />}
@@ -116,12 +116,12 @@ export function AppLayout() {
             <UserMenu />
           </div>
         </header>
-        <main className="flex-1 p-4 pb-20 md:p-6 md:pb-6">
+        <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-20 md:p-6 md:pb-6">
           <Outlet />
         </main>
         <nav
           aria-label="Quick"
-          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-border bg-card md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-sidebar-border bg-sidebar md:hidden"
         >
           {["/", "/firewall", "/services", "/administration"].map((path) => NAV_ITEMS.find((n) => n.to === path)).map((item) =>
             item ? (
@@ -130,7 +130,7 @@ export function AppLayout() {
                 to={item.to}
                 end={item.to === "/"}
                 className={({ isActive }) =>
-                  cn("flex flex-col items-center gap-0.5 py-2 text-[11px]", isActive ? "text-primary" : "text-muted-foreground")
+                  cn("flex flex-col items-center gap-0.5 py-2 text-[11px]", isActive ? "text-foreground" : "text-muted-foreground")
                 }
               >
                 <item.icon className="h-5 w-5" aria-hidden />

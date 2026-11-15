@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { SelectField } from "@/components/ui/select-field";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useState } from "react";
@@ -164,9 +165,7 @@ export function AuditPage() {
           </CardHeader>
           <CardContent className="space-y-3">
             {q.isPending ? (
-              <p role="status" className="text-sm text-muted-foreground">
-                Loading…
-              </p>
+              <Loading />
             ) : data && data.items.length === 0 ? (
               <p className="text-sm text-muted-foreground">No records match.</p>
             ) : (

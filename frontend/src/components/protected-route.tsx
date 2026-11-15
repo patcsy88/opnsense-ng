@@ -1,3 +1,4 @@
+import { Loading } from "@/components/ui/loading";
 import { Navigate, Outlet, useLocation } from "react-router-dom";
 import { ErrorState } from "@/components/error-state";
 import { useAuth } from "@/features/auth/auth";
@@ -8,8 +9,8 @@ export function ProtectedRoute({ roles }: { roles?: Role[] }) {
   const location = useLocation();
   if (loading) {
     return (
-      <div className="grid min-h-screen place-items-center text-sm text-muted-foreground" role="status">
-        Loading…
+      <div className="grid min-h-screen place-items-center">
+        <Loading />
       </div>
     );
   }
