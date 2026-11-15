@@ -328,3 +328,86 @@ test("Unbound domain forward: create, edit, disable, enable, delete on the lab f
   await open();
   await expect(row()).toHaveCount(0);
 });
+
+const PEER = "zz-adr19-test";
+
+test("WireGuard peer: create, edit, disable, enable, delete on the lab firewall", async () => {
+  test.skip(!USER || !PASSWORD, "run through scripts/e2e-lab-hosts.sh");
+  const options = await (await page.request.get("/api/v1/firewalls")).json();
+  const fw = options.find((f: { name: string }) => f.name === FIREWALL);
+  expect(fw?.allow_writes, `allow_writes is on for ${FIREWALL}`).toBe(true);
+
+  const tunnels = (
+    await (
+      await page.request.get(`/api/v1/firewalls/${fw.id}/wireguard/tunnels`)
+    ).json()
+  ).tunnels as { name: string; tunneladdress: string[] }[];
+  expect(
+    tunnels.length,
+    "the lab firewall needs one WireGuard tunnel",
+  ).toBeGreaterThan(0);
+  const first = tunnels[0]?.tunneladdress[0] ?? "";
+  const network = (first.split("/")[0] ?? "").split(".");
+  expect(network.length, "the first tunnel needs an IPv4 address").toBe(4);
+  const address = `${network.slice(0, 3).join(".")}.250/32`;
+  // A fresh random public key; no private key exists for it anywhere.
+  const pubkey = Buffer.from(
+    Array.from({ length: 32 }, () => Math.floor(Math.random() * 256)),
+  ).toString("base64");
+
+  const row = () => page.getByRole("row", { name: new RegExp(PEER) });
+  const open = async () => {
+    await page.goto("/vpn");
+    await page.locator("select").selectOption({ label: FIREWALL });
+    await page.getByRole("tab", { name: "Peers" }).click();
+  };
+  const stageDialogAction = async (name: string) => {
+    await page.getByRole("button", { name }).click();
+    await page
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "Create change request" })
+      .click();
+    await page.waitForURL(/\/changes\//);
+  };
+
+  await open();
+  await expect(row()).toHaveCount(0);
+
+  // Create (normal risk)
+  await page.getByRole("button", { name: "New peer" }).click();
+  await page.getByLabel("Name", { exact: true }).fill(PEER);
+  await page.getByLabel("Tunnel address", { exact: true }).fill(address);
+  await page.getByLabel("Public key", { exact: true }).fill(pubkey);
+  await page.getByRole("checkbox").first().check();
+  await page.getByRole("button", { name: "Create change request" }).click();
+  await page.waitForURL(/\/changes\//);
+  await review(page);
+  await open();
+  await expect(row()).toContainText(address);
+
+  // Edit keepalive (normal risk)
+  await page.getByRole("button", { name: `Edit peer ${PEER}` }).click();
+  await page.getByLabel("Keepalive (optional)", { exact: true }).fill("25");
+  await page.getByRole("button", { name: "Create change request" }).click();
+  await page.waitForURL(/\/changes\//);
+  await review(page);
+
+  // Disable (high risk: the name is typed)
+  await open();
+  await stageDialogAction(`Disable peer ${PEER}`);
+  await review(page, PEER);
+  await open();
+  await expect(row()).toContainText("Disabled");
+
+  // Enable again (normal risk)
+  await stageDialogAction(`Enable peer ${PEER}`);
+  await review(page);
+  await open();
+  await expect(row()).not.toContainText("Disabled");
+
+  // Delete (high risk)
+  await stageDialogAction(`Delete peer ${PEER}`);
+  await review(page, PEER);
+  await open();
+  await expect(row()).toHaveCount(0);
+});

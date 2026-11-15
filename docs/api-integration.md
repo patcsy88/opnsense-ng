@@ -61,14 +61,14 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `unbound.forwards.delete` | POST | `/api/unbound/settings/delForward/{uuid}` | Services: Unbound | no | no | 26.7.8_2 | yes |
 | `unbound.forwards.enable` | POST | `/api/unbound/settings/toggleForward/{uuid}/1` | Services: Unbound | no | no | 26.7.8_2 | yes |
 | `unbound.forwards.disable` | POST | `/api/unbound/settings/toggleForward/{uuid}/0` | Services: Unbound | no | no | 26.7.8_2 | yes |
-| `wireguard.peers.list` | GET | `/api/wireguard/client/searchClient` | VPN: WireGuard (unconfirmed) | yes | no | 26.7.8_2 | no |
-| `wireguard.peers.add` | POST | `/api/wireguard/client/addClient` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
-| `wireguard.peers.update` | POST | `/api/wireguard/client/setClient/{uuid}` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
-| `wireguard.peers.delete` | POST | `/api/wireguard/client/delClient/{uuid}` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
-| `wireguard.peers.enable` | POST | `/api/wireguard/client/toggleClient/{uuid}/1` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
-| `wireguard.peers.disable` | POST | `/api/wireguard/client/toggleClient/{uuid}/0` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
-| `wireguard.tunnels.list` | GET | `/api/wireguard/server/searchServer` | VPN: WireGuard (unconfirmed) | yes | no | 26.7.8_2 | no |
-| `wireguard.reconfigure` | POST | `/api/wireguard/service/reconfigure` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.list` | GET | `/api/wireguard/client/searchClient` | VPN: WireGuard: Configuration (unconfirmed) | yes | no | 26.7.8_2 | no |
+| `wireguard.peers.add` | POST | `/api/wireguard/client/addClient` | VPN: WireGuard: Configuration (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.update` | POST | `/api/wireguard/client/setClient/{uuid}` | VPN: WireGuard: Configuration (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.delete` | POST | `/api/wireguard/client/delClient/{uuid}` | VPN: WireGuard: Configuration (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.enable` | POST | `/api/wireguard/client/toggleClient/{uuid}/1` | VPN: WireGuard: Configuration (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.disable` | POST | `/api/wireguard/client/toggleClient/{uuid}/0` | VPN: WireGuard: Configuration (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.tunnels.list` | GET | `/api/wireguard/server/searchServer` | VPN: WireGuard: Configuration (unconfirmed) | yes | no | 26.7.8_2 | no |
+| `wireguard.reconfigure` | POST | `/api/wireguard/service/reconfigure` | VPN: WireGuard: Configuration (unconfirmed) | no | no | 26.7.8_2 | no |
 | `dnsmasq.domains.list` | GET | `/api/dnsmasq/settings/searchDomain` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.add` | POST | `/api/dnsmasq/settings/addDomain` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.update` | POST | `/api/dnsmasq/settings/setDomain/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
