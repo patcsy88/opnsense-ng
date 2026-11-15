@@ -122,7 +122,7 @@ describe("Unbound host overrides", () => {
     page(SECADMIN);
     renderApp(<App />, "/dns");
     await screen.findByRole("heading", { name: "DNS" });
-    expect(screen.queryByRole("tab")).not.toBeInTheDocument();
+    expect(screen.queryByRole("tablist", { name: "DNS section" })).not.toBeInTheDocument();
   });
 
   it("lists hosts, flags the unverified capability and MX rows as read-only", async () => {

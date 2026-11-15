@@ -1,27 +1,29 @@
+import { lazy } from "react";
 import { Navigate, Route, Routes } from "react-router-dom";
 import { AppLayout } from "@/components/layout/app-layout";
 import { NAV_ITEMS } from "@/components/layout/nav";
 import { ProtectedRoute } from "@/components/protected-route";
-import { AdministrationPage } from "@/pages/administration";
-import { AccountPage } from "@/pages/account";
-import { AuditPage } from "@/pages/audit";
-import { UsersPage } from "@/pages/users";
-import { ChangeDetailPage } from "@/pages/change-detail";
-import { ChangesPage } from "@/pages/changes";
 import { DashboardPage } from "@/pages/dashboard";
-import { FirewallConnectionsPage } from "@/pages/firewall-connections";
-import { NatPage } from "@/pages/nat";
-import { OverviewPage } from "@/pages/overview";
-import { DhcpPage } from "@/pages/dhcp";
-import { DnsPage } from "@/pages/dns";
-import { LogsPage } from "@/pages/logs";
-import { ServicesPage } from "@/pages/services";
-import { TrafficPage } from "@/pages/traffic";
-import { VpnPage } from "@/pages/vpn";
 import { LoginPage } from "@/pages/login";
-import { FirewallPage } from "@/pages/firewall";
-import { NetworkPage } from "@/pages/network";
-import { PlannedPage } from "@/pages/planned";
+
+const AdministrationPage = lazy(() => import("@/pages/administration").then((m) => ({ default: m.AdministrationPage })));
+const AccountPage = lazy(() => import("@/pages/account").then((m) => ({ default: m.AccountPage })));
+const AuditPage = lazy(() => import("@/pages/audit").then((m) => ({ default: m.AuditPage })));
+const UsersPage = lazy(() => import("@/pages/users").then((m) => ({ default: m.UsersPage })));
+const ChangeDetailPage = lazy(() => import("@/pages/change-detail").then((m) => ({ default: m.ChangeDetailPage })));
+const ChangesPage = lazy(() => import("@/pages/changes").then((m) => ({ default: m.ChangesPage })));
+const FirewallConnectionsPage = lazy(() => import("@/pages/firewall-connections").then((m) => ({ default: m.FirewallConnectionsPage })));
+const NatPage = lazy(() => import("@/pages/nat").then((m) => ({ default: m.NatPage })));
+const OverviewPage = lazy(() => import("@/pages/overview").then((m) => ({ default: m.OverviewPage })));
+const DhcpPage = lazy(() => import("@/pages/dhcp").then((m) => ({ default: m.DhcpPage })));
+const DnsPage = lazy(() => import("@/pages/dns").then((m) => ({ default: m.DnsPage })));
+const LogsPage = lazy(() => import("@/pages/logs").then((m) => ({ default: m.LogsPage })));
+const ServicesPage = lazy(() => import("@/pages/services").then((m) => ({ default: m.ServicesPage })));
+const TrafficPage = lazy(() => import("@/pages/traffic").then((m) => ({ default: m.TrafficPage })));
+const VpnPage = lazy(() => import("@/pages/vpn").then((m) => ({ default: m.VpnPage })));
+const FirewallPage = lazy(() => import("@/pages/firewall").then((m) => ({ default: m.FirewallPage })));
+const NetworkPage = lazy(() => import("@/pages/network").then((m) => ({ default: m.NetworkPage })));
+const PlannedPage = lazy(() => import("@/pages/planned").then((m) => ({ default: m.PlannedPage })));
 
 export function App() {
   return (
