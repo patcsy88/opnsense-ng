@@ -295,7 +295,7 @@ async def test_network_admin_lists_without_secrets_and_cannot_approve_own_reques
     assert peers.json()["peers"][0]["pubkey"] == key(1) and peers.json()["peers"][0]["has_psk"]
     assert tunnels.json()["tunnels"][0]["name"] == "wg0"
     assert SECRET not in peers.text and SECRET not in tunnels.text
-    assert peers.json()["registry_verified"] is False
+    assert peers.json()["registry_verified"] is True
     unknown = "5d6e7f80-1a2b-4c3d-8e4f-5a6b7c8d9e0f"
     assert (await app_client.get(f"/api/v1/firewalls/{unknown}/wireguard/peers")).status_code == 404
     cid = str((await stage(app_client, fid, [], peer=peer())).json()["id"])

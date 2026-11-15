@@ -110,6 +110,7 @@ from app.opnsense.registry.entries import (
     WIREGUARD_TUNNELS_DELETE,
     WIREGUARD_TUNNELS_DISABLE,
     WIREGUARD_TUNNELS_ENABLE,
+    WIREGUARD_TUNNELS_KEYPAIR,
     WIREGUARD_TUNNELS_LIST,
     WIREGUARD_TUNNELS_UPDATE,
 )
@@ -140,7 +141,7 @@ def _validation_message(reply: Any) -> str:
         parts = [
             f"{str(field)[:60]}: {str(msg)[:120]}" for field, msg in list(validations.items())[:5]
         ]
-        return "The firewall rejected the alias: " + "; ".join(parts)
+        return "The firewall rejected the change: " + "; ".join(parts)
     message = reply.get("message") if isinstance(reply, dict) else None
     if isinstance(message, str) and message.strip():
         return "The firewall refused the change: " + " ".join(message.split())[:300]
@@ -1043,6 +1044,7 @@ class ResolverSpec:
     toggle_on: str | None = None
     toggle_off: str | None = None
     ok_key: str = "status"
+    keypair_op: str | None = None
 
 
 HOST_SPEC = ResolverSpec(
@@ -1348,6 +1350,7 @@ WIREGUARD_TUNNEL_SPEC = ResolverSpec(
     toggle_on=WIREGUARD_TUNNELS_ENABLE,
     toggle_off=WIREGUARD_TUNNELS_DISABLE,
     ok_key="result",
+    keypair_op=WIREGUARD_TUNNELS_KEYPAIR,
 )
 
 
@@ -1387,6 +1390,26 @@ def apply_domain_change(
     confirm_name: str | None,
 ) -> ChangeRequest:
     return _apply_resolver(DOMAIN_SPEC, db, change_id, user, settings, request, confirm_name)
+
+
+def _add_new_keypair(
+    db: Session,
+    client: OPNsenseClient,
+    operation_id: str,
+    body: dict[str, Any],
+    user: CurrentUser,
+    firewall_id: uuid.UUID,
+    request: Request,
+) -> None:
+    """Put a key pair made by the firewall into a new tunnel's body. The private key lives only
+    in this request body: it is not logged, audited, stored or returned (ADR-0019)."""
+    reply = _call(db, client, operation_id, None, user, firewall_id, request)
+    priv = reply.get("privkey") if isinstance(reply, dict) else None
+    pub = reply.get("pubkey") if isinstance(reply, dict) else None
+    if not (isinstance(priv, str) and isinstance(pub, str) and priv and pub):
+        raise FirewallError(ConnectionStatus.bad_response, "The firewall did not return a key pair")
+    body["server"]["privkey"] = priv
+    body["server"]["pubkey"] = pub
 
 
 def _apply_resolver(
@@ -1475,11 +1498,14 @@ def _apply_resolver(
                 reply = _call(db, client, spec.delete_op, {}, user, fw.id, request, params)
                 want = "deleted"
             else:
+                body = spec.payload(proposed)
+                if action == "create" and spec.keypair_op:
+                    _add_new_keypair(db, client, spec.keypair_op, body, user, fw.id, request)
                 reply = _call(
                     db,
                     client,
                     spec.update_op if action == "update" else spec.add_op,
-                    spec.payload(proposed),
+                    body,
                     user,
                     fw.id,
                     request,

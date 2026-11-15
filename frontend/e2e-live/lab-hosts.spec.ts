@@ -329,37 +329,26 @@ test("Unbound domain forward: create, edit, disable, enable, delete on the lab f
   await expect(row()).toHaveCount(0);
 });
 
-const PEER = "zz-adr19-test";
+const PEER = "zz-adr19-peer";
+const TUNNEL = "zz-adr19-wg";
 
-test("WireGuard peer: create, edit, disable, enable, delete on the lab firewall", async () => {
+test("WireGuard tunnel and peer: create, edit, toggle, delete on the lab firewall", async () => {
   test.skip(!USER || !PASSWORD, "run through scripts/e2e-lab-hosts.sh");
   const options = await (await page.request.get("/api/v1/firewalls")).json();
   const fw = options.find((f: { name: string }) => f.name === FIREWALL);
   expect(fw?.allow_writes, `allow_writes is on for ${FIREWALL}`).toBe(true);
 
-  const tunnels = (
-    await (
-      await page.request.get(`/api/v1/firewalls/${fw.id}/wireguard/tunnels`)
-    ).json()
-  ).tunnels as { name: string; tunneladdress: string[] }[];
-  expect(
-    tunnels.length,
-    "the lab firewall needs one WireGuard tunnel",
-  ).toBeGreaterThan(0);
-  const first = tunnels[0]?.tunneladdress[0] ?? "";
-  const network = (first.split("/")[0] ?? "").split(".");
-  expect(network.length, "the first tunnel needs an IPv4 address").toBe(4);
-  const address = `${network.slice(0, 3).join(".")}.250/32`;
   // A fresh random public key; no private key exists for it anywhere.
   const pubkey = Buffer.from(
     Array.from({ length: 32 }, () => Math.floor(Math.random() * 256)),
   ).toString("base64");
 
-  const row = () => page.getByRole("row", { name: new RegExp(PEER) });
-  const open = async () => {
+  const tunnelRow = () => page.getByRole("row", { name: new RegExp(TUNNEL) });
+  const peerRow = () => page.getByRole("row", { name: new RegExp(PEER) });
+  const open = async (tab: "Peers" | "Tunnels") => {
     await page.goto("/vpn");
     await page.locator("select").selectOption({ label: FIREWALL });
-    await page.getByRole("tab", { name: "Peers" }).click();
+    await page.getByRole("tab", { name: tab }).click();
   };
   const stageDialogAction = async (name: string) => {
     await page.getByRole("button", { name }).click();
@@ -369,45 +358,81 @@ test("WireGuard peer: create, edit, disable, enable, delete on the lab firewall"
       .click();
     await page.waitForURL(/\/changes\//);
   };
+  const submit = async () => {
+    await page.getByRole("button", { name: "Create change request" }).click();
+    await page.waitForURL(/\/changes\//);
+  };
 
-  await open();
-  await expect(row()).toHaveCount(0);
+  await open("Tunnels");
+  await expect(tunnelRow()).toHaveCount(0);
 
-  // Create (normal risk)
+  // Create a tunnel (always high risk: the name is typed). No key is sent.
+  await page.getByRole("button", { name: "New tunnel" }).click();
+  await page.getByLabel("Name", { exact: true }).fill(TUNNEL);
+  await page.getByLabel("Listen port", { exact: true }).fill("51899");
+  await page.getByLabel("Tunnel address", { exact: true }).fill("10.99.0.1/24");
+  await submit();
+  await review(page, TUNNEL);
+  await open("Tunnels");
+  await expect(tunnelRow()).toContainText("10.99.0.1/24");
+  await expect(tunnelRow()).toContainText("51899");
+
+  // Edit the tunnel (MTU)
+  await page.getByRole("button", { name: `Edit tunnel ${TUNNEL}` }).click();
+  await page.getByLabel("MTU (optional)", { exact: true }).fill("1380");
+  await submit();
+  await review(page, TUNNEL);
+
+  // Peer: create (normal risk) inside the new tunnel
+  await open("Peers");
+  await expect(peerRow()).toHaveCount(0);
   await page.getByRole("button", { name: "New peer" }).click();
   await page.getByLabel("Name", { exact: true }).fill(PEER);
-  await page.getByLabel("Tunnel address", { exact: true }).fill(address);
+  await page
+    .getByLabel("Tunnel address", { exact: true })
+    .fill("10.99.0.250/32");
   await page.getByLabel("Public key", { exact: true }).fill(pubkey);
-  await page.getByRole("checkbox").first().check();
-  await page.getByRole("button", { name: "Create change request" }).click();
-  await page.waitForURL(/\/changes\//);
+  await page.getByLabel(new RegExp(TUNNEL)).check();
+  await submit();
   await review(page);
-  await open();
-  await expect(row()).toContainText(address);
+  await open("Peers");
+  await expect(peerRow()).toContainText("10.99.0.250/32");
 
-  // Edit keepalive (normal risk)
+  // Peer: edit keepalive (normal risk)
   await page.getByRole("button", { name: `Edit peer ${PEER}` }).click();
   await page.getByLabel("Keepalive (optional)", { exact: true }).fill("25");
-  await page.getByRole("button", { name: "Create change request" }).click();
-  await page.waitForURL(/\/changes\//);
+  await submit();
   await review(page);
 
-  // Disable (high risk: the name is typed)
-  await open();
+  // Peer: disable (high risk), enable (normal risk)
+  await open("Peers");
   await stageDialogAction(`Disable peer ${PEER}`);
   await review(page, PEER);
-  await open();
-  await expect(row()).toContainText("Disabled");
-
-  // Enable again (normal risk)
+  await open("Peers");
+  await expect(peerRow()).toContainText("Disabled");
   await stageDialogAction(`Enable peer ${PEER}`);
   await review(page);
-  await open();
-  await expect(row()).not.toContainText("Disabled");
+  await open("Peers");
+  await expect(peerRow()).not.toContainText("Disabled");
 
-  // Delete (high risk)
+  // Tunnel: disable and enable (high risk)
+  await open("Tunnels");
+  await stageDialogAction(`Disable tunnel ${TUNNEL}`);
+  await review(page, TUNNEL);
+  await open("Tunnels");
+  await expect(tunnelRow()).toContainText("Disabled");
+  await stageDialogAction(`Enable tunnel ${TUNNEL}`);
+  await review(page, TUNNEL);
+
+  // Delete the peer, then the tunnel
+  await open("Peers");
   await stageDialogAction(`Delete peer ${PEER}`);
   await review(page, PEER);
-  await open();
-  await expect(row()).toHaveCount(0);
+  await open("Peers");
+  await expect(peerRow()).toHaveCount(0);
+  await open("Tunnels");
+  await stageDialogAction(`Delete tunnel ${TUNNEL}`);
+  await review(page, TUNNEL);
+  await open("Tunnels");
+  await expect(tunnelRow()).toHaveCount(0);
 });

@@ -175,6 +175,17 @@ unsettable and unreadable; (6) the lab API user gets the WireGuard config privil
 may create, edit, disable and delete a throwaway peer and tunnel; (8) lists are visible to `admin` and
 `network_admin` only (taken as the recommended default).
 
+### Amendment (2026-11-15): tunnel keys
+
+The lab firewall refuses `addServer` without a private key (`server.privkey: A value is required`),
+so option A does not work as written. The owner chose: **the firewall still generates the key, and
+the backend relays it once.** On create only, the apply step calls the firewall's own `keyPair`
+(`wireguard.tunnels.keypair`, read-only), puts the returned pair into the `addServer` body, and
+discards it. The private key is never accepted from the browser, stored, logged, audited, put in
+`proposed` or `result_snapshot`, or returned. Updates send no key, so existing keys stay. This
+replaces the rule "this app never calls `keyPair`"; `psk` is still never called. A test with a
+sentinel key checks every stored value and response.
+
 ## Build status
 
-Step 2 (peers tab in the VPN page, with tests) is built too. Step 1 (peers backend: registry, normaliser, schema, staging, apply and list endpoints, with tests) is built and not yet lab-verified. Next: the peers frontend, the lab test, then tunnel writes.
+Built and lab-verified (26.7.8_2, 2026-11-15): peers and tunnels (create, edit, toggle, delete), `keyPair`, and `reconfigure` all work through the staged flow. Body root keys are `client` and `server`; toggle uses `/1` and `/0`.

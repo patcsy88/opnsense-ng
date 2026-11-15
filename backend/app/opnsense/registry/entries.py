@@ -49,6 +49,7 @@ WIREGUARD_PEERS_DELETE = "wireguard.peers.delete"
 WIREGUARD_PEERS_ENABLE = "wireguard.peers.enable"
 WIREGUARD_PEERS_DISABLE = "wireguard.peers.disable"
 WIREGUARD_TUNNELS_LIST = "wireguard.tunnels.list"
+WIREGUARD_TUNNELS_KEYPAIR = "wireguard.tunnels.keypair"
 WIREGUARD_TUNNELS_ADD = "wireguard.tunnels.add"
 WIREGUARD_TUNNELS_UPDATE = "wireguard.tunnels.update"
 WIREGUARD_TUNNELS_DELETE = "wireguard.tunnels.delete"
@@ -449,7 +450,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="WireGuard peers (ADR-0019). Keys other than the public key are dropped.",
     ),
     Operation(
@@ -459,7 +460,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Saves a peer, not yet active. Reviewed apply only (ADR-0019).",
     ),
     Operation(
@@ -470,7 +471,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Upsert, so apply confirms it exists first (ADR-0019). Reviewed apply only.",
     ),
     Operation(
@@ -481,7 +482,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Deletes a peer and its links to tunnels. Reviewed apply only (ADR-0019).",
     ),
     Operation(
@@ -492,7 +493,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Enables a peer with an explicit state. Reviewed apply only (ADR-0019).",
     ),
     Operation(
@@ -503,7 +504,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Disables a peer with an explicit state. Reviewed apply only (ADR-0019).",
     ),
     Operation(
@@ -513,8 +514,18 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="WireGuard tunnels (ADR-0019). Private keys are never read into the app.",
+    ),
+    Operation(
+        operation_id=WIREGUARD_TUNNELS_KEYPAIR,
+        method=HttpMethod.GET,
+        endpoint="/api/wireguard/server/keyPair",
+        required_privilege="VPN: WireGuard: Configuration",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=True,
+        notes="Firewall makes a key pair for a new tunnel. Private key is used once, never kept.",
     ),
     Operation(
         operation_id=WIREGUARD_TUNNELS_ADD,
@@ -523,7 +534,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Saves a tunnel, no key sent; the firewall makes one. Reviewed apply (ADR-0019).",
     ),
     Operation(
@@ -534,7 +545,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Upsert, no key sent so keys stay as they are. Reviewed apply (ADR-0019).",
     ),
     Operation(
@@ -545,7 +556,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Deletes a tunnel. Reviewed apply only, always high risk (ADR-0019).",
     ),
     Operation(
@@ -556,7 +567,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Enables a tunnel with an explicit state. Reviewed apply only (ADR-0019).",
     ),
     Operation(
@@ -567,7 +578,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Disables a tunnel with an explicit state. Reviewed apply only (ADR-0019).",
     ),
     Operation(
@@ -577,7 +588,7 @@ _ENTRIES = (
         required_privilege="VPN: WireGuard: Configuration",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
+        verified=True,
         notes="Applies saved WireGuard changes; tunnels may restart. Apply only (ADR-0019).",
     ),
     Operation(

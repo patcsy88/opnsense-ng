@@ -178,11 +178,20 @@ async def test_network_admin_cannot_approve_own_tunnel_request(
     assert (await act(app_client, cid, "approve")).status_code == 403
 
 
-async def test_create_sends_no_key_and_reconfigures(app_client: httpx.AsyncClient) -> None:
+GEN_PRIV = "SENTINEL-GENERATED-PRIVATE-KEY-0000000000000="
+GEN_PUB = "SENTINEL-GENERATED-PUBLIC-KEY-00000000000000="
+
+
+async def test_create_uses_a_firewall_made_key_pair_and_never_keeps_it(
+    app_client: httpx.AsyncClient,
+) -> None:
     fid = await setup(app_client)
     cid = await staged(app_client, fid, [tunnel()], tunnel=tun())
     created = tunnel(uuid=NEW_UUID, name="wg1", port="51821", tunneladdress="10.20.0.1/24")
     with respx.mock() as router:
+        router.get(f"{BASE}/server/keyPair").respond(
+            200, json={"status": "ok", "privkey": GEN_PRIV, "pubkey": GEN_PUB}
+        )
         router.get(TUNNELS).mock(
             side_effect=[
                 httpx.Response(200, json={"rows": [tunnel()]}),
@@ -204,14 +213,41 @@ async def test_create_sends_no_key_and_reconfigures(app_client: httpx.AsyncClien
         "mtu": "",
         "disableroutes": "0",
         "peers": TARGET,
+        "privkey": GEN_PRIV,
+        "pubkey": GEN_PUB,
     }
-    assert "privkey" not in sent["server"] and "pubkey" not in sent["server"]
     assert reconf.call_count == 1
     actions = {a.action for a in db_rows(app_client, select(AuditLog))}
-    assert {"firewall.wireguard.tunnels.add", "firewall.wireguard.reconfigure"} <= actions
+    assert {
+        "firewall.wireguard.tunnels.keypair",
+        "firewall.wireguard.tunnels.add",
+        "firewall.wireguard.reconfigure",
+    } <= actions
     [cr] = db_rows(app_client, select(ChangeRequest))
     assert cr.result_snapshot is not None and cr.result_snapshot["uuid"] == NEW_UUID
-    assert SECRET not in json.dumps(cr.result_snapshot)
+    stored = json.dumps(
+        {
+            "snap": cr.result_snapshot,
+            "proposed": cr.proposed,
+            "base": cr.base_snapshot,
+            "fail": cr.failure_message,
+            "audit": [a.detail for a in db_rows(app_client, select(AuditLog))],
+            "resp": done.json(),
+        },
+        default=str,
+    )
+    assert GEN_PRIV not in stored and SECRET not in stored
+
+
+async def test_create_fails_cleanly_without_a_key_pair(app_client: httpx.AsyncClient) -> None:
+    fid = await setup(app_client)
+    cid = await staged(app_client, fid, [tunnel()], tunnel=tun())
+    with respx.mock(assert_all_called=False) as router:
+        router.get(TUNNELS).respond(200, json={"rows": [tunnel()]})
+        router.get(f"{BASE}/server/keyPair").respond(200, json={"status": "ok"})
+        add = router.post(f"{BASE}/server/addServer")
+        done = await apply(app_client, cid, confirm_name="wg1")
+    assert done.json()["status"] == "failed" and add.call_count == 0
 
 
 async def test_high_risk_apply_needs_the_typed_name(app_client: httpx.AsyncClient) -> None:
@@ -282,6 +318,9 @@ async def test_reconfigure_failure_says_saved_but_not_active(
     cid = await staged(app_client, fid, [tunnel()], tunnel=tun())
     with respx.mock() as router:
         router.get(TUNNELS).respond(200, json={"rows": [tunnel()]})
+        router.get(f"{BASE}/server/keyPair").respond(
+            200, json={"status": "ok", "privkey": GEN_PRIV, "pubkey": GEN_PUB}
+        )
         router.post(f"{BASE}/server/addServer").respond(
             200, json={"result": "saved", "uuid": NEW_UUID}
         )
