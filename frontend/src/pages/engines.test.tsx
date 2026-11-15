@@ -104,7 +104,7 @@ function page(services: unknown[]) {
 
 describe("DHCP and DNS engine tabs", () => {
   it("opens DHCP on the running engine and says what the other is doing", async () => {
-    page([svc("dnsmasq", false), svc("kea-dhcp4", true)]);
+    page([svc("dnsmasq", false), svc("kea-dhcp/v4", true)]);
     renderApp(<App />, "/dhcp");
     expect(
       await screen.findByText("Dnsmasq: stopped · Kea: running"),
@@ -130,9 +130,7 @@ describe("DHCP and DNS engine tabs", () => {
     ).toBeInTheDocument();
     expect(screen.getByRole("tab", { name: "Kea" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Kea" }));
-    expect(
-      await screen.findByText(/Kea is not running/),
-    ).toBeInTheDocument();
+    expect(await screen.findByText(/Kea is not running/)).toBeInTheDocument();
   });
 
   it("offers Unbound and Dnsmasq on DNS, preferring a running Unbound", async () => {
@@ -162,7 +160,7 @@ describe("DHCP and DNS engine tabs", () => {
   });
 
   it("shows Kea leases, reservations and subnets, flagged unverified", async () => {
-    page([svc("kea-dhcp4", true)]);
+    page([svc("kea-dhcp/v4", true)]);
     renderApp(<App />, "/dhcp");
     expect(await screen.findByText("192.168.1.50")).toBeInTheDocument();
     expect(screen.getByText(/unverified/i)).toBeInTheDocument();

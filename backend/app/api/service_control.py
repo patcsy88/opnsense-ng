@@ -44,6 +44,7 @@ HIGH_IMPACT = frozenset(
         "dhcpd",
         "dhcpd6",
         "dhcrelay",
+        "kea-dhcp",
         "kea-dhcp4",
         "kea-dhcp6",
         "radvd",

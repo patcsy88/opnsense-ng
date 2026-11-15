@@ -24,4 +24,4 @@ cd "$root/frontend"
 E2E_BASE_URL="${E2E_BASE_URL:-https://localhost}" \
   E2E_LAB_USER="$user" E2E_LAB_PASSWORD="$password" \
   E2E_LAB_FIREWALL="${E2E_LAB_FIREWALL:-OPNsense.test}" \
-  npx playwright test -c playwright.live.config.ts lab-hosts "$@"
+  npx playwright test -c playwright.live.config.ts "${LAB_SPEC:-lab-hosts}" "$@"

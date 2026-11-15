@@ -33,7 +33,7 @@ export function useEngines(firewallId: string | null): Engines {
   return {
     dnsmasq: state(list, "dnsmasq"),
     unbound: state(list, "unbound"),
-    kea: state(list, "kea-dhcp4", "kea-dhcp6"),
+    kea: state(list, "kea-dhcp/v4", "kea-dhcp4"),
     loading: q.isPending && firewallId !== null,
   };
 }
