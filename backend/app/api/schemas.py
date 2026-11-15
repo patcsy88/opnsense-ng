@@ -9,6 +9,9 @@ from app.opnsense.netpolicy import InvalidBaseUrlError, parse_base_url
 from app.opnsense.normalise import (
     AliasInfo,
     InterfaceInfo,
+    KeaLease,
+    KeaReservation,
+    KeaSubnet,
     LeaseInfo,
     LogEntry,
     LogSummary,
@@ -154,6 +157,27 @@ class WireguardOut(BaseModel):
 class LeasesOut(BaseModel):
     firewall_id: uuid.UUID
     leases: list[LeaseInfo]
+    truncated: bool
+    registry_verified: bool
+
+
+class KeaLeasesOut(BaseModel):
+    firewall_id: uuid.UUID
+    leases: list[KeaLease]
+    truncated: bool
+    registry_verified: bool
+
+
+class KeaReservationsOut(BaseModel):
+    firewall_id: uuid.UUID
+    reservations: list[KeaReservation]
+    truncated: bool
+    registry_verified: bool
+
+
+class KeaSubnetsOut(BaseModel):
+    firewall_id: uuid.UUID
+    subnets: list[KeaSubnet]
     truncated: bool
     registry_verified: bool
 

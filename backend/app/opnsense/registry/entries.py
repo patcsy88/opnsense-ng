@@ -41,6 +41,9 @@ SERVICES_START = "services.start"
 SERVICES_STOP = "services.stop"
 SERVICES_RESTART = "services.restart"
 DHCP_LEASES = "dhcp.leases"
+KEA_LEASES = "kea.leases4.list"
+KEA_RESERVATIONS = "kea.reservations4.list"
+KEA_SUBNETS = "kea.subnets4.list"
 WIREGUARD_STATUS = "wireguard.status"
 WIREGUARD_PEERS_LIST = "wireguard.peers.list"
 WIREGUARD_PEERS_ADD = "wireguard.peers.add"
@@ -293,6 +296,36 @@ _ENTRIES = (
         verified=True,
         notes="Dnsmasq DHCP leases (ADR-0008). The privilege also covers Dnsmasq settings "
         "writes; no write operation is registered. Verified on the lab.",
+    ),
+    Operation(
+        operation_id=KEA_LEASES,
+        method=HttpMethod.GET,
+        endpoint="/api/kea/leases4/search",
+        required_privilege="Services: Kea DHCP",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Kea DHCPv4 leases (ADR-0020). Endpoint and privilege name unconfirmed on the lab.",
+    ),
+    Operation(
+        operation_id=KEA_RESERVATIONS,
+        method=HttpMethod.GET,
+        endpoint="/api/kea/dhcpv4/searchReservation",
+        required_privilege="Services: Kea DHCP",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Kea DHCPv4 reservations (ADR-0020). Unconfirmed on the lab.",
+    ),
+    Operation(
+        operation_id=KEA_SUBNETS,
+        method=HttpMethod.GET,
+        endpoint="/api/kea/dhcpv4/searchSubnet",
+        required_privilege="Services: Kea DHCP",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Kea DHCPv4 subnets (ADR-0020). Unconfirmed on the lab.",
     ),
     Operation(
         operation_id=WIREGUARD_STATUS,

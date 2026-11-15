@@ -1,6 +1,6 @@
 # ADR-0020: Kea DHCP leases and reservations
 
-- Status: proposed (needs owner approval before any Kea code)
+- Status: accepted (Phase A only; Phase B needs a separate approval after Phase A is verified)
 - Date: 2026-11-15
 - Deciders: project owner
 
@@ -27,8 +27,10 @@ operation is marked verified**):
 - Registry operations `kea.leases4.list`, `kea.reservations4.list` and `kea.subnets4.list`, all marked
   unverified until confirmed on the lab.
 - Backend endpoints `GET /firewalls/{id}/kea/leases`, `/kea/reservations`, `/kea/subnets`. All roles may
-  read, as for Dnsmasq leases. Responses are normalised in the backend and use the existing
-  `registry_verified` flag.
+  read leases and subnets, as for Dnsmasq leases (admin, network_admin, security_admin; not read_only,
+  since a lease list is a device inventory). Leases never carry MAC addresses or client ids.
+  Reservations do carry MAC addresses, so only admin and network_admin may read them. Responses are
+  normalised in the backend and use the existing `registry_verified` flag.
 - DHCPv4 only. DHCPv6 is out of scope until asked for.
 - Frontend: the Kea tab replaces its placeholder with Leases, Reservations and Subnets. The unverified
   badge shows until the operations are verified.

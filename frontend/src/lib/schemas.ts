@@ -323,6 +323,51 @@ export const leaseSchema = z.object({
 });
 export type LeaseInfo = z.infer<typeof leaseSchema>;
 
+export const keaLeasesResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  leases: z.array(
+    z.object({
+      address: z.string(),
+      hostname: z.string().nullable(),
+      interface: z.string().nullable(),
+      state: z.string().nullable(),
+      expires: z.string().nullable(),
+    }),
+  ),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
+export const keaReservationsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  reservations: z.array(
+    z.object({
+      uuid: z.string(),
+      subnet: z.string().nullable(),
+      ip_address: z.string(),
+      hw_address: z.string().nullable(),
+      hostname: z.string().nullable(),
+      description: z.string().nullable(),
+    }),
+  ),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
+export const keaSubnetsResponseSchema = z.object({
+  firewall_id: z.uuid(),
+  subnets: z.array(
+    z.object({
+      uuid: z.string(),
+      subnet: z.string(),
+      pools: z.array(z.string()),
+      description: z.string().nullable(),
+    }),
+  ),
+  truncated: z.boolean(),
+  registry_verified: z.boolean(),
+});
+
 export const leasesResponseSchema = z.object({
   firewall_id: z.uuid(),
   leases: z.array(leaseSchema),

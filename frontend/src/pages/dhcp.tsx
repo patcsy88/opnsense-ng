@@ -26,10 +26,10 @@ import {
   EngineTabs,
   type EngineTab,
   InactiveNotice,
-  engineLabel,
   firstRunning,
   useEngines,
 } from "@/features/firewall/engines";
+import { KeaTab } from "@/features/firewall/kea-tab";
 import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 
@@ -234,13 +234,10 @@ export function DhcpPage() {
             </>
           )}
           {engine === "kea" && (
-            <Card>
-              <CardContent className="pt-4 text-sm">
-                Kea is {engineLabel[engines.kea]} on this firewall. Viewing and
-                managing Kea leases and reservations is planned and not
-                available yet. Start and stop it under Services.
-              </CardContent>
-            </Card>
+            <>
+              <InactiveNotice name="Kea" state={engines.kea} />
+              <KeaTab firewallId={selected} canManage={canManage} />
+            </>
           )}
         </>
       )}

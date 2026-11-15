@@ -30,6 +30,9 @@ import {
   auditPageSchema,
   auditPurgeSchema,
   dnsResponseSchema,
+  keaLeasesResponseSchema,
+  keaReservationsResponseSchema,
+  keaSubnetsResponseSchema,
   leasesResponseSchema,
   wireguardResponseSchema,
   servicesResponseSchema,
@@ -348,6 +351,18 @@ export const api = {
   dhcpLeases: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dhcp/leases`, {
       schema: leasesResponseSchema,
+    }),
+  keaLeases: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/kea/leases`, {
+      schema: keaLeasesResponseSchema,
+    }),
+  keaReservations: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/kea/reservations`, {
+      schema: keaReservationsResponseSchema,
+    }),
+  keaSubnets: (id: string) =>
+    request("GET", `${base}/firewalls/${encodeURIComponent(id)}/kea/subnets`, {
+      schema: keaSubnetsResponseSchema,
     }),
   services: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/services`, {

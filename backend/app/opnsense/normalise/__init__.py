@@ -9,6 +9,17 @@ from app.opnsense.normalise.dnsmasq import (
     normalise_hosts,
 )
 from app.opnsense.normalise.interfaces import InterfaceInfo, normalise_interfaces
+from app.opnsense.normalise.kea import (
+    KeaLease,
+    KeaLeasesResult,
+    KeaReservation,
+    KeaReservationsResult,
+    KeaSubnet,
+    KeaSubnetsResult,
+    normalise_kea_leases,
+    normalise_kea_reservations,
+    normalise_kea_subnets,
+)
 from app.opnsense.normalise.leases import LeaseInfo, LeasesResult, normalise_leases
 from app.opnsense.normalise.logs import (
     LogEntry,
@@ -47,6 +58,12 @@ __all__ = [
     "HostInfo",
     "HostsResult",
     "InterfaceInfo",
+    "KeaLease",
+    "KeaLeasesResult",
+    "KeaReservation",
+    "KeaReservationsResult",
+    "KeaSubnet",
+    "KeaSubnetsResult",
     "LeaseInfo",
     "LeasesResult",
     "LogEntry",
@@ -76,6 +93,9 @@ __all__ = [
     "normalise_domains",
     "normalise_hosts",
     "normalise_interfaces",
+    "normalise_kea_leases",
+    "normalise_kea_reservations",
+    "normalise_kea_subnets",
     "normalise_leases",
     "normalise_log",
     "normalise_nat",

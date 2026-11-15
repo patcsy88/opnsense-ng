@@ -51,6 +51,54 @@ function page(services: unknown[]) {
       }),
     ),
     http.get("/api/v1/changes", () => HttpResponse.json([])),
+    http.get(`/api/v1/firewalls/${FW.id}/kea/leases`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        leases: [
+          {
+            address: "192.168.1.50",
+            hostname: "laptop",
+            interface: null,
+            state: null,
+            expires: null,
+          },
+        ],
+        truncated: false,
+        registry_verified: false,
+      }),
+    ),
+    http.get(`/api/v1/firewalls/${FW.id}/kea/reservations`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        reservations: [
+          {
+            uuid: "u1",
+            subnet: null,
+            ip_address: "192.168.1.10",
+            hw_address: "aa:bb:cc:dd:ee:01",
+            hostname: "printer",
+            description: null,
+          },
+        ],
+        truncated: false,
+        registry_verified: false,
+      }),
+    ),
+    http.get(`/api/v1/firewalls/${FW.id}/kea/subnets`, () =>
+      HttpResponse.json({
+        firewall_id: FW.id,
+        subnets: [
+          {
+            uuid: "s1",
+            subnet: "192.168.1.0/24",
+            pools: ["192.168.1.100-192.168.1.200"],
+            description: null,
+          },
+        ],
+        truncated: false,
+        registry_verified: false,
+      }),
+    ),
   );
 }
 
@@ -66,7 +114,7 @@ describe("DHCP and DNS engine tabs", () => {
       "true",
     );
     expect(
-      screen.getByText(/Viewing and managing Kea.*not available yet/),
+      await screen.findByRole("tab", { name: "Reservations" }),
     ).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Dnsmasq" }));
     expect(
@@ -83,9 +131,7 @@ describe("DHCP and DNS engine tabs", () => {
     expect(screen.getByRole("tab", { name: "Kea" })).toBeInTheDocument();
     fireEvent.click(screen.getByRole("tab", { name: "Kea" }));
     expect(
-      await screen.findByText(
-        /Kea is not running on this firewall/,
-      ),
+      await screen.findByText(/Kea is not running/),
     ).toBeInTheDocument();
   });
 
@@ -113,5 +159,16 @@ describe("DHCP and DNS engine tabs", () => {
     expect(
       await screen.findByText(/Unbound is stopped on this firewall/),
     ).toBeInTheDocument();
+  });
+
+  it("shows Kea leases, reservations and subnets, flagged unverified", async () => {
+    page([svc("kea-dhcp4", true)]);
+    renderApp(<App />, "/dhcp");
+    expect(await screen.findByText("192.168.1.50")).toBeInTheDocument();
+    expect(screen.getByText(/unverified/i)).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Reservations" }));
+    expect(await screen.findByText("aa:bb:cc:dd:ee:01")).toBeInTheDocument();
+    fireEvent.click(screen.getByRole("tab", { name: "Subnets" }));
+    expect(await screen.findByText("192.168.1.0/24")).toBeInTheDocument();
   });
 });

@@ -18,6 +18,9 @@ from app.api.schemas import (
     FirewallOut,
     FirewallUpdate,
     InterfacesOut,
+    KeaLeasesOut,
+    KeaReservationsOut,
+    KeaSubnetsOut,
     LeasesOut,
     LogsNewOut,
     LogsOut,
@@ -45,6 +48,9 @@ from app.opnsense.normalise import (
     normalise_cpu_events,
     normalise_dns,
     normalise_interfaces,
+    normalise_kea_leases,
+    normalise_kea_reservations,
+    normalise_kea_subnets,
     normalise_leases,
     normalise_log,
     normalise_nat,
@@ -70,6 +76,9 @@ from app.opnsense.registry.entries import (
     FIREWALL_NAT_PORT_FORWARDS,
     FIREWALL_RULES_LIST,
     INTERFACES_OVERVIEW,
+    KEA_LEASES,
+    KEA_RESERVATIONS,
+    KEA_SUBNETS,
     SERVICES_LIST,
     SYSTEM_DISK,
     SYSTEM_RESOURCES,
@@ -870,6 +879,93 @@ def dhcp_leases(
         leases=result.leases,
         truncated=result.truncated,
         registry_verified=get_operation(DHCP_LEASES).verified,
+    )
+
+
+@router.get("/{firewall_id}/kea/leases", response_model=KeaLeasesOut)
+def kea_leases(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> KeaLeasesOut:
+    """Kea DHCPv4 leases without MAC addresses (ADR-0020)."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=KEA_LEASES,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_kea_leases(raw)
+    return KeaLeasesOut(
+        firewall_id=firewall_id,
+        leases=result.leases,
+        truncated=result.truncated,
+        registry_verified=get_operation(KEA_LEASES).verified,
+    )
+
+
+@router.get("/{firewall_id}/kea/reservations", response_model=KeaReservationsOut)
+def kea_reservations(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(Role.admin, Role.network_admin)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> KeaReservationsOut:
+    """Kea DHCPv4 reservations. They carry MAC addresses, so managers only (ADR-0020)."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=KEA_RESERVATIONS,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_kea_reservations(raw)
+    return KeaReservationsOut(
+        firewall_id=firewall_id,
+        reservations=result.reservations,
+        truncated=result.truncated,
+        registry_verified=get_operation(KEA_RESERVATIONS).verified,
+    )
+
+
+@router.get("/{firewall_id}/kea/subnets", response_model=KeaSubnetsOut)
+def kea_subnets(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(*LOG_ROLES)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> KeaSubnetsOut:
+    """Kea DHCPv4 subnets (ADR-0020)."""
+    try:
+        raw = _run_operation(
+            firewall_id=firewall_id,
+            operation_id=KEA_SUBNETS,
+            user=user,
+            db=db,
+            settings=settings,
+            request=request,
+        )
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    result = normalise_kea_subnets(raw)
+    return KeaSubnetsOut(
+        firewall_id=firewall_id,
+        subnets=result.subnets,
+        truncated=result.truncated,
+        registry_verified=get_operation(KEA_SUBNETS).verified,
     )
 
 
