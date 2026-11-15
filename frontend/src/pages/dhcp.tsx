@@ -8,6 +8,7 @@ import { Input } from "@/components/ui/input";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 
 function expiry(value: string | null): string {
@@ -18,11 +19,8 @@ function expiry(value: string | null): string {
 
 export function DhcpPage() {
   const { hasRole } = useAuth();
-  const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
-  const [chosen, setChosen] = useState<string | null>(null);
+  const { options, firewalls, selected } = useSelectedFirewall();
   const [text, setText] = useState("");
-  const firewalls = options.data ?? [];
-  const selected = chosen ?? firewalls[0]?.id ?? null;
 
   const q = useQuery({
     queryKey: ["firewalls", selected, "dhcp-leases"],
@@ -53,22 +51,6 @@ export function DhcpPage() {
           <Link className="text-sm text-primary underline" to="/dhcp/entries">
             Manage static hosts
           </Link>
-        )}
-        {firewalls.length > 0 && (
-          <label className="flex items-center gap-2 text-sm">
-            Firewall
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
-              value={selected ?? ""}
-              onChange={(e) => setChosen(e.target.value)}
-            >
-              {firewalls.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
         )}
       </div>
 

@@ -32,6 +32,7 @@ import {
 import { ChangeStatusBadge } from "@/features/changes/status";
 import { DomainOverrides } from "@/features/changes/domain-overrides";
 import { HostForm, toHostProposal } from "@/features/changes/host-form";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { DnsmasqHost, HostProposalInput } from "@/lib/schemas";
@@ -41,19 +42,13 @@ const OPEN = new Set(["draft", "validated", "in_review", "approved"]);
 export function DnsEntriesPage() {
   const navigate = useNavigate();
   const qc = useQueryClient();
-  const options = useQuery({
-    queryKey: ["firewalls", "options"],
-    queryFn: api.listFirewallOptions,
-  });
-  const [chosen, setChosen] = useState<string | null>(null);
+  const { options, selected } = useSelectedFirewall();
   const [tab, setTab] = useState<"hosts" | "domains">("hosts");
   const [creating, setCreating] = useState(false);
   const [editing, setEditing] = useState<DnsmasqHost | null>(null);
   const [deleting, setDeleting] = useState<DnsmasqHost | null>(null);
   const [pending, setPending] = useState(false);
   const [changeError, setChangeError] = useState<string | null>(null);
-  const firewalls = options.data ?? [];
-  const selected = chosen ?? firewalls[0]?.id ?? null;
 
   const q = useQuery({
     queryKey: ["firewalls", selected, "dnsmasq-hosts"],
@@ -98,22 +93,6 @@ export function DnsEntriesPage() {
       </p>
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">DNS and DHCP entries</h1>
-        {firewalls.length > 0 && (
-          <label className="flex items-center gap-2 text-sm">
-            Firewall
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
-              value={selected ?? ""}
-              onChange={(e) => setChosen(e.target.value)}
-            >
-              {firewalls.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       {options.isError && (

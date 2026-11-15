@@ -4,6 +4,7 @@ import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/error-state";
 import { Card, CardContent } from "@/components/ui/card";
 import { useAuth } from "@/features/auth/auth";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 
 const INTERVALS = [
@@ -15,6 +16,7 @@ const INTERVALS = [
 const pct = (v: number | null) => (v === null ? "–" : `${v.toFixed(0)}%`);
 
 export function OverviewPage() {
+  const { select } = useSelectedFirewall();
   const { hasRole } = useAuth();
   const admin = hasRole("admin");
   const [pollMs, setPollMs] = useState<number>(60_000); // in memory only
@@ -99,6 +101,7 @@ export function OverviewPage() {
                       <Link
                         className="text-primary underline"
                         to={`/?fw=${f.id}`}
+                        onClick={() => select(f.id)}
                       >
                         {f.name}
                       </Link>

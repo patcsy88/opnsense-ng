@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Input } from "@/components/ui/input";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import type { LogEntry, LogSummary } from "@/lib/schemas";
 
@@ -92,13 +93,10 @@ function SummaryCard({ summary, geoip }: { summary: LogSummary; geoip: boolean }
 }
 
 export function LogsPage() {
-  const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
-  const [chosen, setChosen] = useState<string | null>(null);
+  const { options, firewalls, selected } = useSelectedFirewall();
   const [action, setAction] = useState<(typeof ACTIONS)[number]>("all");
   const [text, setText] = useState("");
   const [liveFor, setLiveFor] = useState<string | null>(null);
-  const firewalls = options.data ?? [];
-  const selected = chosen ?? firewalls[0]?.id ?? null;
 
   const [extra, setExtra] = useState<LogEntry[]>([]);
   const [liveError, setLiveError] = useState(false);
@@ -152,22 +150,6 @@ export function LogsPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Logs</h1>
-        {firewalls.length > 0 && (
-          <label className="flex items-center gap-2 text-sm">
-            Firewall
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
-              value={selected ?? ""}
-              onChange={(e) => setChosen(e.target.value)}
-            >
-              {firewalls.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       {options.isError && <ErrorState error={options.error} onRetry={() => void options.refetch()} />}

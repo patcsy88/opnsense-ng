@@ -23,6 +23,7 @@ import {
 import { useAuth } from "@/features/auth/auth";
 import { WireguardPeers } from "@/features/changes/wireguard-peers";
 import { WireguardTunnels } from "@/features/changes/wireguard-tunnels";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import type { WireguardRecord } from "@/lib/schemas";
 
@@ -51,17 +52,11 @@ function statusVariant(status: string | null) {
 }
 
 export function VpnPage() {
-  const options = useQuery({
-    queryKey: ["firewalls", "options"],
-    queryFn: api.listFirewallOptions,
-  });
+  const { options, firewalls, selected } = useSelectedFirewall();
   const { hasRole } = useAuth();
   const canManage = hasRole("admin") || hasRole("network_admin");
   const [tab, setTab] = useState<"status" | "peers" | "tunnels">("status");
-  const [chosen, setChosen] = useState<string | null>(null);
   const [text, setText] = useState("");
-  const firewalls = options.data ?? [];
-  const selected = chosen ?? firewalls[0]?.id ?? null;
 
   const q = useQuery({
     queryKey: ["firewalls", selected, "wireguard"],
@@ -101,22 +96,6 @@ export function VpnPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">VPN</h1>
-        {firewalls.length > 0 && (
-          <label className="flex items-center gap-2 text-sm">
-            Firewall
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
-              value={selected ?? ""}
-              onChange={(e) => setChosen(e.target.value)}
-            >
-              {firewalls.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       {options.isError && (

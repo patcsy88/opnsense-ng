@@ -11,6 +11,7 @@ import { useAuth } from "@/features/auth/auth";
 import { AliasForm } from "@/features/changes/alias-form";
 import { RuleForm } from "@/features/changes/rule-form";
 import { ChangeStatusBadge, describeChange, statusLabel } from "@/features/changes/status";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import { CHANGE_STATUSES, type AliasProposalInput, type RuleProposalInput } from "@/lib/schemas";
@@ -20,15 +21,12 @@ export function ChangesPage() {
   const canManage = hasRole("admin", "network_admin");
   const qc = useQueryClient();
   const navigate = useNavigate();
-  const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
-  const [chosen, setChosen] = useState<string | null>(null);
+  const { options, firewalls, selected } = useSelectedFirewall();
   const [status, setStatus] = useState("");
   const [creating, setCreating] = useState<"alias" | "rule" | null>(null);
   const [saving, setSaving] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
-  const firewalls = options.data ?? [];
-  const selected = chosen ?? firewalls[0]?.id ?? null;
   const names = new Map(firewalls.map((f) => [f.id, f.name]));
 
   const list = useQuery({
@@ -66,22 +64,6 @@ export function ChangesPage() {
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Changes</h1>
         <div className="flex flex-wrap items-center gap-3">
-          {firewalls.length > 0 && (
-            <label className="flex items-center gap-2 text-sm">
-              Firewall
-              <select
-                className="h-9 rounded-md border border-border bg-card px-2"
-                value={selected ?? ""}
-                onChange={(e) => setChosen(e.target.value)}
-              >
-                {firewalls.map((f) => (
-                  <option key={f.id} value={f.id}>
-                    {f.name}
-                  </option>
-                ))}
-              </select>
-            </label>
-          )}
           <label className="flex items-center gap-2 text-sm">
             Status
             <select

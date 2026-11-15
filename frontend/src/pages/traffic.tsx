@@ -6,18 +6,19 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addSample, formatRate, type History } from "@/features/traffic/rates";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 
 const POLL_MS = 5_000;
 
 export function TrafficPage() {
-  const options = useQuery({ queryKey: ["firewalls", "options"], queryFn: api.listFirewallOptions });
-  const [chosen, setChosen] = useState<string | null>(null);
-  const firewalls = options.data ?? [];
-  const selected = chosen ?? firewalls[0]?.id ?? null;
+  const { options, firewalls, selected } = useSelectedFirewall();
   const [visible, setVisible] = useState(() => document.visibilityState !== "hidden");
   const [history, setHistory] = useState<{ firewall: string | null; data: History }>({ firewall: null, data: {} });
   const origin = useRef<number | null>(null);
+  useEffect(() => {
+    origin.current = null;
+  }, [selected]);
 
   useEffect(() => {
     const onChange = () => setVisible(document.visibilityState !== "hidden");
@@ -50,25 +51,6 @@ export function TrafficPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Traffic</h1>
-        {firewalls.length > 0 && (
-          <label className="flex items-center gap-2 text-sm">
-            Firewall
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
-              value={selected ?? ""}
-              onChange={(e) => {
-                origin.current = null;
-                setChosen(e.target.value);
-              }}
-            >
-              {firewalls.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       {options.isError && <ErrorState error={options.error} onRetry={() => void options.refetch()} />}

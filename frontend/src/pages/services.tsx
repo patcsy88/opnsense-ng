@@ -22,6 +22,7 @@ import {
   TableRow,
 } from "@/components/ui/table";
 import { useAuth } from "@/features/auth/auth";
+import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import { describeError } from "@/lib/errors";
 import type { ServiceInfo } from "@/lib/schemas";
@@ -61,14 +62,8 @@ export function ServicesPage() {
   const [outcome, setOutcome] = useState<{ ok: boolean; text: string } | null>(
     null,
   );
-  const options = useQuery({
-    queryKey: ["firewalls", "options"],
-    queryFn: api.listFirewallOptions,
-  });
-  const [chosen, setChosen] = useState<string | null>(null);
+  const { options, firewalls, selected } = useSelectedFirewall();
   const [text, setText] = useState("");
-  const firewalls = options.data ?? [];
-  const selected = chosen ?? firewalls[0]?.id ?? null;
 
   const q = useQuery({
     queryKey: ["firewalls", selected, "services"],
@@ -118,22 +113,6 @@ export function ServicesPage() {
     <div className="space-y-4">
       <div className="flex flex-wrap items-center justify-between gap-3">
         <h1 className="text-2xl font-semibold">Services</h1>
-        {firewalls.length > 0 && (
-          <label className="flex items-center gap-2 text-sm">
-            Firewall
-            <select
-              className="h-9 rounded-md border border-border bg-card px-2"
-              value={selected ?? ""}
-              onChange={(e) => setChosen(e.target.value)}
-            >
-              {firewalls.map((f) => (
-                <option key={f.id} value={f.id}>
-                  {f.name}
-                </option>
-              ))}
-            </select>
-          </label>
-        )}
       </div>
 
       {options.isError && (

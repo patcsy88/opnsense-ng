@@ -1,6 +1,6 @@
 import { LogOut, LogOutIcon, Menu, UserRound } from "lucide-react";
 import { useState } from "react";
-import { Link, NavLink, Outlet, useNavigate } from "react-router-dom";
+import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import {
@@ -13,6 +13,7 @@ import {
 } from "@/components/ui/dropdown-menu";
 import { Sheet, SheetClose, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/features/auth/auth";
+import { FirewallPicker, SelectedFirewallProvider } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 import { cn } from "@/lib/utils";
 import { NAV_ITEMS } from "./nav";
@@ -86,9 +87,18 @@ function UserMenu() {
   );
 }
 
+/** Pages with no single-firewall scope keep the picker out of the bar. */
+function showsPicker(path: string): boolean {
+  if (path === "/overview" || path === "/account") return false;
+  if (path.startsWith("/administration")) return path.startsWith("/administration/changes");
+  return true;
+}
+
 export function AppLayout() {
   const [open, setOpen] = useState(false);
+  const { pathname } = useLocation();
   return (
+    <SelectedFirewallProvider>
     <div className="min-h-screen md:flex">
       <aside className="hidden w-60 shrink-0 border-r border-border bg-card p-4 md:block">
         <div className="mb-6 px-3 text-sm font-semibold">OPNsense Manager</div>
@@ -114,6 +124,7 @@ export function AppLayout() {
           </Sheet>
           <div className="flex-1 text-sm font-semibold md:hidden">OPNsense Manager</div>
           <div className="ml-auto flex items-center gap-1">
+            {showsPicker(pathname) && <FirewallPicker />}
             <ThemeToggle />
             <UserMenu />
           </div>
@@ -143,5 +154,6 @@ export function AppLayout() {
         </nav>
       </div>
     </div>
+    </SelectedFirewallProvider>
   );
 }
