@@ -16,6 +16,7 @@ from app.db.models import Firewall, Role
 from app.opnsense.errors import FirewallError
 from app.opnsense.normalise.dnsmasq import DomainInfo, HostInfo
 from app.opnsense.normalise.unbound import UnboundForwardInfo, UnboundHostInfo
+from app.opnsense.normalise.wireguard_config import WireguardPeerInfo, WireguardTunnelInfo
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["dnsmasq"])
 
@@ -155,4 +156,74 @@ def list_unbound_forwards(
         firewall_id=firewall_id,
         forwards=forwards,
         registry_verified=get_operation(UNBOUND_FORWARDS_LIST).verified,
+    )
+
+
+class WireguardPeersOut(BaseModel):
+    firewall_id: uuid.UUID
+    peers: list[WireguardPeerInfo]
+    registry_verified: bool
+
+
+@router.get("/{firewall_id}/wireguard/peers", response_model=WireguardPeersOut)
+def list_wireguard_peers(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(Role.admin, Role.network_admin)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> WireguardPeersOut:
+    """WireGuard peers (ADR-0019). Public keys only; admin and network_admin."""
+    from app.opnsense.registry.entries import WIREGUARD_PEERS_LIST, get_operation
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Firewall not found")
+    try:
+        peers = apply_changes.read_wireguard_peers(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except CredentialDecryptionError:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error") from None
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    return WireguardPeersOut(
+        firewall_id=firewall_id,
+        peers=peers,
+        registry_verified=get_operation(WIREGUARD_PEERS_LIST).verified,
+    )
+
+
+class WireguardTunnelsOut(BaseModel):
+    firewall_id: uuid.UUID
+    tunnels: list[WireguardTunnelInfo]
+    registry_verified: bool
+
+
+@router.get("/{firewall_id}/wireguard/tunnels", response_model=WireguardTunnelsOut)
+def list_wireguard_tunnels(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser = Depends(require_roles(Role.admin, Role.network_admin)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> WireguardTunnelsOut:
+    """WireGuard tunnels (ADR-0019). Public keys only; admin and network_admin."""
+    from app.opnsense.registry.entries import WIREGUARD_TUNNELS_LIST, get_operation
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise HTTPException(status.HTTP_404_NOT_FOUND, "Firewall not found")
+    try:
+        tunnels = apply_changes.read_wireguard_tunnels(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+    except CredentialDecryptionError:
+        raise HTTPException(status.HTTP_500_INTERNAL_SERVER_ERROR, "Internal error") from None
+    except FirewallError as exc:
+        raise _log_error(exc, user) from None
+    return WireguardTunnelsOut(
+        firewall_id=firewall_id,
+        tunnels=tunnels,
+        registry_verified=get_operation(WIREGUARD_TUNNELS_LIST).verified,
     )

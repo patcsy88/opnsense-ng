@@ -177,4 +177,4 @@ may create, edit, disable and delete a throwaway peer and tunnel; (8) lists are 
 
 ## Build status
 
-Not started. Peers first, then tunnels.
+Step 1 (peers backend: registry, normaliser, schema, staging, apply and list endpoints, with tests) is built and not yet lab-verified. Next: the peers frontend, the lab test, then tunnel writes.

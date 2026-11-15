@@ -30,6 +30,7 @@ from app.changes.forward_schemas import ForwardProposal
 from app.changes.rule_schemas import RuleProposal
 from app.changes.states import Status
 from app.changes.unbound_schemas import unbound_host_key
+from app.changes.wireguard_schemas import peer_conflict
 from app.core.config import Settings
 from app.core.crypto import CredentialDecryptionError
 from app.core.logging import get_logger
@@ -50,6 +51,12 @@ from app.opnsense.normalise.unbound import (
     UnboundHostInfo,
     normalise_unbound_forwards,
     normalise_unbound_hosts,
+)
+from app.opnsense.normalise.wireguard_config import (
+    WireguardPeerInfo,
+    WireguardTunnelInfo,
+    normalise_wireguard_peers,
+    normalise_wireguard_tunnels,
 )
 from app.opnsense.registry.entries import (
     DNSMASQ_DOMAINS_ADD,
@@ -92,6 +99,14 @@ from app.opnsense.registry.entries import (
     UNBOUND_HOSTS_LIST,
     UNBOUND_HOSTS_UPDATE,
     UNBOUND_RECONFIGURE,
+    WIREGUARD_PEERS_ADD,
+    WIREGUARD_PEERS_DELETE,
+    WIREGUARD_PEERS_DISABLE,
+    WIREGUARD_PEERS_ENABLE,
+    WIREGUARD_PEERS_LIST,
+    WIREGUARD_PEERS_UPDATE,
+    WIREGUARD_RECONFIGURE,
+    WIREGUARD_TUNNELS_LIST,
 )
 
 log = get_logger("changes.apply")
@@ -178,6 +193,8 @@ def begin_apply(
             "dnsmasq_domain": "description",
             "unbound_host": "description",
             "unbound_forward": "description",
+            "wireguard_peer": "peer name",
+            "wireguard_tunnel": "tunnel name",
         }.get(kind, "rule label")
         raise ApplyRefused(f"Type the {what} to confirm this high-risk change")
     fw = db.get(Firewall, cr.firewall_id)
@@ -1020,6 +1037,7 @@ class ResolverSpec:
     reconfigure_op: str = DNSMASQ_RECONFIGURE
     toggle_on: str | None = None
     toggle_off: str | None = None
+    ok_key: str = "status"
 
 
 HOST_SPEC = ResolverSpec(
@@ -1204,6 +1222,95 @@ def apply_unbound_forward_change(
     )
 
 
+def read_wireguard_peers(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[WireguardPeerInfo]:
+    """Read-only: the WireGuard peers currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, WIREGUARD_PEERS_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_wireguard_peers(raw).peers)
+
+
+def read_wireguard_tunnels(
+    db: Session,
+    *,
+    firewall: Firewall,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+) -> list[WireguardTunnelInfo]:
+    """Read-only: the WireGuard tunnels currently on the firewall. Raises FirewallError."""
+    from app.api.firewalls import open_client  # local: avoids an import cycle with the router
+
+    client = open_client(firewall, settings)
+    try:
+        raw = _call(db, client, WIREGUARD_TUNNELS_LIST, None, user, firewall.id, request)
+    finally:
+        anyio.from_thread.run(client.aclose)
+    return list(normalise_wireguard_tunnels(raw).tunnels)
+
+
+def wireguard_peer_payload(proposed: dict[str, Any]) -> dict[str, Any]:
+    """Body for addClient/setClient. No private or preshared key is ever sent; on update the
+    preshared key therefore stays as it is on the firewall."""
+    port = proposed.get("serverport")
+    keepalive = proposed.get("keepalive")
+    return {
+        "client": {
+            "enabled": "1" if proposed.get("enabled", True) else "0",
+            "name": proposed["name"],
+            "pubkey": proposed["pubkey"],
+            "tunneladdress": ",".join(proposed["tunneladdress"]),
+            "servers": ",".join(proposed["servers"]),
+            "serveraddress": proposed.get("serveraddress") or "",
+            "serverport": str(port) if port is not None else "",
+            "keepalive": str(keepalive) if keepalive is not None else "",
+        }
+    }
+
+
+WIREGUARD_PEER_SPEC = ResolverSpec(
+    kind="wireguard_peer",
+    noun="peer",
+    list_op=WIREGUARD_PEERS_LIST,
+    add_op=WIREGUARD_PEERS_ADD,
+    update_op=WIREGUARD_PEERS_UPDATE,
+    delete_op=WIREGUARD_PEERS_DELETE,
+    normalise=lambda raw: list(normalise_wireguard_peers(raw).peers),
+    conflict=peer_conflict,
+    payload=wireguard_peer_payload,
+    same=lambda p, prop: p.pubkey == prop.get("pubkey"),
+    reconfigure_op=WIREGUARD_RECONFIGURE,
+    toggle_on=WIREGUARD_PEERS_ENABLE,
+    toggle_off=WIREGUARD_PEERS_DISABLE,
+    ok_key="result",
+)
+
+
+def apply_wireguard_peer_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    return _apply_resolver(
+        WIREGUARD_PEER_SPEC, db, change_id, user, settings, request, confirm_name
+    )
+
+
 def apply_host_change(
     db: Session,
     *,
@@ -1346,7 +1453,7 @@ def _apply_resolver(
                 request,
                 f"The change is saved on the firewall but NOT active: {exc.message}",
             )
-        status_text = result.get("status") if isinstance(result, dict) else None
+        status_text = result.get(spec.ok_key) if isinstance(result, dict) else None
         if not isinstance(status_text, str) or status_text.strip().lower() != "ok":
             return _finish(
                 db,

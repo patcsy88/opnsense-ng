@@ -28,6 +28,8 @@ KINDS = frozenset(
         "dnsmasq_domain",
         "unbound_host",
         "unbound_forward",
+        "wireguard_peer",
+        "wireguard_tunnel",
     }
 )
 ACTIONS = frozenset({"create", "update", "delete", "toggle"})

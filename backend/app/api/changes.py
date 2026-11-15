@@ -25,6 +25,11 @@ from app.changes.unbound_schemas import (
     UnboundHostProposal,
     inside_forward,
 )
+from app.changes.wireguard_schemas import (
+    WireguardPeerProposal,
+    outside_tunnels,
+    peer_conflict,
+)
 from app.core.config import Settings, get_settings
 from app.core.crypto import CredentialDecryptionError
 from app.db.models import ChangeRequest, Firewall, Role
@@ -1184,6 +1189,7 @@ def apply_change(
             "dnsmasq_domain": apply_changes.apply_domain_change,
             "unbound_host": apply_changes.apply_unbound_host_change,
             "unbound_forward": apply_changes.apply_unbound_forward_change,
+            "wireguard_peer": apply_changes.apply_wireguard_peer_change,
         }.get(cr.kind, apply_changes.apply_alias_change)
         cr = run(
             db,
@@ -2008,5 +2014,225 @@ def stage_unbound_forward_delete(
 ) -> ChangeDetailOut:
     """Stage deleting an Unbound domain forward."""
     return _stage_unbound_forward(
+        request, body.firewall_id, user, db, settings, action="delete", target=target
+    )
+
+
+class WireguardPeerCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    peer: WireguardPeerProposal
+
+
+def _peer_label(p: Any) -> str:
+    return (p.name or str(p.uuid)[:8])[:64]
+
+
+def _stage_wireguard_peer(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+    *,
+    action: str,
+    target: str | None,
+    proposal: WireguardPeerProposal | None = None,
+    enabled: bool | None = None,
+) -> ChangeDetailOut:
+    """Shared staging for create, update, toggle and delete of a WireGuard peer (ADR-0019).
+    Reads only; nothing is written. Creating or enabling a peer is normal risk; deleting,
+    disabling, or changing its key, address or tunnels is high risk."""
+    audit_action = f"change.stage_wireguard_peer_{action}"
+    if target is not None and not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid peer id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_wireguard_peers(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+        tunnels = (
+            apply_changes.read_wireguard_tunnels(
+                db, firewall=fw, user=user, settings=settings, request=request
+            )
+            if proposal is not None
+            else []
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the WireGuard configuration from the firewall") from None
+
+    current = next((p for p in rows if p.uuid == target), None) if target else None
+    if target is not None and current is None:
+        raise refuse("That peer was not found on the firewall")
+
+    proposed: dict[str, Any]
+    reasons: list[str]
+    if proposal is not None:
+        known = {t.uuid for t in tunnels}
+        if not set(proposal.servers) <= known:
+            raise refuse("One of the chosen tunnels does not exist on the firewall")
+        misfit = outside_tunnels(proposal.tunneladdress, tunnels, proposal.servers)
+        if misfit:
+            raise refuse(misfit)
+        clash = peer_conflict(proposal.model_dump(), rows, target)
+        if clash:
+            raise refuse(clash)
+        reasons = proposal.risk_changes(current)
+        if current is not None and current.enabled and not proposal.enabled:
+            reasons.append("disables the peer, which cuts its access")
+        proposed = {**proposal.model_dump(), "label": proposal.name, "risk": reasons}
+        if action == "update" and current is not None:
+            proposed["label"] = _peer_label(current)
+    elif action == "toggle" and current is not None and enabled is not None:
+        if current.enabled == enabled:
+            raise refuse("The peer is already " + ("enabled" if enabled else "disabled"))
+        reasons = [] if enabled else ["disables the peer, which cuts its access"]
+        proposed = {
+            "label": _peer_label(current),
+            "enabled": enabled,
+            "name": current.name,
+            "risk": reasons,
+        }
+    elif action == "delete" and current is not None:
+        reasons = ["deletes the peer, which removes its access and its tunnel links"]
+        proposed = {"label": _peer_label(current), "name": current.name, "risk": reasons}
+    else:
+        raise refuse("Unsupported request")
+
+    if action == "create":
+        same = ChangeRequest.proposed["name"].astext == proposed["name"]
+    else:
+        same = ChangeRequest.target_uuid == target
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "wireguard_peer",
+            ChangeRequest.status.in_(OPEN_STATES),
+            same,
+            *([ChangeRequest.action == "create"] if action == "create" else []),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already changes this peer", duplicate)
+
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="wireguard_peer",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump() if current is not None else None,
+            high_risk=bool(reasons) or action == "delete",
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post("/wireguard-peers", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_peer_create(
+    request: Request,
+    body: WireguardPeerCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new WireGuard peer. Only a public key is accepted."""
+    return _stage_wireguard_peer(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="create",
+        target=None,
+        proposal=body.peer,
+    )
+
+
+@router.post("/wireguard-peers/{target}/update", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_peer_update(
+    request: Request,
+    target: str,
+    body: WireguardPeerCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing a WireGuard peer."""
+    return _stage_wireguard_peer(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="update",
+        target=target,
+        proposal=body.peer,
+    )
+
+
+@router.post("/wireguard-peers/{target}/toggle", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_peer_toggle(
+    request: Request,
+    target: str,
+    body: ForwardToggleCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage enabling or disabling a WireGuard peer."""
+    return _stage_wireguard_peer(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="toggle",
+        target=target,
+        enabled=body.enabled,
+    )
+
+
+@router.post("/wireguard-peers/{target}/delete", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_peer_delete(
+    request: Request,
+    target: str,
+    body: HostDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting a WireGuard peer. Always high risk."""
+    return _stage_wireguard_peer(
         request, body.firewall_id, user, db, settings, action="delete", target=target
     )

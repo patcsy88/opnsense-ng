@@ -42,6 +42,14 @@ SERVICES_STOP = "services.stop"
 SERVICES_RESTART = "services.restart"
 DHCP_LEASES = "dhcp.leases"
 WIREGUARD_STATUS = "wireguard.status"
+WIREGUARD_PEERS_LIST = "wireguard.peers.list"
+WIREGUARD_PEERS_ADD = "wireguard.peers.add"
+WIREGUARD_PEERS_UPDATE = "wireguard.peers.update"
+WIREGUARD_PEERS_DELETE = "wireguard.peers.delete"
+WIREGUARD_PEERS_ENABLE = "wireguard.peers.enable"
+WIREGUARD_PEERS_DISABLE = "wireguard.peers.disable"
+WIREGUARD_TUNNELS_LIST = "wireguard.tunnels.list"
+WIREGUARD_RECONFIGURE = "wireguard.reconfigure"
 DNS_STATS = "dns.stats"
 DNS_TOTALS = "dns.totals"
 FIREWALL_RULES_LIST = "firewall.rules.list"
@@ -428,6 +436,90 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=True,
         notes="Disables a forward with an explicit state. Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=WIREGUARD_PEERS_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/wireguard/client/searchClient",
+        required_privilege="VPN: WireGuard",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="WireGuard peers (ADR-0019). Keys other than the public key are dropped.",
+    ),
+    Operation(
+        operation_id=WIREGUARD_PEERS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/client/addClient",
+        required_privilege="VPN: WireGuard",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Saves a peer, not yet active. Reviewed apply only (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_PEERS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/client/setClient/{uuid}",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Upsert, so apply confirms it exists first (ADR-0019). Reviewed apply only.",
+    ),
+    Operation(
+        operation_id=WIREGUARD_PEERS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/client/delClient/{uuid}",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Deletes a peer and its links to tunnels. Reviewed apply only (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_PEERS_ENABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/client/toggleClient/{uuid}/1",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Enables a peer with an explicit state. Reviewed apply only (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_PEERS_DISABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/client/toggleClient/{uuid}/0",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Disables a peer with an explicit state. Reviewed apply only (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_TUNNELS_LIST,
+        method=HttpMethod.GET,
+        endpoint="/api/wireguard/server/searchServer",
+        required_privilege="VPN: WireGuard",
+        read_only=True,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="WireGuard tunnels (ADR-0019). Private keys are never read into the app.",
+    ),
+    Operation(
+        operation_id=WIREGUARD_RECONFIGURE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/service/reconfigure",
+        required_privilege="VPN: WireGuard",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Applies saved WireGuard changes; tunnels may restart. Apply only (ADR-0019).",
     ),
     Operation(
         operation_id=DNS_STATS,

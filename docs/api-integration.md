@@ -61,6 +61,14 @@ Registry source: `backend/app/opnsense/registry/entries.py`. Verified on OPNsens
 | `unbound.forwards.delete` | POST | `/api/unbound/settings/delForward/{uuid}` | Services: Unbound | no | no | 26.7.8_2 | yes |
 | `unbound.forwards.enable` | POST | `/api/unbound/settings/toggleForward/{uuid}/1` | Services: Unbound | no | no | 26.7.8_2 | yes |
 | `unbound.forwards.disable` | POST | `/api/unbound/settings/toggleForward/{uuid}/0` | Services: Unbound | no | no | 26.7.8_2 | yes |
+| `wireguard.peers.list` | GET | `/api/wireguard/client/searchClient` | VPN: WireGuard (unconfirmed) | yes | no | 26.7.8_2 | no |
+| `wireguard.peers.add` | POST | `/api/wireguard/client/addClient` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.update` | POST | `/api/wireguard/client/setClient/{uuid}` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.delete` | POST | `/api/wireguard/client/delClient/{uuid}` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.enable` | POST | `/api/wireguard/client/toggleClient/{uuid}/1` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.peers.disable` | POST | `/api/wireguard/client/toggleClient/{uuid}/0` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
+| `wireguard.tunnels.list` | GET | `/api/wireguard/server/searchServer` | VPN: WireGuard (unconfirmed) | yes | no | 26.7.8_2 | no |
+| `wireguard.reconfigure` | POST | `/api/wireguard/service/reconfigure` | VPN: WireGuard (unconfirmed) | no | no | 26.7.8_2 | no |
 | `dnsmasq.domains.list` | GET | `/api/dnsmasq/settings/searchDomain` | Services: Dnsmasq DNS/DHCP: Settings | yes | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.add` | POST | `/api/dnsmasq/settings/addDomain` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
 | `dnsmasq.domains.update` | POST | `/api/dnsmasq/settings/setDomain/{uuid}` | Services: Dnsmasq DNS/DHCP: Settings | no | no | 26.7.8_2 | yes |
@@ -144,6 +152,8 @@ Services lists service status (`services.list`): id, name, instance, description
 DHCP leases (`dhcp.leases`, ADR-0008) lists Dnsmasq leases: address, hostname, interface, lease type, vendor and expiry, capped at 1000 rows. MAC addresses, client ids and IAIDs are dropped in the backend. Access is admin, network_admin and security_admin. The privilege also covers Dnsmasq settings writes in OPNsense, but no Dnsmasq write operation is registered. Verified on the lab (26.7.8_2).
 
 Dnsmasq static hosts (ADR-0017): `dnsmasq.hosts.*` and `dnsmasq.reconfigure` are used only by the staged apply procedure, plus a read-only host list for admin and network_admin (MAC addresses included). Saved changes take effect only after `reconfigure`, which restarts Dnsmasq. `setHost` is an upsert, so apply confirms the host exists and still matches its stored fingerprint first. All five operations were verified on the lab (26.7.8_2) with a create, edit and delete of a throwaway host. Domain overrides (`dnsmasq.domains.*`) use the same flow, with the request body under the root key `domainoverride` (hosts use `host`); the firewall answers `result: failed` with no detail when the key is wrong. Every override is high risk, and the list endpoint `GET /api/v1/firewalls/{id}/dnsmasq/domains` is admin and network_admin only. All were verified on the lab (26.7.8_2).
+
+WireGuard peers (ADR-0019): `wireguard.peers.*` and `wireguard.reconfigure` use the same staged flow, with the body under the root key `client` (from the upstream source, unconfirmed on the lab). No private or preshared key is ever sent or kept: a peer is created from its public key only, a preshared key is shown only as a "set" flag, and an update leaves it untouched. `reconfigure` replies `{result: ok}` and may restart tunnels. Tunnel writes follow in a later step. All of these are unverified until the lab test.
 
 Unbound domain forwards (ADR-0018): `unbound.forwards.*` use the same staged flow, with the body under the root key `dot` and `type` fixed to `forward`; DNS-over-TLS rows in the same list are filtered out. Every forward change, including enable and disable, is high risk, and a host override inside a forwarded domain is high risk too. Empty, single-label and broad domains are refused. The list endpoint `GET /api/v1/firewalls/{id}/unbound/forwards` is admin and network_admin only. Verified on the lab (26.7.8_2) with a create, edit, disable, enable and delete of a throwaway forward.
 

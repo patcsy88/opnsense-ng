@@ -267,10 +267,10 @@ async def test_firewall_error_is_audited_and_collapsed_for_the_api(
     assert detail(actions(app_client)[0])["reason"] == "firewall_error"
 
 
-async def test_registry_entries_are_unverified_writes_with_safe_paths() -> None:
+async def test_registry_entries_are_verified_writes_with_safe_paths() -> None:
     for op_id in ("services.start", "services.stop", "services.restart"):
         op = get_operation(op_id)
-        assert op.read_only is False and op.verified is False
+        assert op.read_only is False and op.verified is True
         assert op.resolve_endpoint({"service": "ntpd", "instance": ""}).endswith(
             f"/{op_id[9:]}/ntpd"
         )
