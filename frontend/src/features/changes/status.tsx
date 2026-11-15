@@ -32,12 +32,13 @@ export function ChangeStatusBadge({ status }: { status: string }) {
 }
 
 export function targetName(c: ChangeRequest): string | undefined {
-  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" || c.kind === "dnsmasq_domain" || c.kind === "unbound_host" || c.kind === "unbound_forward" || c.kind === "wireguard_peer" || c.kind === "wireguard_tunnel" ? "label" : "name";
+  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" || c.kind === "dnsmasq_domain" || c.kind === "unbound_host" || c.kind === "unbound_forward" || c.kind === "wireguard_peer" || c.kind === "wireguard_tunnel" || c.kind === "kea_reservation" ? "label" : "name";
   const value = c.proposed?.[key];
   return typeof value === "string" ? value : undefined;
 }
 
 export function describeChange(c: ChangeRequest): string {
+  if (c.kind === "kea_reservation") return `${c.action} DHCP reservation ${targetName(c) ?? "?"}`;
   if (c.kind === "wireguard_tunnel") {
     if (c.action === "toggle") return `${c.proposed?.enabled === false ? "disable" : "enable"} VPN tunnel ${targetName(c) ?? "?"}`;
     return `${c.action} VPN tunnel ${targetName(c) ?? "?"}`;
@@ -73,6 +74,10 @@ export function describeChange(c: ChangeRequest): string {
 
 export function describeEffect(c: ChangeRequest, firewall: string): string {
   const name = targetName(c) ?? "?";
+  if (c.kind === "kea_reservation") {
+    const verb = c.action === "create" ? "creates" : c.action === "update" ? "changes" : "deletes";
+    return `This ${verb} the DHCP reservation for ${name} on ${firewall} and reconfigures Kea. Kea may restart and DHCP may pause briefly; existing leases may be affected.`;
+  }
   if (c.kind === "wireguard_tunnel") {
     const verb =
       c.action === "create" ? "creates" : c.action === "update" ? "changes" : c.action === "delete" ? "deletes" : c.proposed?.enabled === false ? "disables" : "enables";

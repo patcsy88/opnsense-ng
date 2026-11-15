@@ -74,6 +74,7 @@ function page(services: unknown[]) {
           {
             uuid: "u1",
             subnet: null,
+            subnet_id: null,
             ip_address: "192.168.1.10",
             hw_address: "aa:bb:cc:dd:ee:01",
             hostname: "printer",

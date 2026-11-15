@@ -344,6 +344,7 @@ export const keaReservationsResponseSchema = z.object({
     z.object({
       uuid: z.string(),
       subnet: z.string().nullable(),
+      subnet_id: z.string().nullable(),
       ip_address: z.string(),
       hw_address: z.string().nullable(),
       hostname: z.string().nullable(),
@@ -353,6 +354,18 @@ export const keaReservationsResponseSchema = z.object({
   truncated: z.boolean(),
   registry_verified: z.boolean(),
 });
+
+export type KeaReservation = z.infer<
+  typeof keaReservationsResponseSchema
+>["reservations"][number];
+
+export interface KeaReservationInput {
+  subnet: string;
+  ip_address: string;
+  hw_address: string;
+  hostname: string | null;
+  description: string | null;
+}
 
 export const keaSubnetsResponseSchema = z.object({
   firewall_id: z.uuid(),
@@ -367,6 +380,8 @@ export const keaSubnetsResponseSchema = z.object({
   truncated: z.boolean(),
   registry_verified: z.boolean(),
 });
+
+export type KeaSubnet = z.infer<typeof keaSubnetsResponseSchema>["subnets"][number];
 
 export const leasesResponseSchema = z.object({
   firewall_id: z.uuid(),

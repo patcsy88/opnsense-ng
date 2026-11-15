@@ -44,6 +44,7 @@ import {
   type AliasProposalInput,
   type ForwardProposalInput,
   type DomainProposalInput,
+  type KeaReservationInput,
   type HostProposalInput,
   type UnboundHostProposalInput,
   type UnboundForwardProposalInput,
@@ -375,6 +376,21 @@ export const api = {
   dnsmasqDomains: (id: string) =>
     request("GET", `${base}/firewalls/${encodeURIComponent(id)}/dnsmasq/domains`, {
       schema: dnsmasqDomainsResponseSchema,
+    }),
+  stageKeaReservation: (firewallId: string, reservation: KeaReservationInput) =>
+    request("POST", `${base}/changes/kea-reservations`, {
+      body: { firewall_id: firewallId, reservation },
+      schema: changeDetailSchema,
+    }),
+  stageKeaReservationUpdate: (firewallId: string, uuid: string, reservation: KeaReservationInput) =>
+    request("POST", `${base}/changes/kea-reservations/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, reservation },
+      schema: changeDetailSchema,
+    }),
+  stageKeaReservationDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/kea-reservations/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
     }),
   stageDomain: (firewallId: string, override: DomainProposalInput) =>
     request("POST", `${base}/changes/dnsmasq-domains`, {

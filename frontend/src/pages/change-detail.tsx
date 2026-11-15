@@ -237,8 +237,32 @@ function currentWireguardTunnelRows(s: Record<string, unknown>): [string, string
   ];
 }
 
+function keaReservationRows(p: Record<string, unknown>): [string, string][] {
+  if (p.ip_address === undefined || p.hw_address === undefined) {
+    return [["Reservation", String(p.label ?? "—")], ...risk(p)];
+  }
+  return [
+    ["IP address", String(p.ip_address)],
+    ["MAC address", String(p.hw_address)],
+    ["Hostname", String(p.hostname ?? "—")],
+    ["Description", String(p.description ?? "—")],
+    ...risk(p),
+  ];
+}
+
+function currentKeaReservationRows(s: Record<string, unknown>): [string, string][] {
+  return [
+    ["IP address", String(s.ip_address ?? "—")],
+    ["Subnet", String(s.subnet ?? "—")],
+    ...(s.hw_address === undefined ? [] : ([["MAC address", String(s.hw_address ?? "—")]] as [string, string][])),
+    ["Hostname", String(s.hostname ?? "—")],
+    ["Description", String(s.description ?? "—")],
+  ];
+}
+
 function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
+  if (kind === "kea_reservation") return keaReservationRows(p);
   if (kind === "dnsmasq_host") return hostRows(p);
   if (kind === "dnsmasq_domain") return domainRows(p);
   if (kind === "unbound_host") return unboundHostRows(p);
@@ -350,7 +374,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : c.kind === "unbound_forward" ? "Forward" : c.kind === "wireguard_peer" ? "VPN peer" : c.kind === "wireguard_tunnel" ? "VPN tunnel" : "Alias"} to delete` : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : c.kind === "unbound_forward" ? "Forward" : c.kind === "wireguard_peer" ? "VPN peer" : c.kind === "wireguard_tunnel" ? "VPN tunnel" : c.kind === "kea_reservation" ? "DHCP reservation" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -384,6 +408,8 @@ export function ChangeDetailPage() {
                     ? "This VPN peer will be deleted. See the current peer below."
                     : c.kind === "wireguard_tunnel"
                     ? "This VPN tunnel will be deleted. See the current tunnel below."
+                    : c.kind === "kea_reservation"
+                    ? "This DHCP reservation will be deleted. See the current reservation below."
                     : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
@@ -535,6 +561,27 @@ export function ChangeDetailPage() {
           <CardContent>
             <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
               {currentUnboundHostRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "kea_reservation" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current reservation</CardTitle>
+            <CardDescription>
+              The reservation as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {currentKeaReservationRows(c.base_snapshot).map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
