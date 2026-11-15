@@ -1,4 +1,4 @@
-"""Kea DHCPv4 leases, reservations and subnets (ADR-0020). Field names are unverified on the lab.
+"""Kea DHCPv4 leases, reservations and subnets (ADR-0020). Lease rows verified on a live OPNsense.
 
 Leases never carry MAC addresses or client ids. Reservations do, and their endpoint is closed to
 roles that may not manage hosts.
@@ -73,6 +73,17 @@ def _ipv4(value: Any) -> str | None:
         return None
 
 
+_LEASE_STATES = {0: "active", 1: "declined", 2: "expired"}
+
+
+def _state(value: Any) -> str | None:
+    if isinstance(value, bool):
+        return None
+    if isinstance(value, str) and value.isdigit():
+        value = int(value)
+    return _LEASE_STATES.get(value) if isinstance(value, int) else None
+
+
 def _expiry(value: Any) -> str | None:
     if isinstance(value, bool):
         return None
@@ -100,7 +111,7 @@ def normalise_kea_leases(raw: Any) -> KeaLeasesResult:
                 address=address,
                 hostname=_text(row.get("hostname"), 255),
                 interface=_text(row.get("if_name"), 64),
-                state=_text(row.get("state"), 32),
+                state=_state(row.get("state")),
                 expires=_expiry(row.get("expire")),
             )
         )

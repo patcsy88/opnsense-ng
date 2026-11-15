@@ -22,7 +22,7 @@ LEASES = {
             "hwaddr": "aa:bb:cc:dd:ee:ff",
             "client_id": "01:aa:bb",
             "if_name": "lan",
-            "state": "0",
+            "state": 0,
             "expire": 1762950000,
         },
         {"address": "fd00::5"},
@@ -56,6 +56,7 @@ SUBNETS = {
 def test_lease_mapping_is_ipv4_only_and_drops_macs() -> None:
     result = normalise_kea_leases(LEASES)
     assert [lease.address for lease in result.leases] == ["192.168.1.50"]
+    assert result.leases[0].state == "active"
     dumped = result.model_dump_json()
     for secret in ("aa:bb:cc", "client_id", "01:aa:bb"):
         assert secret not in dumped
@@ -99,7 +100,7 @@ async def test_endpoints_roles_audit_and_unverified(app_client: httpx.AsyncClien
         sec_reservations = await app_client.get(f"{root}/reservations")
         await switch(app_client, Role.read_only, "ro")
         ro_leases = await app_client.get(f"{root}/leases")
-    assert leases.status_code == 200 and leases.json()["registry_verified"] is False
+    assert leases.status_code == 200 and leases.json()["registry_verified"] is True
     assert reservations.json()["registry_verified"] is True
     assert "aa:bb:cc" not in leases.text and len(leases.json()["leases"]) == 1
     assert len(reservations.json()["reservations"]) == 1

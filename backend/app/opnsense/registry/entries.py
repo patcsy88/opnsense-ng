@@ -308,9 +308,10 @@ _ENTRIES = (
         required_privilege="Services: Kea DHCP",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Kea DHCPv4 leases (ADR-0020). Endpoint, privilege and envelope confirmed on the "
-        "lab; row fields are not, because no client had a lease.",
+        verified=True,
+        notes="Kea DHCPv4 leases (ADR-0020). Endpoint, privilege, envelope and row fields "
+        "confirmed on a live OPNsense with active leases. `state` is an integer (0 active, "
+        "1 declined, 2 expired).",
     ),
     Operation(
         operation_id=KEA_RESERVATIONS,
