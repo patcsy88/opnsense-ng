@@ -49,6 +49,11 @@ WIREGUARD_PEERS_DELETE = "wireguard.peers.delete"
 WIREGUARD_PEERS_ENABLE = "wireguard.peers.enable"
 WIREGUARD_PEERS_DISABLE = "wireguard.peers.disable"
 WIREGUARD_TUNNELS_LIST = "wireguard.tunnels.list"
+WIREGUARD_TUNNELS_ADD = "wireguard.tunnels.add"
+WIREGUARD_TUNNELS_UPDATE = "wireguard.tunnels.update"
+WIREGUARD_TUNNELS_DELETE = "wireguard.tunnels.delete"
+WIREGUARD_TUNNELS_ENABLE = "wireguard.tunnels.enable"
+WIREGUARD_TUNNELS_DISABLE = "wireguard.tunnels.disable"
 WIREGUARD_RECONFIGURE = "wireguard.reconfigure"
 DNS_STATS = "dns.stats"
 DNS_TOTALS = "dns.totals"
@@ -510,6 +515,60 @@ _ENTRIES = (
         min_version="26.7.8_2",
         verified=False,
         notes="WireGuard tunnels (ADR-0019). Private keys are never read into the app.",
+    ),
+    Operation(
+        operation_id=WIREGUARD_TUNNELS_ADD,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/server/addServer",
+        required_privilege="VPN: WireGuard: Configuration",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Saves a tunnel, no key sent; the firewall makes one. Reviewed apply (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_TUNNELS_UPDATE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/server/setServer/{uuid}",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard: Configuration",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Upsert, no key sent so keys stay as they are. Reviewed apply (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_TUNNELS_DELETE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/server/delServer/{uuid}",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard: Configuration",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Deletes a tunnel. Reviewed apply only, always high risk (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_TUNNELS_ENABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/server/toggleServer/{uuid}/1",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard: Configuration",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Enables a tunnel with an explicit state. Reviewed apply only (ADR-0019).",
+    ),
+    Operation(
+        operation_id=WIREGUARD_TUNNELS_DISABLE,
+        method=HttpMethod.POST,
+        endpoint="/api/wireguard/server/toggleServer/{uuid}/0",
+        path_params=("uuid",),
+        required_privilege="VPN: WireGuard: Configuration",
+        read_only=False,
+        min_version="26.7.8_2",
+        verified=False,
+        notes="Disables a tunnel with an explicit state. Reviewed apply only (ADR-0019).",
     ),
     Operation(
         operation_id=WIREGUARD_RECONFIGURE,

@@ -132,16 +132,6 @@ describe("VPN peers", () => {
     ).not.toBeInTheDocument();
   });
 
-  it("lists tunnels read-only", async () => {
-    page(NETADMIN);
-    renderApp(<App />, "/vpn");
-    await openTab("Tunnels");
-    expect(await screen.findByText("10.10.0.1/24")).toBeInTheDocument();
-    expect(
-      screen.queryByRole("button", { name: /new|edit|delete/i }),
-    ).toBeNull();
-  });
-
   it("hides the tabs from roles that cannot manage", async () => {
     page(SECADMIN);
     renderApp(<App />, "/vpn");

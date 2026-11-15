@@ -160,3 +160,80 @@ class WireguardPeerProposal(BaseModel):
         if set(self.servers) != set(current.servers):
             reasons.append("changes which tunnels the peer belongs to")
         return reasons
+
+
+def tunnel_conflict(proposed: dict[str, Any], tunnels: list[Any], own: str | None) -> str | None:
+    """Duplicate name or port, or a tunnel network that overlaps another tunnel's."""
+    nets = []
+    for a in proposed.get("tunneladdress") or []:
+        try:
+            nets.append(ipaddress.ip_interface(a).network)
+        except ValueError:
+            continue
+    for t in tunnels:
+        if t.uuid == own:
+            continue
+        if (t.name or "").lower() == str(proposed.get("name", "")).lower():
+            return "A tunnel with this name already exists"
+        if t.port and str(proposed.get("port")) == t.port:
+            return "Another tunnel already listens on this port"
+        for a in t.tunneladdress:
+            try:
+                other = ipaddress.ip_interface(a).network
+            except ValueError:
+                continue
+            if any(n.version == other.version and n.overlaps(other) for n in nets):
+                return "This tunnel network overlaps another tunnel's network"
+    return None
+
+
+class WireguardTunnelProposal(BaseModel):
+    """A tunnel without any key. The firewall makes the private key itself on creation and this
+    app never reads, sends or stores it."""
+
+    model_config = ConfigDict(extra="forbid")
+
+    name: str = Field(min_length=1, max_length=64)
+    port: int = Field(ge=1, le=65535)
+    tunneladdress: list[str] = Field(min_length=1, max_length=8)
+    mtu: int | None = Field(default=None, ge=576, le=9000)
+    disableroutes: bool = False
+    peers: list[str] = Field(default_factory=list, max_length=256)
+    enabled: bool = True
+
+    @field_validator("name")
+    @classmethod
+    def _name(cls, v: str) -> str:
+        item = v.strip()
+        if not _NAME.match(item):
+            raise ValueError("Name may use letters, digits, dot, dash and underscore (max 64)")
+        return item
+
+    @field_validator("tunneladdress")
+    @classmethod
+    def _addresses(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for item in v:
+            try:
+                iface = ipaddress.ip_interface(item.strip())
+            except ValueError:
+                raise ValueError("Use an address with a prefix, such as 10.10.0.1/24") from None
+            if "/" not in item or iface.network.prefixlen == iface.max_prefixlen:
+                raise ValueError("A tunnel address needs a network prefix, such as 10.10.0.1/24")
+            out.append(str(iface))
+        if len(set(out)) != len(out):
+            raise ValueError("Duplicate addresses are not allowed")
+        return out
+
+    @field_validator("peers")
+    @classmethod
+    def _peers(cls, v: list[str]) -> list[str]:
+        out: list[str] = []
+        for item in v:
+            try:
+                out.append(str(uuidlib.UUID(item.strip())))
+            except ValueError:
+                raise ValueError("Peers are chosen by id from the list") from None
+        if len(set(out)) != len(out):
+            raise ValueError("Duplicate peers are not allowed")
+        return out

@@ -30,7 +30,7 @@ from app.changes.forward_schemas import ForwardProposal
 from app.changes.rule_schemas import RuleProposal
 from app.changes.states import Status
 from app.changes.unbound_schemas import unbound_host_key
-from app.changes.wireguard_schemas import peer_conflict
+from app.changes.wireguard_schemas import peer_conflict, tunnel_conflict
 from app.core.config import Settings
 from app.core.crypto import CredentialDecryptionError
 from app.core.logging import get_logger
@@ -106,7 +106,12 @@ from app.opnsense.registry.entries import (
     WIREGUARD_PEERS_LIST,
     WIREGUARD_PEERS_UPDATE,
     WIREGUARD_RECONFIGURE,
+    WIREGUARD_TUNNELS_ADD,
+    WIREGUARD_TUNNELS_DELETE,
+    WIREGUARD_TUNNELS_DISABLE,
+    WIREGUARD_TUNNELS_ENABLE,
     WIREGUARD_TUNNELS_LIST,
+    WIREGUARD_TUNNELS_UPDATE,
 )
 
 log = get_logger("changes.apply")
@@ -1308,6 +1313,55 @@ def apply_wireguard_peer_change(
 ) -> ChangeRequest:
     return _apply_resolver(
         WIREGUARD_PEER_SPEC, db, change_id, user, settings, request, confirm_name
+    )
+
+
+def wireguard_tunnel_payload(proposed: dict[str, Any]) -> dict[str, Any]:
+    """Body for addServer/setServer. No key is sent: a new tunnel gets its key from the firewall
+    and an update leaves the existing keys alone."""
+    mtu = proposed.get("mtu")
+    return {
+        "server": {
+            "enabled": "1" if proposed.get("enabled", True) else "0",
+            "name": proposed["name"],
+            "port": str(proposed["port"]),
+            "tunneladdress": ",".join(proposed["tunneladdress"]),
+            "mtu": str(mtu) if mtu is not None else "",
+            "disableroutes": "1" if proposed.get("disableroutes") else "0",
+            "peers": ",".join(proposed.get("peers") or []),
+        }
+    }
+
+
+WIREGUARD_TUNNEL_SPEC = ResolverSpec(
+    kind="wireguard_tunnel",
+    noun="tunnel",
+    list_op=WIREGUARD_TUNNELS_LIST,
+    add_op=WIREGUARD_TUNNELS_ADD,
+    update_op=WIREGUARD_TUNNELS_UPDATE,
+    delete_op=WIREGUARD_TUNNELS_DELETE,
+    normalise=lambda raw: list(normalise_wireguard_tunnels(raw).tunnels),
+    conflict=tunnel_conflict,
+    payload=wireguard_tunnel_payload,
+    same=lambda t, prop: (t.name or "").lower() == str(prop.get("name", "")).lower(),
+    reconfigure_op=WIREGUARD_RECONFIGURE,
+    toggle_on=WIREGUARD_TUNNELS_ENABLE,
+    toggle_off=WIREGUARD_TUNNELS_DISABLE,
+    ok_key="result",
+)
+
+
+def apply_wireguard_tunnel_change(
+    db: Session,
+    *,
+    change_id: uuid.UUID,
+    user: CurrentUser,
+    settings: Settings,
+    request: Request,
+    confirm_name: str | None,
+) -> ChangeRequest:
+    return _apply_resolver(
+        WIREGUARD_TUNNEL_SPEC, db, change_id, user, settings, request, confirm_name
     )
 
 

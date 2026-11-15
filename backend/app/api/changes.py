@@ -27,8 +27,10 @@ from app.changes.unbound_schemas import (
 )
 from app.changes.wireguard_schemas import (
     WireguardPeerProposal,
+    WireguardTunnelProposal,
     outside_tunnels,
     peer_conflict,
+    tunnel_conflict,
 )
 from app.core.config import Settings, get_settings
 from app.core.crypto import CredentialDecryptionError
@@ -1190,6 +1192,7 @@ def apply_change(
             "unbound_host": apply_changes.apply_unbound_host_change,
             "unbound_forward": apply_changes.apply_unbound_forward_change,
             "wireguard_peer": apply_changes.apply_wireguard_peer_change,
+            "wireguard_tunnel": apply_changes.apply_wireguard_tunnel_change,
         }.get(cr.kind, apply_changes.apply_alias_change)
         cr = run(
             db,
@@ -2234,5 +2237,218 @@ def stage_wireguard_peer_delete(
 ) -> ChangeDetailOut:
     """Stage deleting a WireGuard peer. Always high risk."""
     return _stage_wireguard_peer(
+        request, body.firewall_id, user, db, settings, action="delete", target=target
+    )
+
+
+class WireguardTunnelCreate(BaseModel):
+    model_config = ConfigDict(extra="forbid")
+
+    firewall_id: uuid.UUID
+    tunnel: WireguardTunnelProposal
+
+
+def _tunnel_label(t: Any) -> str:
+    return (t.name or str(t.uuid)[:8])[:64]
+
+
+def _stage_wireguard_tunnel(
+    request: Request,
+    firewall_id: uuid.UUID,
+    user: CurrentUser,
+    db: Session,
+    settings: Settings,
+    *,
+    action: str,
+    target: str | None,
+    proposal: WireguardTunnelProposal | None = None,
+    enabled: bool | None = None,
+) -> ChangeDetailOut:
+    """Shared staging for create, update, toggle and delete of a WireGuard tunnel (ADR-0019).
+    Reads only. Every tunnel change is high risk. No key is accepted or returned."""
+    audit_action = f"change.stage_wireguard_tunnel_{action}"
+    if target is not None and not _is_uuid(target):
+        raise HTTPException(status.HTTP_422_UNPROCESSABLE_CONTENT, "Invalid tunnel id")
+
+    def refuse(message: str, change_id: uuid.UUID | None = None) -> HTTPException:
+        return _refuse(
+            db,
+            service.ChangeError(message),
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=change_id,
+        )
+
+    fw = db.get(Firewall, firewall_id)
+    if fw is None:
+        raise refuse("Unknown firewall")
+    try:
+        rows = apply_changes.read_wireguard_tunnels(
+            db, firewall=fw, user=user, settings=settings, request=request
+        )
+        peers = (
+            apply_changes.read_wireguard_peers(
+                db, firewall=fw, user=user, settings=settings, request=request
+            )
+            if proposal is not None
+            else []
+        )
+    except FirewallError, CredentialDecryptionError:
+        raise refuse("Could not read the WireGuard configuration from the firewall") from None
+
+    current = next((t for t in rows if t.uuid == target), None) if target else None
+    if target is not None and current is None:
+        raise refuse("That tunnel was not found on the firewall")
+
+    proposed: dict[str, Any]
+    if proposal is not None:
+        if not set(proposal.peers) <= {p.uuid for p in peers}:
+            raise refuse("One of the chosen peers does not exist on the firewall")
+        clash = tunnel_conflict(proposal.model_dump(), rows, target)
+        if clash:
+            raise refuse(clash)
+        verb = "creates a tunnel" if current is None else "changes the tunnel"
+        reasons = [f"{verb}, which can interrupt the VPN while WireGuard reconfigures"]
+        proposed = {**proposal.model_dump(), "label": proposal.name, "risk": reasons}
+        if action == "update" and current is not None:
+            proposed["label"] = _tunnel_label(current)
+    elif action == "toggle" and current is not None and enabled is not None:
+        if current.enabled == enabled:
+            raise refuse("The tunnel is already " + ("enabled" if enabled else "disabled"))
+        reasons = ["enables or disables the tunnel, which starts or cuts all of its VPN traffic"]
+        proposed = {
+            "label": _tunnel_label(current),
+            "enabled": enabled,
+            "name": current.name,
+            "risk": reasons,
+        }
+    elif action == "delete" and current is not None:
+        reasons = ["deletes the tunnel, which removes all of its VPN access"]
+        proposed = {"label": _tunnel_label(current), "name": current.name, "risk": reasons}
+    else:
+        raise refuse("Unsupported request")
+
+    if action == "create":
+        same = ChangeRequest.proposed["name"].astext == proposed["name"]
+    else:
+        same = ChangeRequest.target_uuid == target
+    duplicate = db.scalar(
+        select(ChangeRequest.id).where(
+            ChangeRequest.firewall_id == firewall_id,
+            ChangeRequest.kind == "wireguard_tunnel",
+            ChangeRequest.status.in_(OPEN_STATES),
+            same,
+            *([ChangeRequest.action == "create"] if action == "create" else []),
+        )
+    )
+    if duplicate is not None:
+        raise refuse("An open request already changes this tunnel", duplicate)
+
+    try:
+        cr = service.create_draft(
+            db,
+            user=user,
+            firewall_id=firewall_id,
+            kind="wireguard_tunnel",
+            action=action,
+            target_uuid=target,
+            proposed=proposed,
+            base_snapshot=current.model_dump() if current is not None else None,
+            high_risk=True,
+            request=request,
+        )
+        service.transition(db, cr, Status.validated, user=user, request=request)
+    except service.ChangeError as exc:
+        raise _refuse(
+            db,
+            exc,
+            action=audit_action,
+            user=user,
+            request=request,
+            firewall_id=firewall_id,
+            change_id=None,
+        ) from None
+    db.commit()
+    return _detail(db, cr)
+
+
+@router.post("/wireguard-tunnels", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_tunnel_create(
+    request: Request,
+    body: WireguardTunnelCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage a new WireGuard tunnel. The firewall makes its private key."""
+    return _stage_wireguard_tunnel(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="create",
+        target=None,
+        proposal=body.tunnel,
+    )
+
+
+@router.post("/wireguard-tunnels/{target}/update", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_tunnel_update(
+    request: Request,
+    target: str,
+    body: WireguardTunnelCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage editing a WireGuard tunnel. Keys are left as they are."""
+    return _stage_wireguard_tunnel(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="update",
+        target=target,
+        proposal=body.tunnel,
+    )
+
+
+@router.post("/wireguard-tunnels/{target}/toggle", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_tunnel_toggle(
+    request: Request,
+    target: str,
+    body: ForwardToggleCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage enabling or disabling a WireGuard tunnel."""
+    return _stage_wireguard_tunnel(
+        request,
+        body.firewall_id,
+        user,
+        db,
+        settings,
+        action="toggle",
+        target=target,
+        enabled=body.enabled,
+    )
+
+
+@router.post("/wireguard-tunnels/{target}/delete", response_model=ChangeDetailOut, status_code=201)
+def stage_wireguard_tunnel_delete(
+    request: Request,
+    target: str,
+    body: HostDeleteCreate,
+    user: CurrentUser = Depends(require_roles(*MANAGERS)),
+    db: Session = Depends(get_db),
+    settings: Settings = Depends(get_settings),
+) -> ChangeDetailOut:
+    """Stage deleting a WireGuard tunnel."""
+    return _stage_wireguard_tunnel(
         request, body.firewall_id, user, db, settings, action="delete", target=target
     )

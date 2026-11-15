@@ -505,6 +505,16 @@ export interface WireguardPeerProposalInput {
   enabled: boolean;
 }
 
+export interface WireguardTunnelProposalInput {
+  name: string;
+  port: number;
+  tunneladdress: string[];
+  mtu: number | null;
+  disableroutes: boolean;
+  peers: string[];
+  enabled: boolean;
+}
+
 export const servicesResponseSchema = z.object({
   firewall_id: z.uuid(),
   services: z.array(serviceSchema),

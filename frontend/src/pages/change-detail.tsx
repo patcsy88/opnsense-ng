@@ -205,6 +205,38 @@ function currentWireguardPeerRows(s: Record<string, unknown>): [string, string][
   ];
 }
 
+function wireguardTunnelRows(p: Record<string, unknown>): [string, string][] {
+  if (p.port === undefined) {
+    return [
+      ["Tunnel", String(p.label ?? "—")],
+      ...(p.enabled === undefined ? [] : ([["Enabled", p.enabled ? "Yes" : "No"]] as [string, string][])),
+      ...risk(p),
+    ];
+  }
+  const list = (v: unknown) => (Array.isArray(v) && v.length ? v.join(", ") : "—");
+  return [
+    ["Name", String(p.name ?? "—")],
+    ["Listen port", String(p.port)],
+    ["Tunnel address", list(p.tunneladdress)],
+    ["MTU", p.mtu === null || p.mtu === undefined ? "—" : String(p.mtu)],
+    ["Disable routes", p.disableroutes ? "Yes" : "No"],
+    ["Peers", Array.isArray(p.peers) ? String(p.peers.length) : "0"],
+    ["Enabled", p.enabled === false ? "No" : "Yes"],
+    ...risk(p),
+  ];
+}
+
+function currentWireguardTunnelRows(s: Record<string, unknown>): [string, string][] {
+  const list = (v: unknown) => (Array.isArray(v) && v.length ? v.join(", ") : "—");
+  return [
+    ["Name", String(s.name ?? "—")],
+    ["Listen port", String(s.port ?? "—")],
+    ["Tunnel address", list(s.tunneladdress)],
+    ["Peers", Array.isArray(s.peers) ? String(s.peers.length) : "0"],
+    ["Enabled", s.enabled === false ? "No" : "Yes"],
+  ];
+}
+
 function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [string, string][] {
   const p = source ?? {};
   if (kind === "dnsmasq_host") return hostRows(p);
@@ -212,6 +244,7 @@ function proposalRows(source: Record<string, unknown> | null, kind = "alias"): [
   if (kind === "unbound_host") return unboundHostRows(p);
   if (kind === "unbound_forward") return unboundForwardRows(p);
   if (kind === "wireguard_peer") return wireguardPeerRows(p);
+  if (kind === "wireguard_tunnel") return wireguardTunnelRows(p);
   if (kind === "nat_forward") return forwardRows(p);
   if (kind === "rule" && p.action !== undefined) {
     const ports = (v: unknown) => (v ? `:${String(v)}` : "");
@@ -317,7 +350,7 @@ export function ChangeDetailPage() {
 
       <Card>
         <CardHeader>
-          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : c.kind === "unbound_forward" ? "Forward" : c.kind === "wireguard_peer" ? "VPN peer" : "Alias"} to delete` : "Proposal"}</CardTitle>
+          <CardTitle>{c.action === "delete" ? `${c.kind === "rule" ? "Rule" : c.kind === "nat_forward" ? "Port forward" : c.kind === "dnsmasq_host" ? "Host entry" : c.kind === "dnsmasq_domain" ? "Domain override" : c.kind === "unbound_host" ? "Host override" : c.kind === "unbound_forward" ? "Forward" : c.kind === "wireguard_peer" ? "VPN peer" : c.kind === "wireguard_tunnel" ? "VPN tunnel" : "Alias"} to delete` : "Proposal"}</CardTitle>
           <CardDescription>
             Firewall: {firewall} · requested by {c.requester_username}
             {c.reviewer_username ? ` · reviewed by ${c.reviewer_username}` : ""}
@@ -349,6 +382,8 @@ export function ChangeDetailPage() {
                     ? "This forward will be deleted. See the current forward below."
                     : c.kind === "wireguard_peer"
                     ? "This VPN peer will be deleted. See the current peer below."
+                    : c.kind === "wireguard_tunnel"
+                    ? "This VPN tunnel will be deleted. See the current tunnel below."
                     : "This alias will be deleted. The values above are what it holds now."}
             </p>
           )}
@@ -437,6 +472,27 @@ export function ChangeDetailPage() {
           <CardContent>
             <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
               {currentUnboundForwardRows(c.base_snapshot).map(([k, v]) => (
+                <div key={k} className="contents">
+                  <dt className="text-muted-foreground">{k}</dt>
+                  <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>
+                </div>
+              ))}
+            </dl>
+          </CardContent>
+        </Card>
+      )}
+
+      {c.kind === "wireguard_tunnel" && c.base_snapshot && (
+        <Card>
+          <CardHeader>
+            <CardTitle>Current tunnel</CardTitle>
+            <CardDescription>
+              The tunnel as it was when the request was made. Applying is refused if it has changed since.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <dl className="grid gap-2 text-sm sm:grid-cols-[8rem_1fr]">
+              {currentWireguardTunnelRows(c.base_snapshot).map(([k, v]) => (
                 <div key={k} className="contents">
                   <dt className="text-muted-foreground">{k}</dt>
                   <dd className="break-all font-mono text-xs sm:text-sm">{v}</dd>

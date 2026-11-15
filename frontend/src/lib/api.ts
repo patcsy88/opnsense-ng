@@ -45,6 +45,7 @@ import {
   type UnboundHostProposalInput,
   type UnboundForwardProposalInput,
   type WireguardPeerProposalInput,
+  type WireguardTunnelProposalInput,
   type RuleProposalInput,
   type FirewallCreateInput,
   type FirewallUpdateInput,
@@ -448,6 +449,26 @@ export const api = {
     }),
   stageWireguardPeerDelete: (firewallId: string, uuid: string) =>
     request("POST", `${base}/changes/wireguard-peers/${encodeURIComponent(uuid)}/delete`, {
+      body: { firewall_id: firewallId },
+      schema: changeDetailSchema,
+    }),
+  stageWireguardTunnel: (firewallId: string, tunnel: WireguardTunnelProposalInput) =>
+    request("POST", `${base}/changes/wireguard-tunnels`, {
+      body: { firewall_id: firewallId, tunnel },
+      schema: changeDetailSchema,
+    }),
+  stageWireguardTunnelUpdate: (firewallId: string, uuid: string, tunnel: WireguardTunnelProposalInput) =>
+    request("POST", `${base}/changes/wireguard-tunnels/${encodeURIComponent(uuid)}/update`, {
+      body: { firewall_id: firewallId, tunnel },
+      schema: changeDetailSchema,
+    }),
+  stageWireguardTunnelToggle: (firewallId: string, uuid: string, enabled: boolean) =>
+    request("POST", `${base}/changes/wireguard-tunnels/${encodeURIComponent(uuid)}/toggle`, {
+      body: { firewall_id: firewallId, enabled },
+      schema: changeDetailSchema,
+    }),
+  stageWireguardTunnelDelete: (firewallId: string, uuid: string) =>
+    request("POST", `${base}/changes/wireguard-tunnels/${encodeURIComponent(uuid)}/delete`, {
       body: { firewall_id: firewallId },
       schema: changeDetailSchema,
     }),

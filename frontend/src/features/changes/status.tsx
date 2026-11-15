@@ -32,12 +32,16 @@ export function ChangeStatusBadge({ status }: { status: string }) {
 }
 
 export function targetName(c: ChangeRequest): string | undefined {
-  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" || c.kind === "dnsmasq_domain" || c.kind === "unbound_host" || c.kind === "unbound_forward" || c.kind === "wireguard_peer" ? "label" : "name";
+  const key = c.kind === "rule" || c.kind === "nat_forward" || c.kind === "dnsmasq_host" || c.kind === "dnsmasq_domain" || c.kind === "unbound_host" || c.kind === "unbound_forward" || c.kind === "wireguard_peer" || c.kind === "wireguard_tunnel" ? "label" : "name";
   const value = c.proposed?.[key];
   return typeof value === "string" ? value : undefined;
 }
 
 export function describeChange(c: ChangeRequest): string {
+  if (c.kind === "wireguard_tunnel") {
+    if (c.action === "toggle") return `${c.proposed?.enabled === false ? "disable" : "enable"} VPN tunnel ${targetName(c) ?? "?"}`;
+    return `${c.action} VPN tunnel ${targetName(c) ?? "?"}`;
+  }
   if (c.kind === "wireguard_peer") {
     if (c.action === "toggle") return `${c.proposed?.enabled === false ? "disable" : "enable"} VPN peer ${targetName(c) ?? "?"}`;
     return `${c.action} VPN peer ${targetName(c) ?? "?"}`;
@@ -69,6 +73,11 @@ export function describeChange(c: ChangeRequest): string {
 
 export function describeEffect(c: ChangeRequest, firewall: string): string {
   const name = targetName(c) ?? "?";
+  if (c.kind === "wireguard_tunnel") {
+    const verb =
+      c.action === "create" ? "creates" : c.action === "update" ? "changes" : c.action === "delete" ? "deletes" : c.proposed?.enabled === false ? "disables" : "enables";
+    return `This ${verb} the VPN tunnel "${name}" on ${firewall} and reconfigures WireGuard. Tunnels may restart, so active VPN sessions can drop for a moment, possibly including yours.`;
+  }
   if (c.kind === "wireguard_peer") {
     const verb =
       c.action === "create" ? "creates" : c.action === "update" ? "changes" : c.action === "delete" ? "deletes" : c.proposed?.enabled === false ? "disables" : "enables";
