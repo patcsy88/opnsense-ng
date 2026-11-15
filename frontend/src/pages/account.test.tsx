@@ -53,12 +53,47 @@ describe("MFA login step", () => {
       target: { value: "correct-horse-battery" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
-    fireEvent.change(await screen.findByLabelText("Authentication code"), {
-      target: { value: "123456" },
+    const field = await screen.findByLabelText("Authentication code");
+    fireEvent.change(field, { target: { value: "12345" } });
+    expect(sent).toBeNull();
+    fireEvent.change(field, { target: { value: "12a3456" } });
+    await waitFor(() =>
+      expect(sent).toEqual({ challenge: "chal-1", code: "123456" }),
+    );
+  });
+
+  it("takes a recovery code through the Verify button", async () => {
+    let sent: unknown = null;
+    server.use(
+      http.get(
+        "/api/v1/auth/me",
+        () => new HttpResponse(null, { status: 401 }),
+      ),
+      http.post("/api/v1/auth/login", () =>
+        HttpResponse.json({ mfa_required: true, challenge: "chal-1" }),
+      ),
+      http.post("/api/v1/auth/login/mfa", async ({ request }) => {
+        sent = await request.json();
+        return HttpResponse.json({ user: ENROLLED, csrf_token: "tok" });
+      }),
+    );
+    renderApp(<App />, "/login");
+    fireEvent.change(await screen.findByLabelText("Username"), {
+      target: { value: "alice" },
+    });
+    fireEvent.change(screen.getByLabelText("Password"), {
+      target: { value: "correct-horse-battery" },
+    });
+    fireEvent.click(screen.getByRole("button", { name: "Sign in" }));
+    fireEvent.click(
+      await screen.findByRole("button", { name: "Use a recovery code instead" }),
+    );
+    fireEvent.change(screen.getByLabelText("Authentication code"), {
+      target: { value: "abcd-efgh-ijkl" },
     });
     fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     await waitFor(() =>
-      expect(sent).toEqual({ challenge: "chal-1", code: "123456" }),
+      expect(sent).toEqual({ challenge: "chal-1", code: "abcd-efgh-ijkl" }),
     );
   });
 
@@ -89,7 +124,6 @@ describe("MFA login step", () => {
     fireEvent.change(await screen.findByLabelText("Authentication code"), {
       target: { value: "000000" },
     });
-    fireEvent.click(screen.getByRole("button", { name: "Verify" }));
     expect(
       await screen.findByText("Invalid or expired code"),
     ).toBeInTheDocument();

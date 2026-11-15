@@ -17,6 +17,7 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState(false);
   const [challenge, setChallenge] = useState<string | null>(null);
+  const [useRecovery, setUseRecovery] = useState(false);
   const from = (location.state as { from?: string } | null)?.from ?? "/";
 
   if (user) return <Navigate to={from} replace />;
@@ -42,7 +43,10 @@ export function LoginPage() {
     } catch (err) {
       setError(err instanceof ApiError && err.kind === "unauthorized" ? err.message : describeError(err).message);
       const field = formEl.elements.namedItem("code");
-      if (field instanceof HTMLInputElement) field.value = "";
+      if (field instanceof HTMLInputElement) {
+        field.value = "";
+        field.focus();
+      }
     } finally {
       setPending(false);
     }
@@ -90,18 +94,51 @@ export function LoginPage() {
             <form onSubmit={(e) => void onSubmitCode(e)} className="space-y-4" noValidate>
               <div className="space-y-1">
                 <Label htmlFor="code">Authentication code</Label>
-                <Input
-                  id="code"
-                  name="code"
-                  inputMode="text"
-                  autoComplete="one-time-code"
-                  autoCapitalize="none"
-                  autoFocus
-                  required
-                />
+                {useRecovery ? (
+                  <Input
+                    key="recovery"
+                    id="code"
+                    name="code"
+                    inputMode="text"
+                    autoComplete="off"
+                    autoCapitalize="none"
+                    autoFocus
+                    required
+                  />
+                ) : (
+                  <Input
+                    key="otp"
+                    id="code"
+                    name="code"
+                    inputMode="numeric"
+                    pattern="[0-9]*"
+                    maxLength={6}
+                    autoComplete="one-time-code"
+                    autoFocus
+                    required
+                    className="text-center font-mono text-lg tracking-[0.5em]"
+                    onChange={(e) => {
+                      const digits = e.target.value.replace(/\D/g, "").slice(0, 6);
+                      if (digits !== e.target.value) e.target.value = digits;
+                      if (digits.length === 6 && !pending) e.target.form?.requestSubmit();
+                    }}
+                  />
+                )}
                 <p className="text-xs text-muted-foreground">
-                  Enter the 6-digit code from your authenticator app, or a recovery code.
+                  {useRecovery
+                    ? "Enter one of your recovery codes."
+                    : "Enter the 6-digit code from your authenticator app. It is sent when you type the last digit."}
                 </p>
+                <button
+                  type="button"
+                  className="text-xs underline underline-offset-2"
+                  onClick={() => {
+                    setUseRecovery((v) => !v);
+                    setError(null);
+                  }}
+                >
+                  {useRecovery ? "Use the 6-digit code instead" : "Use a recovery code instead"}
+                </button>
               </div>
               {error && (
                 <p role="alert" className="text-sm text-destructive">
@@ -117,6 +154,7 @@ export function LoginPage() {
                 className="w-full"
                 onClick={() => {
                   setChallenge(null);
+                  setUseRecovery(false);
                   setError(null);
                 }}
               >

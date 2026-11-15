@@ -18,8 +18,8 @@ async function signIn(
   await page.getByLabel("Password", { exact: true }).fill(password);
   await page.getByRole("button", { name: "Sign in" }).click();
   if (totp) {
+    // Six digits submit on their own.
     await page.getByLabel("Authentication code").fill(await totp.next());
-    await page.getByRole("button", { name: "Verify" }).click();
   }
   try {
     await page.waitForURL((u) => !u.pathname.startsWith("/login"), {
