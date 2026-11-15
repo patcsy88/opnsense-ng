@@ -38,3 +38,4 @@ The backend is a thin, network-bound layer: it proxies calls to the OPNsense API
 - **Python 3.14:** more mature wheel ecosystem. Kept as the fallback.
 - **Node 26:** longest support window (to 2029-04-30) but newest, with less proven tooling compatibility.
 - **Python 3.12 / Node 22:** rejected, as their support windows end too soon (2028-10 and 2027-04).
+- Added 2026-11-15 (approved by project owner, ADR-0022): `@base-ui/react` 1.9.0 (MIT), `@fontsource-variable/inter` 5.3.0 and `@fontsource-variable/geist-mono` 5.3.0 (OFL-1.1, latin subset bundled). `radix-ui` is removed once the migration finishes.
