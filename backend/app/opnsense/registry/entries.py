@@ -340,8 +340,9 @@ _ENTRIES = (
         required_privilege="Services: Kea DHCP",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Saves a reservation, not yet active. Reviewed apply only (ADR-0021).",
+        verified=True,
+        notes="Saves a reservation, not yet active. Body root key `reservation`. Reviewed apply "
+        "only (ADR-0021). Verified on the lab.",
     ),
     Operation(
         operation_id=KEA_RESERVATIONS_UPDATE,
@@ -351,8 +352,9 @@ _ENTRIES = (
         required_privilege="Services: Kea DHCP",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Edits a reservation, not yet active. Reviewed apply only (ADR-0021).",
+        verified=True,
+        notes="Edits a reservation, not yet active. Reviewed apply only (ADR-0021). Verified on "
+        "the lab.",
     ),
     Operation(
         operation_id=KEA_RESERVATIONS_DELETE,
@@ -362,8 +364,8 @@ _ENTRIES = (
         required_privilege="Services: Kea DHCP",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Deletes a reservation. Reviewed apply only (ADR-0021).",
+        verified=True,
+        notes="Deletes a reservation. Reviewed apply only (ADR-0021). Verified on the lab.",
     ),
     Operation(
         operation_id=KEA_RECONFIGURE,
@@ -372,8 +374,9 @@ _ENTRIES = (
         required_privilege="Services: Kea DHCP",
         read_only=False,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Activates saved Kea changes; Kea may restart and DHCP may pause. Apply only.",
+        verified=True,
+        notes='Activates saved Kea changes; replies {"status": "ok"}. Kea may restart and DHCP '
+        "may pause. Apply only. Verified on the lab.",
     ),
     Operation(
         operation_id=WIREGUARD_STATUS,
