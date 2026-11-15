@@ -131,6 +131,7 @@ function Reservations({ id }: { id: string }) {
       <TableHeader>
         <TableRow>
           <TableHead>IP address</TableHead>
+          <TableHead>Subnet</TableHead>
           <TableHead>MAC address</TableHead>
           <TableHead>Hostname</TableHead>
           <TableHead>Description</TableHead>
@@ -141,6 +142,9 @@ function Reservations({ id }: { id: string }) {
           <TableRow key={r.uuid}>
             <TableCell className="font-mono text-xs sm:text-sm">
               {r.ip_address}
+            </TableCell>
+            <TableCell className="font-mono text-xs sm:text-sm">
+              {r.subnet ?? "—"}
             </TableCell>
             <TableCell className="font-mono text-xs sm:text-sm">
               {r.hw_address ?? "—"}

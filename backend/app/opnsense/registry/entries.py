@@ -305,7 +305,8 @@ _ENTRIES = (
         read_only=True,
         min_version="26.7.8_2",
         verified=False,
-        notes="Kea DHCPv4 leases (ADR-0020). Endpoint and privilege name unconfirmed on the lab.",
+        notes="Kea DHCPv4 leases (ADR-0020). Endpoint, privilege and envelope confirmed on the "
+        "lab; row fields are not, because no client had a lease.",
     ),
     Operation(
         operation_id=KEA_RESERVATIONS,
@@ -314,8 +315,9 @@ _ENTRIES = (
         required_privilege="Services: Kea DHCP",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Kea DHCPv4 reservations (ADR-0020). Unconfirmed on the lab.",
+        verified=True,
+        notes="Kea DHCPv4 reservations (ADR-0020). Verified on the lab; `subnet` is a uuid and "
+        "`%subnet` its readable form.",
     ),
     Operation(
         operation_id=KEA_SUBNETS,
@@ -324,8 +326,8 @@ _ENTRIES = (
         required_privilege="Services: Kea DHCP",
         read_only=True,
         min_version="26.7.8_2",
-        verified=False,
-        notes="Kea DHCPv4 subnets (ADR-0020). Unconfirmed on the lab.",
+        verified=True,
+        notes="Kea DHCPv4 subnets (ADR-0020). Verified on the lab.",
     ),
     Operation(
         operation_id=WIREGUARD_STATUS,

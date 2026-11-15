@@ -121,7 +121,7 @@ def normalise_kea_reservations(raw: Any) -> KeaReservationsResult:
         out.append(
             KeaReservation(
                 uuid=uuid,
-                subnet=_text(row.get("subnet"), 64),
+                subnet=_text(row.get("%subnet"), 64) or _text(row.get("subnet"), 64),
                 ip_address=address,
                 hw_address=_text(row.get("hw_address"), 32),
                 hostname=_text(row.get("hostname"), 255),

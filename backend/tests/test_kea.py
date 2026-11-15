@@ -34,7 +34,8 @@ RESERVATIONS = {
     "rows": [
         {
             "uuid": "u1",
-            "subnet": "s1",
+            "subnet": "uuid-s1",
+            "%subnet": "192.168.1.0/24",
             "ip_address": "192.168.1.10",
             "hw_address": "aa:bb:cc:dd:ee:01",
             "hostname": "printer",
@@ -62,7 +63,11 @@ def test_lease_mapping_is_ipv4_only_and_drops_macs() -> None:
 
 def test_reservation_and_subnet_mapping_skip_bad_rows() -> None:
     res = normalise_kea_reservations(RESERVATIONS).reservations
-    assert [r.uuid for r in res] == ["u1"] and res[0].hw_address == "aa:bb:cc:dd:ee:01"
+    assert (
+        [r.uuid for r in res] == ["u1"]
+        and res[0].subnet == "192.168.1.0/24"
+        and res[0].hw_address == "aa:bb:cc:dd:ee:01"
+    )
     subnets = normalise_kea_subnets(SUBNETS).subnets
     assert [s.uuid for s in subnets] == ["s1", "s2"]
     assert subnets[0].pools == ["192.168.1.100-192.168.1.200"] and subnets[1].pools == []
@@ -95,6 +100,7 @@ async def test_endpoints_roles_audit_and_unverified(app_client: httpx.AsyncClien
         await switch(app_client, Role.read_only, "ro")
         ro_leases = await app_client.get(f"{root}/leases")
     assert leases.status_code == 200 and leases.json()["registry_verified"] is False
+    assert reservations.json()["registry_verified"] is True
     assert "aa:bb:cc" not in leases.text and len(leases.json()["leases"]) == 1
     assert len(reservations.json()["reservations"]) == 1
     assert len(subnets.json()["subnets"]) == 2
