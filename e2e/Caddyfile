@@ -1,4 +1,11 @@
 localhost:8443 {
+	@trafficstream path /api/v1/firewalls/*/traffic/stream
+	handle @trafficstream {
+		reverse_proxy backend:8000 {
+			flush_interval -1
+		}
+	}
+
 	handle /api/* {
 		reverse_proxy backend:8000
 	}

@@ -7,6 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addSample, formatRate, type History } from "@/features/traffic/rates";
+import { useTrafficStream } from "@/features/traffic/use-traffic-stream";
 import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 
@@ -27,15 +28,18 @@ export function TrafficPage() {
     return () => document.removeEventListener("visibilitychange", onChange);
   }, []);
 
+  const stream = useTrafficStream(selected, visible);
+  const polling = stream.mode === "fallback";
   const q = useQuery({
     queryKey: ["firewalls", selected, "traffic"],
     queryFn: () => api.traffic(selected as string),
-    enabled: selected !== null && visible,
-    refetchInterval: visible ? POLL_MS : false,
+    enabled: selected !== null && visible && polling,
+    refetchInterval: visible && polling ? POLL_MS : false,
     refetchIntervalInBackground: false,
   });
 
-  const sample = q.data;
+  const live = stream.sample?.firewall_id === selected ? stream.sample : null;
+  const sample = polling ? (q.data ?? live ?? undefined) : (live ?? q.data);
   useEffect(() => {
     if (!sample || sample.time === null) return;
     origin.current ??= sample.time;
@@ -66,15 +70,16 @@ export function TrafficPage() {
         <Card>
           <CardHeader>
             <CardTitle className="flex flex-wrap items-center gap-2">
-              Interface traffic {q.data && !q.data.registry_verified && <UnverifiedBadge />}
+              Interface traffic {sample && !sample.registry_verified && <UnverifiedBadge />}
             </CardTitle>
             <CardDescription>
-              Rates are worked out in your browser from the firewall's counters, every 5 seconds, for the last 5
-              minutes. History is lost when you leave or reload this page, and polling pauses while the tab is hidden.
+              Rates are worked out in your browser from the firewall's counters, about every second while the live
+              stream is connected (every 5 seconds otherwise), for the last 5 minutes. History is lost when you leave
+              or reload this page, and updates pause while the tab is hidden.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {q.isPending ? (
+            {sample === undefined ? (
               <Loading />
             ) : series.length === 0 ? (
               <p className="text-sm text-muted-foreground">No interface counters reported.</p>

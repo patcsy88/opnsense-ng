@@ -85,6 +85,7 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 
 ## Known limitations
 
+- The traffic stream (ADR-0023) keeps its shared sampler and its connection limits in memory, so they are per backend process. Caddy must not buffer or compress `/api/v1/firewalls/*/traffic/stream`; the shipped Caddyfile sets `flush_interval -1` for it.
 - Rate-limit counters (per IP) are in memory, so a single backend process is assumed. Per-username lockout is stored in the database.
 - Tested against one lab OPNsense (26.7.8_2) only. Six read-only dashboard operations are verified; see `docs/api-integration.md`.
 - The dashboard shows hostname, versions, updates, uptime, load average, CPU, memory and the root filesystem's disk usage.

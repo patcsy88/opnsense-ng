@@ -1,6 +1,6 @@
 # ADR-0023: Near-real-time traffic over a backend SSE stream
 
-- Status: accepted (approved by project owner on 2026-11-15)
+- Status: accepted and implemented (approved by project owner on 2026-11-15)
 - Date: 2026-11-15
 - Deciders: project owner
 
@@ -72,3 +72,13 @@ Other facts:
 ## Counter check
 
 Done read-only on 2026-11-15 on two OPNsense records (9 and 2 interfaces), calling `/traffic` twelve times at about 1.1 s intervals. The 2 s cache meant each record answered with a new sample about every 2.4 s. Every new sample had a later firewall `time` and higher byte counters, so the counters are read live on each call and are not refreshed on a slow timer. This does not show the counters at one-second granularity, because the cache hid it. The sampler calls the snapshot directly every second, and its first live run shows whether consecutive samples differ. If they often repeat, the browser skips them and the chart simply updates at the counters' own rate.
+
+## Outcome
+
+- Built as described. The hub is `backend/app/opnsense/traffic_stream.py`, the endpoint is `backend/app/api/traffic_stream.py`, and the browser hook is `frontend/src/features/traffic/use-traffic-stream.ts`.
+- Audit action names: `firewall.traffic.stream_open`, `firewall.traffic.stream_close` and `firewall.traffic.stream_denied` (a refused stream gets its own throttled record).
+- A stream also ends with `session_ended` when the account is deactivated, loses its role, or must change its password, not only when the session expires. This is re-checked every 15 s.
+- Editing or deleting a firewall ends its streams (`firewall_changed`), so a changed address or credential is never used by an old stream.
+- Checked on the lab through Caddy on two OPNsense records: events arrived 0.93-1.05 s apart, and each had a newer firewall timestamp, so the counters do refresh every second.
+- Not covered: more than one backend worker. Each would run its own sampler and keep its own limits.
+

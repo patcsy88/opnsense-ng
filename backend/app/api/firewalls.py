@@ -87,6 +87,7 @@ from app.opnsense.registry.entries import (
     TRAFFIC_INTERFACES,
     WIREGUARD_STATUS,
 )
+from app.opnsense.traffic_stream import hub as traffic_hub
 
 router = APIRouter(prefix="/api/v1/firewalls", tags=["firewalls"])
 log = get_logger("api.firewalls")
@@ -288,6 +289,7 @@ def update_firewall(
             request=request,
         )
         raise HTTPException(status.HTTP_409_CONFLICT, "A firewall with this name exists") from None
+    traffic_hub.forget(firewall_id)
     return _out(fw)
 
 
@@ -314,6 +316,7 @@ def delete_firewall(
     db.commit()
     cpu_sampler.forget(firewall_id)
     traffic_cache.forget(firewall_id)
+    traffic_hub.forget(firewall_id)
 
 
 @router.get("/options", response_model=list[FirewallOption])

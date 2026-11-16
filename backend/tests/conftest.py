@@ -118,11 +118,14 @@ def csrf_headers(client: httpx.AsyncClient) -> dict[str, str]:
 def _reset_cpu_sampler() -> Iterator[None]:
     from app.api import overview
     from app.opnsense import cpu_sampler, traffic_cache
+    from app.opnsense.traffic_stream import hub
 
     cpu_sampler.clear()
     traffic_cache.clear()
+    hub.clear()
     overview.clear()
     yield
     cpu_sampler.clear()
     traffic_cache.clear()
+    hub.clear()
     overview.clear()
