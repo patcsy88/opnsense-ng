@@ -81,7 +81,7 @@ function UserMenu() {
 
 /** Pages with no single-firewall scope keep the picker out of the bar. */
 function showsPicker(path: string): boolean {
-  if (path === "/account") return false;
+  if (path === "/" || path === "/account") return false;
   if (path.startsWith("/administration")) return path.startsWith("/administration/changes");
   return true;
 }

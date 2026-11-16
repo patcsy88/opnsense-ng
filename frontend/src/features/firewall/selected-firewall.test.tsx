@@ -56,4 +56,11 @@ describe("shared firewall choice", () => {
     expect(screen.getByLabelText("Firewall")).toHaveTextContent("bravo-fw");
     expect(sessionStorage.getItem("selected-firewall")).toBe(B);
   });
+
+  it("is not shown on the dashboard, which lists every firewall", async () => {
+    setup([]);
+    renderApp(<App />, "/");
+    expect(await screen.findByRole("heading", { name: "Dashboard" })).toBeInTheDocument();
+    expect(screen.queryByLabelText("Firewall")).toBeNull();
+  });
 });
