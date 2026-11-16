@@ -1,9 +1,10 @@
 import { act, screen } from "@testing-library/react";
 import { http, HttpResponse, type JsonBodyType } from "msw";
-import { afterEach, describe, expect, it, vi } from "vitest";
+import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { App } from "@/App";
 import { server } from "@/test/server";
-import { ADMIN, FW, READER, renderApp } from "@/test/utils";
+import { ADMIN, FW, READER, chooseOption, renderApp } from "@/test/utils";
+import { RATE_KEY } from "@/features/traffic/update-rate";
 
 const sample = (verified = true) => ({
   firewall_id: FW.id,
@@ -155,6 +156,92 @@ describe("Traffic page live stream", () => {
     await vi.waitFor(() => expect(FakeEventSource.all).toHaveLength(1));
     view.unmount();
     expect(first().closed).toBe(true);
+  });
+});
+
+describe("Traffic update rate", () => {
+  beforeEach(() => localStorage.removeItem(RATE_KEY));
+  afterEach(() => {
+    vi.unstubAllGlobals();
+    FakeEventSource.all = [];
+    localStorage.removeItem(RATE_KEY);
+  });
+
+  const at = (t: number, inBytes: number) => ({
+    ...sample(),
+    time: t,
+    interfaces: [{ interface: "wan", name: "WAN", in_bytes: inBytes, out_bytes: 0, in_packets: 1, out_packets: 1 }],
+  });
+
+  it("defaults to live and remembers the choice", async () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    traffic(ADMIN);
+    renderApp(<App />, "/traffic");
+    const picker = await screen.findByRole("combobox", { name: "Update rate" });
+    expect(picker).toHaveTextContent("Live (1 s)");
+    await chooseOption(picker, "Every 5 s");
+    expect(localStorage.getItem(RATE_KEY)).toBe("5");
+    expect(screen.getByRole("combobox", { name: "Update rate" })).toHaveTextContent("Every 5 s");
+  });
+
+  it("starts from a remembered choice and ignores a bad stored value", async () => {
+    localStorage.setItem(RATE_KEY, "10");
+    traffic(ADMIN);
+    const view = renderApp(<App />, "/traffic");
+    expect(await screen.findByRole("combobox", { name: "Update rate" })).toHaveTextContent("Every 10 s");
+    view.unmount();
+    localStorage.setItem(RATE_KEY, "bogus");
+    traffic(ADMIN);
+    renderApp(<App />, "/traffic");
+    expect(await screen.findByRole("combobox", { name: "Update rate" })).toHaveTextContent("Live (1 s)");
+  });
+
+  it("draws only every Nth second of the stream", async () => {
+    localStorage.setItem(RATE_KEY, "5");
+    vi.stubGlobal("EventSource", FakeEventSource);
+    traffic(ADMIN);
+    renderApp(<App />, "/traffic");
+    await vi.waitFor(() => expect(FakeEventSource.all).toHaveLength(1));
+    const es = first();
+    act(() => es.onopen?.());
+    act(() => es.send(at(100, 0)));
+    for (const t of [101, 102, 103, 104]) act(() => es.send(at(t, t * 1000)));
+    expect(await screen.findByRole("heading", { name: "WAN" })).toBeInTheDocument();
+    expect(screen.getByText("Collecting samples…")).toBeInTheDocument(); // still one sample drawn
+    act(() => es.send(at(105, 105000)));
+    act(() => es.send(at(107, 107000))); // too soon after 105: not drawn
+    act(() => es.send(at(110, 110000)));
+    expect(await screen.findByRole("img", { name: "Traffic graph for WAN" })).toBeInTheDocument();
+  });
+
+  it("closes the stream while paused and opens it again on resume", async () => {
+    vi.stubGlobal("EventSource", FakeEventSource);
+    traffic(ADMIN);
+    renderApp(<App />, "/traffic");
+    await vi.waitFor(() => expect(FakeEventSource.all).toHaveLength(1));
+    await chooseOption(await screen.findByRole("combobox", { name: "Update rate" }), "Paused");
+    expect(first().closed).toBe(true);
+    expect(localStorage.getItem(RATE_KEY)).toBe("paused");
+    expect(await screen.findByText(/Paused\. Choose an update rate/)).toBeInTheDocument();
+    await chooseOption(screen.getByRole("combobox", { name: "Update rate" }), "Live (1 s)");
+    await vi.waitFor(() => expect(FakeEventSource.all).toHaveLength(2));
+  });
+
+  it("does not poll the firewall while paused", async () => {
+    localStorage.setItem(RATE_KEY, "paused");
+    let polls = 0;
+    server.use(
+      http.get("/api/v1/auth/me", () => HttpResponse.json(ADMIN)),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
+      http.get(`/api/v1/firewalls/${FW.id}/traffic`, () => {
+        polls += 1;
+        return HttpResponse.json(sample());
+      }),
+    );
+    renderApp(<App />, "/traffic");
+    expect(await screen.findByText(/Paused\. Choose an update rate/)).toBeInTheDocument();
+    await new Promise((r) => setTimeout(r, 200));
+    expect(polls).toBe(0);
   });
 });
 

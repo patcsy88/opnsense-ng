@@ -25,7 +25,7 @@ Node 24 is the target (`engines`). Dependencies are pinned exactly (`.npmrc` `sa
 
 ## Client-side storage
 
-- `localStorage`: only the `theme` preference.
+- `localStorage`: the `theme` preference and the Traffic page's `traffic-update-rate` choice. Nothing from a firewall.
 - React Query cache is in memory, cleared on 401/logout. Firewall secrets are never put in React state, query cache or mutation cache (the connections form posts directly and resets the form).
 - The service worker precaches static build assets only; `/api/*` is `NetworkOnly` and excluded from the navigation fallback. Offline navigations get `/offline.html`, which contains no firewall data.
 

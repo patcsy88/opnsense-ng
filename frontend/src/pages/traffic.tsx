@@ -3,24 +3,44 @@ import { useQuery } from "@tanstack/react-query";
 import { useEffect, useRef, useState } from "react";
 import { CartesianGrid, Legend, Line, LineChart, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { ErrorState } from "@/components/error-state";
+import { SelectField } from "@/components/ui/select-field";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { UnverifiedBadge } from "@/components/ui/status-badge";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
 import { addSample, formatRate, type History } from "@/features/traffic/rates";
+import { RATE_OPTIONS, rateSeconds, readRate, saveRate, type UpdateRate } from "@/features/traffic/update-rate";
 import { useTrafficStream } from "@/features/traffic/use-traffic-stream";
 import { useSelectedFirewall } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
 
-const POLL_MS = 5_000;
+const MIN_POLL_MS = 5_000;
+// Firewall timestamps are not exact, so a sample just under the chosen gap still counts.
+const GAP_TOLERANCE = 0.2;
 
 export function TrafficPage() {
   const { options, firewalls, selected } = useSelectedFirewall();
   const [visible, setVisible] = useState(() => document.visibilityState !== "hidden");
   const [history, setHistory] = useState<{ firewall: string | null; data: History }>({ firewall: null, data: {} });
   const origin = useRef<number | null>(null);
+  const lastDrawn = useRef<number | null>(null);
+  const [rate, setRate] = useState<UpdateRate>(readRate);
+  const paused = rate === "paused";
+  const every = rateSeconds(rate);
   useEffect(() => {
     origin.current = null;
+    lastDrawn.current = null;
   }, [selected]);
+
+  const changeRate = (next: UpdateRate) => {
+    if (paused) {
+      // The gap would otherwise be drawn as one long average, so start the series again.
+      setHistory({ firewall: null, data: {} });
+      origin.current = null;
+    }
+    lastDrawn.current = null;
+    saveRate(next);
+    setRate(next);
+  };
 
   useEffect(() => {
     const onChange = () => setVisible(document.visibilityState !== "hidden");
@@ -28,27 +48,29 @@ export function TrafficPage() {
     return () => document.removeEventListener("visibilitychange", onChange);
   }, []);
 
-  const stream = useTrafficStream(selected, visible);
+  const stream = useTrafficStream(selected, visible && !paused);
   const polling = stream.mode === "fallback";
   const q = useQuery({
     queryKey: ["firewalls", selected, "traffic"],
     queryFn: () => api.traffic(selected as string),
-    enabled: selected !== null && visible && polling,
-    refetchInterval: visible && polling ? POLL_MS : false,
+    enabled: selected !== null && visible && !paused && polling,
+    refetchInterval: visible && !paused && polling ? Math.max(every * 1000, MIN_POLL_MS) : false,
     refetchIntervalInBackground: false,
   });
 
   const live = stream.sample?.firewall_id === selected ? stream.sample : null;
   const sample = polling ? (q.data ?? live ?? undefined) : (live ?? q.data);
   useEffect(() => {
-    if (!sample || sample.time === null) return;
+    if (!sample || sample.time === null || paused) return;
+    if (lastDrawn.current !== null && sample.time - lastDrawn.current < every - GAP_TOLERANCE) return;
+    lastDrawn.current = sample.time;
     origin.current ??= sample.time;
     const base = origin.current;
     setHistory((prev) => {
       const same = prev.firewall === sample.firewall_id;
       return { firewall: sample.firewall_id, data: addSample(same ? prev.data : {}, sample, base) };
     });
-  }, [sample]);
+  }, [sample, paused, every]);
 
   const series = history.firewall === selected ? Object.entries(history.data) : [];
 
@@ -69,17 +91,30 @@ export function TrafficPage() {
       {selected && !q.isError && (
         <Card>
           <CardHeader>
-            <CardTitle className="flex flex-wrap items-center gap-2">
-              Interface traffic {sample && !sample.registry_verified && <UnverifiedBadge />}
-            </CardTitle>
+            <div className="flex flex-wrap items-center justify-between gap-2">
+              <CardTitle className="flex flex-wrap items-center gap-2">
+                Interface traffic {sample && !sample.registry_verified && <UnverifiedBadge />}
+              </CardTitle>
+              <SelectField
+                aria-label="Update rate"
+                options={RATE_OPTIONS}
+                value={rate}
+                onValueChange={(v) => changeRate(v as UpdateRate)}
+                size="sm"
+                className="w-40"
+              />
+            </div>
             <CardDescription>
-              Rates are worked out in your browser from the firewall's counters, about every second while the live
-              stream is connected (every 5 seconds otherwise), for the last 5 minutes. History is lost when you leave
-              or reload this page, and updates pause while the tab is hidden.
+              Rates are worked out in your browser from the firewall's counters at the update rate you choose, for the
+              last 5 minutes. Live updates arrive about every second while the stream is connected, and every 5
+              seconds or slower if it is not. History is lost when you leave or reload this page, and updates pause
+              while the tab is hidden.
             </CardDescription>
           </CardHeader>
           <CardContent className="space-y-4">
-            {sample === undefined ? (
+            {paused && series.length === 0 ? (
+              <p className="text-sm text-muted-foreground">Paused. Choose an update rate to resume.</p>
+            ) : sample === undefined ? (
               <Loading />
             ) : series.length === 0 ? (
               <p className="text-sm text-muted-foreground">No interface counters reported.</p>
