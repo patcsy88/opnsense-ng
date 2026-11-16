@@ -75,3 +75,13 @@ multiply both the load on the firewalls and the size of the audit log.
   same data to every role.
 - **Keep per-operation audit rows.** Rejected for the reason above. It is the main point where the
   owner may prefer a different trade-off.
+
+## Update (2026-11-16)
+
+The separate "Overview" page and its nav item were removed at the project owner's request. The
+Dashboard (`/`) now shows the same data as one card per firewall: name, reachable or not, hostname,
+version, uptime, and CPU, memory and disk bars. Clicking a card selects that firewall for the other
+pages and stays on the Dashboard. The backend contract above is unchanged, and the Dashboard refreshes
+every 60 seconds by default (30 s, 60 s, off) with a "Refresh now" button. `/overview` redirects to `/`.
+The old single-firewall connectivity and system-status cards were removed; their endpoints remain.
+

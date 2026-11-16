@@ -14,7 +14,6 @@ const ChangeDetailPage = lazy(() => import("@/pages/change-detail").then((m) => 
 const ChangesPage = lazy(() => import("@/pages/changes").then((m) => ({ default: m.ChangesPage })));
 const FirewallConnectionsPage = lazy(() => import("@/pages/firewall-connections").then((m) => ({ default: m.FirewallConnectionsPage })));
 const NatPage = lazy(() => import("@/pages/nat").then((m) => ({ default: m.NatPage })));
-const OverviewPage = lazy(() => import("@/pages/overview").then((m) => ({ default: m.OverviewPage })));
 const DhcpPage = lazy(() => import("@/pages/dhcp").then((m) => ({ default: m.DhcpPage })));
 const DnsPage = lazy(() => import("@/pages/dns").then((m) => ({ default: m.DnsPage })));
 const LogsPage = lazy(() => import("@/pages/logs").then((m) => ({ default: m.LogsPage })));
@@ -35,7 +34,7 @@ export function App() {
           {NAV_ITEMS.filter((n) => !n.implemented).map((n) => (
             <Route key={n.to} path={n.to} element={<PlannedPage title={n.label} />} />
           ))}
-          <Route path="/overview" element={<OverviewPage />} />
+          <Route path="/overview" element={<Navigate to="/" replace />} />
           <Route path="/firewall" element={<FirewallPage />} />
           <Route path="/administration/changes" element={<ChangesPage />} />
           <Route path="/administration/changes/:id" element={<ChangeDetailPage />} />

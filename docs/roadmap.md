@@ -6,7 +6,7 @@
 | 2 | Interface monitoring, firewall rules, aliases | P0 |
 | 3 | NAT, firewall logs, traffic monitoring (done) | P1 |
 | 4 | VPN, DHCP, DNS, service management (read-only views done; service start, stop and restart built per ADR-0016 and lab-verified; Dnsmasq static hosts and domain overrides built per ADR-0017 and lab-verified; Unbound host overrides and domain forwards built per ADR-0018 and lab-verified; WireGuard peers and tunnels built per ADR-0019 and lab-verified; Kea DHCPv4 leases, reservations and subnets read-only per ADR-0020, subnets, reservations and leases verified; Kea reservation create, update and delete built per ADR-0021 and lab-verified) | P1 |
-| 5 | Audit logging, advanced security, multi-firewall (done: audit viewer, TOTP MFA, user management, PostgreSQL login limits, multi-firewall overview) | P2 |
+| 5 | Audit logging, advanced security, multi-firewall (done: audit viewer, TOTP MFA, user management, PostgreSQL login limits, multi-firewall overview, now the Dashboard cards) | P2 |
 | 6 | Analytics, notifications, automation | P2 |
 | Traffic | Near-real-time traffic chart over a backend SSE stream per ADR-0023 (done, lab-verified through Caddy) | P2 |
 | UI | Move the UI from shadcn/Radix to coss ui on Base UI per ADR-0022 (done: tokens and fonts, primitives, overlays, tabs and selects, layout, lazy-loaded pages; live specs rerun on the lab) | P2 |

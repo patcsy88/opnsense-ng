@@ -56,14 +56,4 @@ describe("shared firewall choice", () => {
     expect(screen.getByLabelText("Firewall")).toHaveTextContent("bravo-fw");
     expect(sessionStorage.getItem("selected-firewall")).toBe(B);
   });
-
-  it("is not shown on the overview page", async () => {
-    setup([]);
-    server.use(http.get("/api/v1/overview", () => HttpResponse.json([])));
-    renderApp(<App />, "/overview");
-    expect(
-      await screen.findByRole("heading", { name: "Overview" }),
-    ).toBeInTheDocument();
-    expect(screen.queryByLabelText("Firewall")).toBeNull();
-  });
 });

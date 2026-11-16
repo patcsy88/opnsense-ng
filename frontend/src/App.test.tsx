@@ -5,22 +5,6 @@ import { App } from "./App";
 import { server } from "@/test/server";
 import { ADMIN, FW, READER, renderApp } from "@/test/utils";
 
-const okStatus = {
-  firewall_id: FW.id,
-  status: { hostname: "fw.lan", versions: ["OPNsense 26.1"], updates: null, server_time: null,
-    uptime: "3 days",
-    load_average: "0.10, 0.20, 0.30",
-    memory_total_bytes: 8589934592,
-    memory_used_bytes: 2147483648,
-    memory_used_percent: 25,
-    cpu_used_percent: 37.5,
-    disk_total_bytes: 21474836480,
-    disk_used_bytes: 5368709120,
-    disk_used_percent: 25,
-  },
-  registry_verified: false,
-};
-
 function mockSession(user: typeof ADMIN | typeof READER | null) {
   server.use(
     http.get("/api/v1/auth/me", () =>
@@ -97,23 +81,32 @@ describe("auth flow", () => {
 });
 
 describe("role-based rendering", () => {
-  it("admin sees the connections link and detailed connectivity", async () => {
+  const overviewEntry = (over: object = {}) => ({
+    id: FW.id,
+    name: "edge-1",
+    reachable: false,
+    status: "tls_error",
+    message: "bad cert",
+    hostname: null,
+    version: null,
+    uptime: null,
+    cpu_used_percent: null,
+    memory_used_percent: null,
+    disk_used_percent: null,
+    checked_at: 1,
+    ...over,
+  });
+
+  it("admin sees the failure detail on the dashboard", async () => {
     mockSession(ADMIN);
     server.use(
-      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: FW.name }])),
-      http.get("/api/v1/firewalls/:id/connectivity", () =>
-        HttpResponse.json({ firewall_id: FW.id, ok: false, status: "tls_error", message: "bad cert", registry_verified: true }),
+      http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: "edge-1" }])),
+      http.get("/api/v1/firewalls/overview", () =>
+        HttpResponse.json({ firewalls: [overviewEntry()], truncated: false }),
       ),
-      http.get("/api/v1/firewalls/:id/system/status", () => HttpResponse.json(okStatus)),
     );
     renderApp(<App />, "/");
-    expect(await screen.findByText("tls_error")).toBeInTheDocument();
-    expect(await screen.findByText("fw.lan")).toBeInTheDocument();
-    expect(await screen.findByText("Unverified API mapping")).toBeInTheDocument();
-    expect(await screen.findByText("2048 MB of 8192 MB (25%)")).toBeInTheDocument();
-    expect(await screen.findByText("0.10, 0.20, 0.30")).toBeInTheDocument();
-    expect(await screen.findByText("37.5%")).toBeInTheDocument();
-    expect(await screen.findByText("5.0 GB of 20.0 GB (25%)")).toBeInTheDocument();
+    expect(await screen.findByText(/tls_error: bad cert/)).toBeInTheDocument();
   });
 
   it("read-only user picks a firewall from the options list and never calls the detailed list", async () => {
@@ -125,15 +118,17 @@ describe("role-based rendering", () => {
         return HttpResponse.json([]);
       }),
       http.get("/api/v1/firewalls/options", () => HttpResponse.json([{ id: FW.id, name: "edge-1" }])),
-      http.get("/api/v1/firewalls/:id/connectivity", () =>
-        HttpResponse.json({ firewall_id: FW.id, ok: false, status: "unreachable", message: "Firewall is unreachable", registry_verified: true }),
+      http.get("/api/v1/firewalls/overview", () =>
+        HttpResponse.json({
+          firewalls: [overviewEntry({ status: "unreachable", message: "Firewall is unreachable" })],
+          truncated: false,
+        }),
       ),
-      http.get("/api/v1/firewalls/:id/system/status", () => HttpResponse.json(okStatus)),
     );
     renderApp(<App />, "/");
-    expect(await screen.findByText("Firewall is unreachable")).toBeInTheDocument();
+    expect(await screen.findByText("Unreachable")).toBeInTheDocument();
     await waitFor(() => expect(screen.getByLabelText("Firewall")).toHaveTextContent("edge-1"));
-    expect(screen.queryByText("tls_error")).not.toBeInTheDocument();
+    expect(screen.queryByText(/tls_error/)).not.toBeInTheDocument();
     expect(detailedListCalled).toBe(false);
   });
 

@@ -4,7 +4,6 @@ import {
   Flame,
   Globe,
   LayoutDashboard,
-  LayoutList,
   Network,
   Router,
   Shuffle,
@@ -27,7 +26,6 @@ export interface NavItem {
 
 export const NAV_ITEMS: NavItem[] = [
   { to: "/", label: "Dashboard", icon: LayoutDashboard, implemented: true },
-  { to: "/overview", label: "Overview", icon: LayoutList, implemented: true },
   { to: "/firewall", label: "Firewall", icon: Flame, implemented: true },
   { to: "/nat", label: "NAT", icon: Shuffle, implemented: true },
   { to: "/network", label: "Network", icon: Network, implemented: true },
