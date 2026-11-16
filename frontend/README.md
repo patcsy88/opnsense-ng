@@ -12,7 +12,7 @@ Node 24 is the target (`engines`). Dependencies are pinned exactly (`.npmrc` `sa
 | `npm run build` | typecheck, production build, then `scripts/check-sw.mjs` |
 | `npm test` | Vitest + Testing Library + msw |
 | `npm run lint` / `npm run typecheck` | ESLint / `tsc --noEmit` |
-| `npm run e2e` | Playwright smoke test (API mocked by route interception; needs `npx playwright install chromium` once) |
+| `npm run e2e` | Playwright smoke test and an iPhone-profile check in WebKit (API mocked by route interception; needs `npx playwright install chromium webkit` once) |
 | `npm run check:sw` | Assert the built service worker has no `/api` caching |
 | `npm run icons` | Regenerate placeholder PNG icons |
 

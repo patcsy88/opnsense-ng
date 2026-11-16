@@ -26,13 +26,12 @@ test("login with a mocked API and see the dashboard", async ({ page }) => {
         return json([{ id: FW.id, name: FW.name }]);
       case "/api/v1/firewalls":
         return json([FW]);
-      case `/api/v1/firewalls/${FW.id}/connectivity`:
-        return json({ firewall_id: FW.id, ok: true, status: "ok", message: "Connected", registry_verified: false });
-      case `/api/v1/firewalls/${FW.id}/system/status`:
+      case "/api/v1/firewalls/overview":
         return json({
-          firewall_id: FW.id,
-          status: { hostname: "fw.lan", versions: ["OPNsense 26.1"], updates: null, server_time: null, uptime: "3 days", load_average: null, memory_total_bytes: null, memory_used_bytes: null, memory_used_percent: null, cpu_used_percent: null, disk_total_bytes: null, disk_used_bytes: null, disk_used_percent: null },
-          registry_verified: false,
+          firewalls: [
+            { id: FW.id, name: FW.name, reachable: true, status: "ok", message: "Connected", hostname: "fw.lan", version: "OPNsense 26.1", uptime: "3 days", cpu_used_percent: 10, memory_used_percent: 20, disk_used_percent: 30, checked_at: 1 },
+          ],
+          truncated: false,
         });
       default:
         return json({ detail: "unmocked" }, 404);
@@ -48,7 +47,6 @@ test("login with a mocked API and see the dashboard", async ({ page }) => {
   await expect(page.getByRole("heading", { name: "Dashboard" })).toBeVisible();
   await expect(page.getByText("Reachable")).toBeVisible();
   await expect(page.getByText("fw.lan")).toBeVisible();
-  await expect(page.getByText("Unverified API mapping").first()).toBeVisible();
 
   // Nothing but the theme preference may be persisted client-side.
   const keys = await page.evaluate(() => Object.keys(localStorage));

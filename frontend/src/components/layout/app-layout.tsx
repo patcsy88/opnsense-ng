@@ -97,7 +97,7 @@ export function AppLayout() {
         <NavLinks />
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
-        <header className="flex h-14 items-center gap-2 border-b border-border bg-background px-4">
+        <header className="flex h-14 items-center gap-2 border-b border-border bg-background pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
           <Sheet open={open} onOpenChange={setOpen}>
             <SheetTrigger
               render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation" />}
@@ -117,14 +117,14 @@ export function AppLayout() {
             <UserMenu />
           </div>
         </header>
-        <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-20 md:p-6 md:pb-6">
+        <main className="mx-auto w-full max-w-7xl flex-1 p-4 pb-[calc(5rem+env(safe-area-inset-bottom))] md:p-6 md:pb-6">
           <Suspense fallback={<Loading />}>
             <Outlet />
           </Suspense>
         </main>
         <nav
           aria-label="Quick"
-          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-sidebar-border bg-sidebar md:hidden"
+          className="fixed inset-x-0 bottom-0 z-40 grid grid-cols-4 border-t border-sidebar-border bg-sidebar pb-[env(safe-area-inset-bottom)] pl-[env(safe-area-inset-left)] pr-[env(safe-area-inset-right)] md:hidden"
         >
           {["/", "/firewall", "/services", "/administration"].map((path) => NAV_ITEMS.find((n) => n.to === path)).map((item) =>
             item ? (

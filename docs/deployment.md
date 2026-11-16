@@ -83,6 +83,20 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 - Lost authenticator and recovery codes (CLI): `docker compose exec backend python -m app.auth.cli reset-mfa <username>` clears the user's MFA and ends their sessions; they enrol again at the next sign-in. Run it from the host, so it needs shell access to the server
 - Audit log: admins and security admins view it under Administration, Audit log. Only an admin can purge, and only records older than `AUDIT_RETENTION_DAYS`. Take a backup first if you need to keep them
 
+## Using the app on an iPhone or iPad (installed PWA)
+
+The app is an installable web app. On iOS it needs no App Store build.
+
+1. **Give the app an address the phone trusts.** Set `SITE_ADDRESS` to a real hostname that resolves from the phone (public DNS, or your own DNS reached over your VPN). Caddy gets a Let's Encrypt certificate automatically when the hostname is public. For a private name, either use a DNS-challenge certificate or install your own CA on the phone (Settings → General → VPN & Device Management, then Settings → General → About → Certificate Trust Settings → enable full trust). The internal `localhost` certificate will not work on a phone.
+2. **Make the phone able to reach it.** The app does not need to be on the internet. A VPN into the network that hosts it is enough.
+3. **Install it from Safari.** Open the address, tap Share, then Add to Home Screen. It opens full-screen with its own icon.
+
+Notes:
+- The sign-in session works as in a browser: secure cookies, CSRF, idle timeout and MFA are unchanged. iOS may clear a Home Screen app's storage after long non-use, so you may need to sign in again.
+- The live Traffic chart uses a server-sent stream. iOS pauses it when the app goes to the background and it reconnects when you return.
+- The service worker caches static files only, never `/api`, so firewall data is not kept on the phone.
+- A native App Store app (for example a Capacitor wrapper) is not built. It would need a new dependency, a cookie and CSP review, and an Apple Developer account, so it would need its own ADR.
+
 ## Known limitations
 
 - The traffic stream (ADR-0023) keeps its shared sampler and its connection limits in memory, so they are per backend process. Caddy must not buffer or compress `/api/v1/firewalls/*/traffic/stream`; the shipped Caddyfile sets `flush_interval -1` for it.
