@@ -12,14 +12,15 @@ Status: Docker Compose stack (`caddy`, `frontend`, `backend`, `postgres`) smoke-
 
 `install.sh` is the one script to run. It is written for a host behind a TLS-terminating tunnel such as Pangolin (see the iPhone section below for what that means for the app).
 
-Needs: any Linux with Docker Engine, Compose v2, and `bash`, `curl` and `openssl`. The script does not install Docker and stops with a link if it is missing.
+Needs: any Linux with Docker Engine, Compose v2, and `bash`, `curl`, `tar` and `openssl`. The script does not install Docker and stops with a link if it is missing. The repository is public, so no git, SSH key or token is needed on the host.
 
 ```
-git clone git@github.com:patcsy88/opnsense-ng.git
-cd opnsense-ng
-./install.sh --dry-run   # optional: checks the host, changes nothing
-./install.sh
+curl -fsSLO https://raw.githubusercontent.com/patcsy88/opnsense-ng/main/install.sh
+bash install.sh --dry-run   # optional: checks the host, changes nothing
+bash install.sh
 ```
+
+The script downloads the code into `./opnsense-ng` (set `INSTALL_DIR` to change it) and carries on from there. Inside an existing checkout it just runs.
 
 What it asks: the public hostname, the address or range Caddy sees the tunnel agent connect from (it refuses `0.0.0.0/0` and anything wider than a /16), the first admin's username, and optionally a MaxMind account ID and licence key (the key is read hidden and is never written to `.env`). The admin password is typed into the app's own prompt, hidden.
 
@@ -31,7 +32,7 @@ Afterwards:
 3. **Sign in once and check the audit log shows your real address.** If it shows the tunnel's, correct `CADDY_TRUSTED_PROXIES` in `.env` and run `docker compose up -d`.
 4. **At the host firewall, allow port 80 only from the tunnel agent and block 443.** The script does not change the host firewall.
 
-Updating: `git pull && ./install.sh`. Existing secrets and your other `.env` settings are kept, and database migrations run when the backend starts. Do not delete `.env` or run `docker compose down -v` unless you mean to start from an empty database: a new password would not change an existing database volume, and a new encryption key would make stored firewall credentials unreadable.
+Updating: run `bash install.sh` again (from the folder that contains `opnsense-ng`, or inside it after a `git pull`). It downloads the newest code over the old files. Existing secrets and your other `.env` settings are kept, and database migrations run when the backend starts. Do not delete `.env` or run `docker compose down -v` unless you mean to start from an empty database: a new password would not change an existing database volume, and a new encryption key would make stored firewall credentials unreadable.
 
 Backup: `docker compose exec -T postgres pg_dump -U opnsense_mgr opnsense_mgr > backup.sql`
 

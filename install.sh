@@ -2,8 +2,10 @@
 # One-step setup for a Linux host: checks the host, asks for what it cannot know, generates the
 # secrets, writes .env (mode 600), builds and starts the stack and creates the first admin.
 #
-# Run from the repository root as a normal user that may use Docker:   ./install.sh
-# Safe to re-run (after a git pull, for example): existing secrets are kept.
+# On a fresh host (needs only bash, curl, tar, openssl and Docker):
+#   curl -fsSLO https://raw.githubusercontent.com/patcsy88/opnsense-ng/main/install.sh && bash install.sh
+# It downloads the code into ./opnsense-ng (INSTALL_DIR to change) and carries on from there.
+# Inside an existing checkout it just runs. Re-running updates the code and keeps .env.
 #
 #   ./install.sh --dry-run   check the host and show what would happen; writes and starts nothing
 #
@@ -27,7 +29,42 @@ case "${1:-}" in
     ;;
 esac
 
-cd "$(dirname "$0")"
+# Bootstrap: on a fresh host this file may be the only thing present. Fetch the code (public
+# repository, plain HTTPS, no git or SSH keys needed) and continue from the downloaded copy.
+# Re-running the same way updates the code in place and keeps .env, geoip/ and other local files.
+REPO_TARBALL="${INSTALL_TARBALL_URL:-https://github.com/patcsy88/opnsense-ng/archive/refs/heads/main.tar.gz}"
+here="$(cd "$(dirname "${BASH_SOURCE[0]:-$0}")" 2>/dev/null && pwd || true)"
+if [ ! -f "$here/docker-compose.yml" ] || [ ! -f "$here/Caddyfile" ]; then
+  target="${INSTALL_DIR:-$PWD/opnsense-ng}"
+  for tool in curl tar; do
+    command -v "$tool" >/dev/null 2>&1 || {
+      echo "ERROR: $tool is required to download the code." >&2
+      exit 1
+    }
+  done
+  echo "Downloading the code to $target"
+  dl="$(mktemp -d)"
+  trap 'rm -rf "$dl"' EXIT
+  curl --fail --silent --show-error --location --proto '=https' --tlsv1.2 \
+    --output "$dl/src.tar.gz" "$REPO_TARBALL" || {
+    echo "ERROR: could not download $REPO_TARBALL" >&2
+    exit 1
+  }
+  mkdir -p "$target"
+  tar -xzf "$dl/src.tar.gz" -C "$target" --strip-components=1
+  [ -f "$target/docker-compose.yml" ] || {
+    echo "ERROR: the download does not look like this project." >&2
+    exit 1
+  }
+  chmod +x "$target/install.sh" "$target"/scripts/*.sh 2>/dev/null || true
+  # With "curl ... | bash" stdin is the script itself, so give the prompts the terminal back.
+  if [ ! -t 0 ] && [ -r /dev/tty ] && : </dev/tty 2>/dev/null; then
+    exec bash "$target/install.sh" "$@" </dev/tty
+  fi
+  exec bash "$target/install.sh" "$@"
+fi
+
+cd "$here"
 ENV_FILE=".env"
 SUBNET_PREFIX="172.30."
 
@@ -320,7 +357,7 @@ Do now
      This script does not change the host firewall.
 
 Everyday commands (run in $(pwd))
-  Update:   git pull && ./install.sh
+  Update:   bash install.sh   (downloads the newest code and keeps .env)
   Logs:     docker compose logs -f backend
   Backup:   docker compose exec -T postgres pg_dump -U opnsense_mgr opnsense_mgr > backup.sql
   Stop:     docker compose down        (add -v only to delete the database)
