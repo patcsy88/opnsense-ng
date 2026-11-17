@@ -20,6 +20,7 @@ services:
 
   backend:
     build: ./backend
+    image: ghcr.io/patcsy88/opnsense-ng-backend:${APP_TAG:-latest}
     restart: unless-stopped
     depends_on:
       postgres:
@@ -44,6 +45,7 @@ services:
 
   frontend:
     build: ./frontend
+    image: ghcr.io/patcsy88/opnsense-ng-frontend:${APP_TAG:-latest}
     restart: unless-stopped
     networks:
       - internal

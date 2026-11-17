@@ -20,6 +20,10 @@ bash install.sh --dry-run   # optional: checks the host, changes nothing
 bash install.sh
 ```
 
+Images are prebuilt by GitHub Actions and pulled from `ghcr.io` (ADR-0024), so the host builds nothing. Set `INSTALL_BUILD=1` to build on the host instead. Pin a version with `APP_TAG=<commit sha>` in `.env`; the default is `latest`.
+
+**One-time, by the repository owner:** after the first publish run, open each package (`opnsense-ng-backend`, `opnsense-ng-frontend`) under the GitHub profile's Packages, then Package settings, and set visibility to Public. New packages are private, and a host without a login cannot pull them.
+
 The script downloads the code into `./opnsense-ng` (set `INSTALL_DIR` to change it) and carries on from there. Inside an existing checkout it just runs.
 
 What it asks: the public hostname, the address or range Caddy sees the tunnel agent connect from (it refuses `0.0.0.0/0` and anything wider than a /16), the first admin's username, and optionally a MaxMind account ID and licence key (the key is read hidden and is never written to `.env`). The admin password is typed into the app's own prompt, hidden.
@@ -36,7 +40,7 @@ Updating: run `bash install.sh` again (from the folder that contains `opnsense-n
 
 Backup: `docker compose exec -T postgres pg_dump -U opnsense_mgr opnsense_mgr > backup.sql`
 
-Tested: syntax and ShellCheck, the dry run, refusal of bad tunnel ranges, `.env` mode and re-run behaviour in a Debian container with Docker stubbed, and that the generated key is a valid Fernet key. Not tested: a full run on a real Linux host, and a real Pangolin tunnel.
+Tested: syntax and ShellCheck, the dry run, refusal of bad tunnel ranges, `.env` mode and re-run behaviour in a Debian container with Docker stubbed, and that the generated key is a valid Fernet key. Not tested: the publishing workflow (it first runs on GitHub), pulling from GHCR, a full run on a real Linux host, and a real Pangolin tunnel.
 
 The manual steps below do the same by hand.
 

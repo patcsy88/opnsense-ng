@@ -10,6 +10,7 @@
 #   ./install.sh --dry-run   check the host and show what would happen; writes and starts nothing
 #
 # Optional answers can be given as environment variables to skip a prompt:
+#   INSTALL_BUILD=1 builds the images on the host instead of pulling them.
 #   INSTALL_HOSTNAME, INSTALL_TRUSTED_PROXIES, INSTALL_ADMIN_USER, MAXMIND_ACCOUNT_ID, MAXMIND_LICENSE_KEY
 #
 # This setup is for use behind a TLS-terminating tunnel such as Pangolin (docs/deployment.md).
@@ -118,10 +119,10 @@ if command -v ip >/dev/null 2>&1; then
 fi
 
 avail_kb="$(df -Pk . | awk 'NR==2 {print $4}')"
-[ "${avail_kb:-0}" -ge 3145728 ] || warn "Less than 3 GB free here. Building the images needs about that much."
+[ "${avail_kb:-0}" -ge 2097152 ] || warn "Less than 2 GB free here. The images and the database need about that much."
 if [ -r /proc/meminfo ]; then
   mem_kb="$(awk '/MemAvailable/ {print $2}' /proc/meminfo)"
-  [ "${mem_kb:-0}" -ge 1048576 ] || warn "Less than 1 GB of memory available. The frontend build may fail."
+  [ "${mem_kb:-0}" -ge 524288 ] || warn "Less than 512 MB of memory available."
 fi
 
 # ---------------------------------------------------------------- helpers for .env
@@ -258,9 +259,19 @@ else
 fi
 
 # ---------------------------------------------------------------- 5. build and start
-step "5/8 Building and starting the stack (the first build takes a few minutes)"
+step "5/8 Fetching and starting the stack"
 
-act docker compose build
+# Published images by default (ADR-0024). INSTALL_BUILD=1 builds them on this host instead,
+# which needs about 3 GB of disk, Node and PyPI access, and a few minutes.
+if [ "${INSTALL_BUILD:-0}" = 1 ]; then
+  act docker compose build
+elif [ "$DRY_RUN" = 1 ]; then
+  say "[dry-run] would run: docker compose pull"
+else
+  docker compose pull || die "Could not pull the images from ghcr.io.
+  If the packages were only just published, they may still be private: see docs/deployment.md.
+  To build on this host instead, run: INSTALL_BUILD=1 bash install.sh"
+fi
 act docker compose up -d
 
 wait_healthy() { # wait_healthy <service>
