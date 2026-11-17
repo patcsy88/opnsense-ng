@@ -111,3 +111,30 @@ describe("api client", () => {
     await expect(request("GET", "https://evil.example/x")).rejects.toThrow();
   });
 });
+
+describe("access gateway in front of the app", () => {
+  it("reports a redirect as a gateway error and does not sign the user out", async () => {
+    const handler = vi.fn();
+    setUnauthorizedHandler(handler);
+    server.use(
+      http.get(
+        "/api/v1/firewalls/options",
+        () => new HttpResponse(null, { status: 302, headers: { Location: "https://login.example.test/" } }),
+      ),
+    );
+    const err = await api.listFirewallOptions().catch((e: unknown) => e);
+    setUnauthorizedHandler(null);
+    expect(err).toBeInstanceOf(ApiError);
+    expect((err as ApiError).kind).toBe("gateway");
+    expect(handler).not.toHaveBeenCalled();
+  });
+});
+
+describe("gateway error text", () => {
+  it("tells the user to reload and sign in at the gateway", async () => {
+    const { describeError } = await import("./errors");
+    const d = describeError(new ApiError("gateway", 302, "x"));
+    expect(d.title).toBe("Gateway sign-in required");
+    expect(d.retryable).toBe(false);
+  });
+});

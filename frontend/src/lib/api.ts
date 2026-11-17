@@ -64,6 +64,7 @@ export type ApiErrorKind =
   | "conflict"
   | "validation"
   | "server"
+  | "gateway"
   | "network"
   | "schema";
 
@@ -162,7 +163,9 @@ export async function request<T = void>(
     throw new Error("API client only accepts relative /api/ paths");
   }
   const headers: Record<string, string> = { Accept: "application/json" };
-  const init: RequestInit = { method, headers, credentials: "same-origin" };
+  // The API never redirects. A redirect means an access gateway in front of the app (for example a
+  // tunnel login) has ended its session, and following it would only fail with an opaque error.
+  const init: RequestInit = { method, headers, credentials: "same-origin", redirect: "manual" };
   if (opts.body !== undefined) {
     headers["Content-Type"] = "application/json";
     init.body = JSON.stringify(opts.body);
@@ -177,6 +180,9 @@ export async function request<T = void>(
     res = await fetch(path, init);
   } catch {
     throw new ApiError("network", 0, "Cannot reach the server");
+  }
+  if (res.type === "opaqueredirect" || (res.status >= 300 && res.status < 400)) {
+    throw new ApiError("gateway", res.status, "Sign-in through the access gateway is required");
   }
 
   if (!res.ok) {

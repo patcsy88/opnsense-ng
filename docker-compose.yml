@@ -56,6 +56,7 @@ services:
       - frontend
     environment:
       SITE_ADDRESS: ${SITE_ADDRESS:-localhost}
+      CADDY_TRUSTED_PROXIES: ${CADDY_TRUSTED_PROXIES:-127.0.0.1/32}
     ports:
       - "80:80"
       - "443:443"

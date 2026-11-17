@@ -28,6 +28,12 @@ export function describeError(err: unknown): ErrorDescription {
         retryable: true,
       };
     }
+    case "gateway":
+      return {
+        title: "Gateway sign-in required",
+        message: "The access gateway in front of this app has ended your session. Reload the page to sign in again.",
+        retryable: false,
+      };
     case "network":
       return { title: "Server unreachable", message: "Cannot reach the server. Check your connection and retry.", retryable: true };
     case "server":

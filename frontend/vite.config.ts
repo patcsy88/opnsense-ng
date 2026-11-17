@@ -8,6 +8,9 @@ export function pwaPlugin() {
   return VitePWA({
     registerType: "autoUpdate",
     injectRegister: "auto",
+    // The manifest request carries cookies, so an access gateway in front of the app does not
+    // redirect it to its login page.
+    useCredentials: true,
     manifest: {
       name: "OPNsense Firewall Manager",
       short_name: "FW Manager",

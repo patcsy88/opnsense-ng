@@ -33,6 +33,7 @@ Back up `CREDENTIAL_ENCRYPTION_KEY` separately from the database. Without it, st
 | `ALLOWED_HOSTS` | yes | Accepted `Host` headers; use the public hostname |
 | `SITE_ADDRESS` | yes for TLS | Hostname Caddy serves (default `localhost`) |
 | `ALLOWED_ORIGINS` | no | Extra allowed origins for login; empty = same-origin |
+| `CADDY_TRUSTED_PROXIES` | no | Addresses Caddy trusts for `X-Forwarded-For`, space separated. Default `127.0.0.1/32` (nothing). Set it only behind a TLS-terminating tunnel or proxy |
 | `TRUSTED_PROXIES` | no | Proxy addresses trusted for `X-Forwarded-For` (defaults to the compose subnet) |
 | `ALLOWED_FIREWALL_NETWORKS` | no | Replaces the default private-only target policy |
 | `ALLOW_INSECURE_TLS` | no | Permit `verify_tls=false` on firewalls (default false) |
@@ -85,15 +86,30 @@ Firewall addresses must be in a private range unless `ALLOWED_FIREWALL_NETWORKS`
 
 ## Using the app on an iPhone or iPad (installed PWA)
 
-The app is an installable web app. On iOS it needs no App Store build.
+The app is an installable web app. On iOS it needs no App Store build. It needs an HTTPS address the phone trusts. The setup below uses a tunnel such as Pangolin that terminates TLS and signs users in before they reach the app. A public hostname with a Let's Encrypt certificate straight on Caddy also works, and needs no tunnel settings.
 
-1. **Give the app an address the phone trusts.** Set `SITE_ADDRESS` to a real hostname that resolves from the phone (public DNS, or your own DNS reached over your VPN). Caddy gets a Let's Encrypt certificate automatically when the hostname is public. For a private name, either use a DNS-challenge certificate or install your own CA on the phone (Settings → General → VPN & Device Management, then Settings → General → About → Certificate Trust Settings → enable full trust). The internal `localhost` certificate will not work on a phone.
-2. **Make the phone able to reach it.** The app does not need to be on the internet. A VPN into the network that hosts it is enough.
-3. **Install it from Safari.** Open the address, tap Share, then Add to Home Screen. It opens full-screen with its own icon.
+### Behind a TLS-terminating tunnel (Pangolin)
+
+1. **Run the tunnel agent (Newt) next to the stack** and point the Pangolin resource at Caddy over plain HTTP, for example `http://caddy:80` when Newt joins the compose network, or `http://<docker-host>:80` otherwise. Pangolin presents the HTTPS certificate to the browser.
+2. **Set these in `.env`:**
+   - `SITE_ADDRESS=:80`. Caddy then serves plain HTTP and neither asks for a certificate nor redirects to HTTPS, which would loop behind the tunnel.
+   - `ALLOWED_HOSTS=<public hostname>`. Pangolin must pass the original `Host` header through.
+   - `CADDY_TRUSTED_PROXIES=<address or range Caddy sees the tunnel connect from>`. Without it Caddy treats the tunnel agent as the client, so every user shares one address in the audit log and one login rate-limit bucket. Check the real address in the audit log after a test sign-in. Do not trust a wider range than the tunnel needs.
+   - `TRUSTED_PROXIES` already covers the compose network, so the backend accepts the address Caddy passes on.
+   - Leave `ALLOWED_ORIGINS` empty and `COOKIE_SECURE` at its default. The browser still uses HTTPS, so the `__Host-` cookies work.
+   - Apply with `docker compose up -d` (Caddy has to be recreated to read the new variable).
+3. **Keep the app's own sign-in and MFA.** Treat the tunnel login as an outer gate. The app's roles, audit log and staged changes depend on its own session, and it never trusts identity headers from the tunnel. Do not expose ports 80 and 443 of the Docker host to any network that should not reach the app directly.
+4. **Install it from Safari.** Open the address, sign in at the tunnel, then tap Share and Add to Home Screen.
+
+First test on the phone, in this order:
+- The tunnel login, then the app sign-in with MFA, in the installed app. An installed iOS app keeps its own cookies, separate from Safari, so it signs in again. Passkey prompts may behave differently in an installed app.
+- The audit log shows the real client address for that sign-in, not the tunnel's.
+- The Traffic chart updates about once a second. If the tunnel buffers or cuts the stream, the chart falls back to polling every 5 s, which is the only symptom.
+- Leave the app open past the tunnel's session lifetime. Requests will then show "Gateway sign-in required". Reload the page to sign in at the tunnel again.
 
 Notes:
-- The sign-in session works as in a browser: secure cookies, CSRF, idle timeout and MFA are unchanged. iOS may clear a Home Screen app's storage after long non-use, so you may need to sign in again.
-- The live Traffic chart uses a server-sent stream. iOS pauses it when the app goes to the background and it reconnects when you return.
+- The manifest is fetched with cookies, so a tunnel login does not block the install name or icon.
+- The app session works as in a browser: secure cookies, CSRF, idle timeout and MFA are unchanged. iOS may clear a Home Screen app's storage after long non-use, so you may need to sign in again.
 - The service worker caches static files only, never `/api`, so firewall data is not kept on the phone.
 - A native App Store app (for example a Capacitor wrapper) is not built. It would need a new dependency, a cookie and CSP review, and an Apple Developer account, so it would need its own ADR.
 
