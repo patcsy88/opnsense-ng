@@ -27,7 +27,7 @@ function Meter({ label, value }: { label: string; value: number | null }) {
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium">{pct(value)}</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+      <div className="h-1.5 overflow-hidden rounded-full bg-default" aria-hidden>
         <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
       </div>
     </div>

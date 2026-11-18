@@ -59,7 +59,7 @@ export function InactiveNotice({
   return (
     <p
       role="status"
-      className="rounded-md border border-border bg-muted p-2 text-sm"
+      className="rounded-md border border-border bg-default p-2 text-sm"
     >
       {name} is {engineLabel[st]}
       {why} on this firewall, so changes here will not affect clients until it
