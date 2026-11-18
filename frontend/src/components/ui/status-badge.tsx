@@ -13,7 +13,7 @@ const CONFIG = {
 export function StatusBadge({ level, label }: { level: HealthLevel; label?: string }) {
   const { variant, Icon, label: defaultLabel } = CONFIG[level];
   return (
-    <Badge variant={variant}>
+    <Badge variant={variant} data-level={level}>
       <Icon className="h-3 w-3" aria-hidden />
       {label ?? defaultLabel}
     </Badge>
