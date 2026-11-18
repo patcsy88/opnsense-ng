@@ -2,6 +2,7 @@ import { useQuery } from "@tanstack/react-query";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 import { ErrorState } from "@/components/error-state";
+import { Button } from "@/components/ui/button";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Loading } from "@/components/ui/loading";
 import { SelectField } from "@/components/ui/select-field";
@@ -27,7 +28,7 @@ function Meter({ label, value }: { label: string; value: number | null }) {
         <span className="text-muted-foreground">{label}</span>
         <span className="font-medium">{pct(value)}</span>
       </div>
-      <div className="h-1.5 overflow-hidden rounded-full bg-muted" aria-hidden>
+      <div className="h-1.5 overflow-hidden rounded-full bg-default" aria-hidden>
         <div className="h-full rounded-full bg-primary" style={{ width: `${width}%` }} />
       </div>
     </div>
@@ -121,14 +122,15 @@ export function DashboardPage() {
               options={POLL_OPTIONS.map((o) => ({ value: String(o.ms), label: o.label }))}
             />
           </label>
-          <button
+          <Button
             type="button"
-            className="h-9 rounded-md border border-border bg-card px-3"
+            variant="outline"
+            size="sm"
             disabled={query.isFetching}
             onClick={() => void query.refetch()}
           >
             Refresh now
-          </button>
+          </Button>
         </div>
       </div>
 

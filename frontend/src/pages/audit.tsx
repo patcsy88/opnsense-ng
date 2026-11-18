@@ -114,6 +114,7 @@ export function AuditPage() {
             <label className="space-y-1 text-sm">
               Outcome
               <SelectField
+                aria-label="Outcome"
                 value={draft.outcome}
                 onValueChange={(v) => setDraft({ ...draft, outcome: v })}
                 options={OUTCOMES.map((o) => ({ value: o, label: o === "" ? "Any" : o }))}

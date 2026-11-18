@@ -1,11 +1,10 @@
+import { Drawer, Dropdown, Label, Separator } from "@heroui/react";
 import { LogOut, LogOutIcon, Menu as MenuIcon, UserRound } from "lucide-react";
 import { Suspense, useState } from "react";
-import { Link, NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
+import { NavLink, Outlet, useLocation, useNavigate } from "react-router-dom";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { Button } from "@/components/ui/button";
 import { Loading } from "@/components/ui/loading";
-import { Menu, MenuGroup, MenuGroupLabel, MenuItem, MenuPopup, MenuSeparator, MenuTrigger } from "@/components/ui/menu";
-import { Sheet, SheetContent, SheetDescription, SheetTitle, SheetTrigger } from "@/components/ui/sheet";
 import { useAuth } from "@/features/auth/auth";
 import { FirewallPicker, SelectedFirewallProvider } from "@/features/firewall/selected-firewall";
 import { api } from "@/lib/api";
@@ -53,29 +52,35 @@ function UserMenu() {
   };
   if (!user) return null;
   return (
-    <Menu>
-      <MenuTrigger render={<Button variant="ghost" size="sm" aria-label="User menu" />}>
+    <Dropdown>
+      <Button variant="ghost" size="sm" aria-label="User menu">
         <UserRound className="h-4 w-4" />
         <span className="hidden sm:inline">{user.username}</span>
-      </MenuTrigger>
-      <MenuPopup align="end">
-        <MenuGroup>
-          <MenuGroupLabel>
-            {user.username} · {user.role}
-          </MenuGroupLabel>
-        </MenuGroup>
-        <MenuSeparator />
-        <MenuItem render={<Link to="/account" />}>
-          <UserRound className="h-4 w-4" /> Account and MFA
-        </MenuItem>
-        <MenuItem onClick={() => void end(api.logout)}>
-          <LogOut className="h-4 w-4" /> Sign out
-        </MenuItem>
-        <MenuItem onClick={() => void end(api.logoutAll)}>
-          <LogOutIcon className="h-4 w-4" /> Sign out everywhere
-        </MenuItem>
-      </MenuPopup>
-    </Menu>
+      </Button>
+      <Dropdown.Popover placement="bottom end">
+        <div className="px-3 py-2 text-xs text-muted-foreground">
+          {user.username} · {user.role}
+        </div>
+        <Separator />
+        <Dropdown.Menu
+          onAction={(key) => {
+            if (key === "account") navigate("/account");
+            else if (key === "logout") void end(api.logout);
+            else if (key === "logout-all") void end(api.logoutAll);
+          }}
+        >
+          <Dropdown.Item id="account" textValue="Account and MFA">
+            <UserRound className="h-4 w-4" /> <Label>Account and MFA</Label>
+          </Dropdown.Item>
+          <Dropdown.Item id="logout" textValue="Sign out">
+            <LogOut className="h-4 w-4" /> <Label>Sign out</Label>
+          </Dropdown.Item>
+          <Dropdown.Item id="logout-all" textValue="Sign out everywhere">
+            <LogOutIcon className="h-4 w-4" /> <Label>Sign out everywhere</Label>
+          </Dropdown.Item>
+        </Dropdown.Menu>
+      </Dropdown.Popover>
+    </Dropdown>
   );
 }
 
@@ -98,18 +103,27 @@ export function AppLayout() {
       </aside>
       <div className="flex min-w-0 flex-1 flex-col">
         <header className="flex h-14 items-center gap-2 border-b border-border bg-background pl-[max(1rem,env(safe-area-inset-left))] pr-[max(1rem,env(safe-area-inset-right))]">
-          <Sheet open={open} onOpenChange={setOpen}>
-            <SheetTrigger
-              render={<Button variant="ghost" size="icon" className="md:hidden" aria-label="Open navigation" />}
-            >
-              <MenuIcon className="h-5 w-5" />
-            </SheetTrigger>
-            <SheetContent side="left">
-              <SheetTitle className="mb-4 px-3 text-sm font-semibold">OPNsense Manager</SheetTitle>
-              <SheetDescription className="sr-only">Site navigation</SheetDescription>
-              <NavLinks onNavigate={() => setOpen(false)} className="px-2" />
-            </SheetContent>
-          </Sheet>
+          <Button
+            variant="ghost"
+            size="icon"
+            className="md:hidden"
+            aria-label="Open navigation"
+            onClick={() => setOpen(true)}
+          >
+            <MenuIcon className="h-5 w-5" />
+          </Button>
+          <Drawer.Backdrop isOpen={open} onOpenChange={setOpen}>
+            <Drawer.Content placement="left">
+              <Drawer.Dialog aria-label="Site navigation">
+                <Drawer.Header>
+                  <Drawer.Heading className="px-3 text-sm font-semibold">OPNsense Manager</Drawer.Heading>
+                </Drawer.Header>
+                <Drawer.Body>
+                  <NavLinks onNavigate={() => setOpen(false)} className="px-2" />
+                </Drawer.Body>
+              </Drawer.Dialog>
+            </Drawer.Content>
+          </Drawer.Backdrop>
           <div className="flex-1 text-sm font-semibold md:hidden">OPNsense Manager</div>
           <div className="ml-auto flex items-center gap-1">
             {showsPicker(pathname) && <FirewallPicker />}

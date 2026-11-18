@@ -294,7 +294,7 @@ function Manage({
                 variant="destructive"
                 disabled={disable.isPending}
                 onClick={(e) => {
-                  const form = e.currentTarget.form;
+                  const form = (e.currentTarget as HTMLButtonElement).form;
                   if (!form) return;
                   setError(null);
                   const v = read(form);

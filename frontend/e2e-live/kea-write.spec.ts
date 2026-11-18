@@ -81,7 +81,7 @@ test("Kea reservation: create, edit, delete on the lab firewall", async ({
   const row = () => page.getByRole("row", { name: new RegExp(IP) });
   const open = async () => {
     await page.goto("/dhcp");
-    await pick(page, page.getByRole("combobox", { name: "Firewall" }), FIREWALL);
+    await pick(page, page.getByRole("button", { name: /Firewall/ }), FIREWALL);
     await page.getByRole("tab", { name: "Kea", exact: true }).click();
     await page.getByRole("tab", { name: "Reservations" }).click();
     await expect(page.getByText("Loading…")).toHaveCount(0);

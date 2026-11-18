@@ -177,23 +177,23 @@ describe("Traffic update rate", () => {
     vi.stubGlobal("EventSource", FakeEventSource);
     traffic(ADMIN);
     renderApp(<App />, "/traffic");
-    const picker = await screen.findByRole("combobox", { name: "Update rate" });
+    const picker = await screen.findByRole("button", { name: /Update rate/ });
     expect(picker).toHaveTextContent("Live (1 s)");
     await chooseOption(picker, "Every 5 s");
     expect(localStorage.getItem(RATE_KEY)).toBe("5");
-    expect(screen.getByRole("combobox", { name: "Update rate" })).toHaveTextContent("Every 5 s");
+    expect(screen.getByRole("button", { name: /Update rate/ })).toHaveTextContent("Every 5 s");
   });
 
   it("starts from a remembered choice and ignores a bad stored value", async () => {
     localStorage.setItem(RATE_KEY, "10");
     traffic(ADMIN);
     const view = renderApp(<App />, "/traffic");
-    expect(await screen.findByRole("combobox", { name: "Update rate" })).toHaveTextContent("Every 10 s");
+    expect(await screen.findByRole("button", { name: /Update rate/ })).toHaveTextContent("Every 10 s");
     view.unmount();
     localStorage.setItem(RATE_KEY, "bogus");
     traffic(ADMIN);
     renderApp(<App />, "/traffic");
-    expect(await screen.findByRole("combobox", { name: "Update rate" })).toHaveTextContent("Live (1 s)");
+    expect(await screen.findByRole("button", { name: /Update rate/ })).toHaveTextContent("Live (1 s)");
   });
 
   it("draws only every Nth second of the stream", async () => {
@@ -219,11 +219,11 @@ describe("Traffic update rate", () => {
     traffic(ADMIN);
     renderApp(<App />, "/traffic");
     await vi.waitFor(() => expect(FakeEventSource.all).toHaveLength(1));
-    await chooseOption(await screen.findByRole("combobox", { name: "Update rate" }), "Paused");
+    await chooseOption(await screen.findByRole("button", { name: /Update rate/ }), "Paused");
     expect(first().closed).toBe(true);
     expect(localStorage.getItem(RATE_KEY)).toBe("paused");
     expect(await screen.findByText(/Paused\. Choose an update rate/)).toBeInTheDocument();
-    await chooseOption(screen.getByRole("combobox", { name: "Update rate" }), "Live (1 s)");
+    await chooseOption(screen.getByRole("button", { name: /Update rate/ }), "Live (1 s)");
     await vi.waitFor(() => expect(FakeEventSource.all).toHaveLength(2));
   });
 

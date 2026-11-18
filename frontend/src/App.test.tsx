@@ -161,8 +161,8 @@ describe("role-based rendering", () => {
     expect(screen.getByText("Up")).toBeInTheDocument();
     expect(screen.getByText("no carrier")).toBeInTheDocument();
     // An enabled interface without carrier is an alarm; an unassigned one that is down is not.
-    expect(screen.getByText("no carrier").closest("[class*=text-destructive]")).not.toBeNull();
-    expect(screen.getByText("down").closest("[class*=text-destructive]")).toBeNull();
+    expect(screen.getByText("no carrier").closest("[data-level=critical]")).not.toBeNull();
+    expect(screen.getByText("down").closest("[data-level=critical]")).toBeNull();
     expect(screen.getByText("Unverified API mapping")).toBeInTheDocument();
   });
 

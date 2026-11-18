@@ -9,7 +9,7 @@
 | 5 | Audit logging, advanced security, multi-firewall (done: audit viewer, TOTP MFA, user management, PostgreSQL login limits, multi-firewall overview, now the Dashboard cards) | P2 |
 | 6 | Analytics, notifications, automation | P2 |
 | Traffic | Near-real-time traffic chart over a backend SSE stream per ADR-0023 (done, lab-verified through Caddy) | P2 |
-| UI | Move the UI from shadcn/Radix to coss ui on Base UI per ADR-0022 (done: tokens and fonts, primitives, overlays, tabs and selects, layout, lazy-loaded pages; live specs rerun on the lab) | P2 |
+| UI | Move the UI from coss ui (ADR-0022) to HeroUI v3 per ADR-0025 (done on the `heroui` branch: wrappers, dialogs, selects, menus, tables; awaiting review by eye and merge) | P2 |
 
 MVP: secure connection to OPNsense, health/interface/resource view, rule management, logs and blocked traffic, alias management with apply.
 

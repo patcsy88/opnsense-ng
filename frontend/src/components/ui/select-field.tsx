@@ -1,4 +1,5 @@
-import { Select, SelectItem, SelectPopup, SelectTrigger, SelectValue } from "@/components/ui/select";
+import { ListBox, Select } from "@heroui/react";
+import type { ReactElement } from "react";
 
 export interface SelectOption {
   value: string;
@@ -19,7 +20,7 @@ interface SelectFieldProps {
   "aria-label"?: string;
 }
 
-/** Native-select-shaped wrapper over the coss Select, used wherever a plain choice list is needed. */
+/** Native-select-shaped wrapper over the HeroUI Select, used wherever a plain choice list is needed. */
 export function SelectField({
   options,
   value,
@@ -29,28 +30,33 @@ export function SelectField({
   id,
   disabled,
   className,
-  size,
   "aria-label": ariaLabel,
-}: SelectFieldProps) {
+}: SelectFieldProps): ReactElement {
   return (
     <Select
-      items={options}
-      value={value}
-      defaultValue={defaultValue}
-      onValueChange={onValueChange ? (v) => onValueChange(String(v)) : undefined}
+      fullWidth
+      id={id}
       name={name}
-      disabled={disabled}
+      aria-label={ariaLabel}
+      className={className}
+      isDisabled={disabled}
+      selectedKey={value}
+      defaultSelectedKey={defaultValue}
+      onSelectionChange={onValueChange ? (k) => k !== null && onValueChange(String(k)) : undefined}
     >
-      <SelectTrigger id={id} aria-label={ariaLabel} className={className} size={size}>
-        <SelectValue />
-      </SelectTrigger>
-      <SelectPopup>
-        {options.map((o) => (
-          <SelectItem key={o.value} value={o.value}>
-            {o.label}
-          </SelectItem>
-        ))}
-      </SelectPopup>
+      <Select.Trigger>
+        <Select.Value />
+        <Select.Indicator />
+      </Select.Trigger>
+      <Select.Popover>
+        <ListBox items={options.map((o) => ({ ...o, id: o.value }))}>
+          {(o) => (
+            <ListBox.Item id={o.id} textValue={o.label}>
+              {o.label}
+            </ListBox.Item>
+          )}
+        </ListBox>
+      </Select.Popover>
     </Select>
   );
 }

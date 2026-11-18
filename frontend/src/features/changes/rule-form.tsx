@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { SelectField } from "@/components/ui/select-field";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -163,6 +164,7 @@ export function RuleForm({ initial, pending, error, onSubmit, onCancel }: Props)
           <Label htmlFor="rule-protocol">Protocol</Label>
           <SelectField
             id="rule-protocol"
+            aria-label="Protocol"
             value={protocol}
             onValueChange={(v) => setProtocol(v as RuleProposalInput["protocol"])}
             options={["any", "TCP", "UDP", "TCP/UDP", "ICMP"].map((v) => ({ value: v, label: v }))}
@@ -196,12 +198,12 @@ export function RuleForm({ initial, pending, error, onSubmit, onCancel }: Props)
         existing alias. Ports: a number, a range such as 8000:8100, or a port alias.
       </p>
       <div className="flex gap-4 text-sm">
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="enabled" defaultChecked={initial?.enabled ?? true} /> Enabled
-        </label>
-        <label className="flex items-center gap-2">
-          <input type="checkbox" name="log" defaultChecked={initial?.log ?? false} /> Log matching packets
-        </label>
+        <Checkbox name="enabled" defaultChecked={initial?.enabled ?? true}>
+          Enabled
+        </Checkbox>
+        <Checkbox name="log" defaultChecked={initial?.log ?? false}>
+          Log matching packets
+        </Checkbox>
       </div>
       <p className="text-xs text-muted-foreground">
         Pass-any rules and rules on WAN are marked high risk. {editing ? "The rule keeps its position." : "The rule is placed after the last existing rule."}
