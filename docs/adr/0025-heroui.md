@@ -1,6 +1,6 @@
 # ADR-0025: HeroUI replaces coss ui
 
-- Status: accepted (approved by project owner on 2026-11-18); implementation in progress on the `heroui` branch
+- Status: accepted (approved by project owner on 2026-11-18); implemented on the `heroui` branch, not yet merged
 - Date: 2026-11-18
 - Deciders: project owner
 - Supersedes: ADR-0022
@@ -23,3 +23,10 @@ ADR-0022 adopted coss ui, copied into `frontend/src/components/ui` on Base UI. T
 - The look changes. The owner reviews it by eye after the migration, since automated tests cover behaviour and structure only.
 - The bundle size is measured before and after.
 - npm audit shows the same 22 findings before and after adding the packages (all pre-existing, dev tooling).
+
+## Outcome
+
+- All 21 files in `src/components/ui` are now wrappers or removed (`select`, `menu`, `sheet`, `alert-dialog`, `scroll-area` and `segmented-control` were deleted). `@base-ui/react` and `class-variance-authority` are removed.
+- Tables keep native markup styled with HeroUI variables. The menus and mobile navigation use HeroUI Dropdown and Drawer directly.
+- Selects are React Aria buttons, not comboboxes, so tests find them by button role.
+- Precached assets grew from about 1377 KiB to about 1810 KiB.

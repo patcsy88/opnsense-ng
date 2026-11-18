@@ -1,20 +1,12 @@
 # Third-party notices (frontend)
 
-## coss ui
+## HeroUI
 
-Components in `src/components/ui` are copied from coss ui (https://github.com/cosscom/ui), adapted to this project's import paths (ADR-0022). Local changes are marked with a comment in the file.
+`@heroui/react` and `@heroui/styles`, Apache License 2.0, Copyright (c) HeroUI Inc. (ADR-0025). The components in `src/components/ui` are thin wrappers over HeroUI. Licence text: https://www.apache.org/licenses/LICENSE-2.0
 
-MIT License. Copyright (c) 2025 coss.com and Origin UI.
+## React Aria
 
-Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
-
-The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
-
-THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
-
-## Base UI
-
-`@base-ui/react`, MIT License, Copyright (c) MUI.
+`react-aria`, `react-aria-components` and the `@react-aria/*` and `@internationalized/date` packages, Apache License 2.0, Copyright (c) Adobe.
 
 ## Fonts
 
