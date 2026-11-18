@@ -61,7 +61,7 @@ describe("Audit log page", () => {
     renderApp(<App />, "/administration/audit");
     await screen.findByText("firewall.dns.stats");
     fireEvent.change(screen.getByLabelText("User"), { target: { value: "bob" } });
-    await chooseOption(screen.getByLabelText("Outcome"), "failure");
+    await chooseOption(screen.getByRole("button", { name: /Outcome/ }), "failure");
     fireEvent.click(screen.getByRole("button", { name: "Apply filters" }));
     await waitFor(() => expect(seen.some((s) => s.includes("username=bob") && s.includes("outcome=failure"))).toBe(true));
   });

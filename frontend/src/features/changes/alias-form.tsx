@@ -68,6 +68,7 @@ export function AliasForm({ initial, pending, error, onSubmit, onCancel }: Props
         <Label htmlFor="alias-type">Type</Label>
         <SelectField
           id="alias-type"
+          aria-label="Type"
           options={ALIAS_TYPES.map((t) => ({ value: t, label: t }))}
           value={type}
           disabled={editing}

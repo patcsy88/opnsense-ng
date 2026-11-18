@@ -69,7 +69,7 @@ describe("Users page", () => {
     fireEvent.change(await screen.findByLabelText("Username"), {
       target: { value: "ann" },
     });
-await chooseOption(screen.getByLabelText("Role"), "network_admin");
+await chooseOption(screen.getByRole("button", { name: /\bRole$/ }), "network_admin");
     fireEvent.click(screen.getByRole("button", { name: "Create user" }));
     expect(await screen.findByTestId("temp-password")).toHaveTextContent(
       "Abcd2345Efgh6789Jklm",
@@ -91,7 +91,7 @@ await chooseOption(screen.getByLabelText("Role"), "network_admin");
       }),
     );
     renderApp(<App />, "/administration/users");
-await chooseOption(await screen.findByLabelText("Role for ann"), "security_admin");
+await chooseOption(await screen.findByRole("button", { name: /Role for ann/ }), "security_admin");
     await waitFor(() => expect(sent).toEqual({ role: "security_admin" }));
   });
 

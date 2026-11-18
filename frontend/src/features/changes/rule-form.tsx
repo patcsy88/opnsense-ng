@@ -163,6 +163,7 @@ export function RuleForm({ initial, pending, error, onSubmit, onCancel }: Props)
           <Label htmlFor="rule-protocol">Protocol</Label>
           <SelectField
             id="rule-protocol"
+            aria-label="Protocol"
             value={protocol}
             onValueChange={(v) => setProtocol(v as RuleProposalInput["protocol"])}
             options={["any", "TCP", "UDP", "TCP/UDP", "ICMP"].map((v) => ({ value: v, label: v }))}

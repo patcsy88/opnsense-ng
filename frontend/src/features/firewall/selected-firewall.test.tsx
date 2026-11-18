@@ -44,7 +44,7 @@ describe("shared firewall choice", () => {
     const seen: string[] = [];
     setup(seen);
     renderApp(<App />, "/network");
-    const picker = await screen.findByLabelText("Firewall");
+    const picker = await screen.findByRole("button", { name: /Firewall/ });
     await waitFor(() => expect(seen).toContain(A));
     await chooseOption(picker, "bravo-fw");
     await waitFor(() => expect(seen).toContain(B));

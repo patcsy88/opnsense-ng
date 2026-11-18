@@ -273,7 +273,7 @@ describe("Alias update and delete", () => {
     renderApp(<App />, "/firewall");
     fireEvent.click(await screen.findByRole("button", { name: /^edit$/i }));
     expect(await screen.findByLabelText("Name")).toHaveAttribute("readonly");
-    expect(screen.getByLabelText("Type")).toBeDisabled();
+    expect(screen.getByRole("button", { name: /Type/ })).toBeDisabled();
     fireEvent.change(screen.getByLabelText("Content"), { target: { value: "10.0.0.1\n10.0.0.9" } });
     fireEvent.click(screen.getByRole("button", { name: "Create change request" }));
     await waitFor(() => expect(body).not.toBeNull());
@@ -550,7 +550,7 @@ describe("New rule", () => {
     fireEvent.click(newRule);
     fireEvent.change(await screen.findByLabelText("Description"), { target: { value: "Block telnet" } });
     fireEvent.change(screen.getByLabelText("Interface"), { target: { value: "lan" } });
-    await chooseOption(screen.getByLabelText("Protocol"), "TCP");
+    await chooseOption(screen.getByRole("button", { name: /Protocol/ }), "TCP");
     fireEvent.change(await screen.findByLabelText("Destination port"), { target: { value: "23" } });
     fireEvent.click(screen.getByLabelText(/log matching/i));
     fireEvent.click(screen.getByRole("button", { name: "Create request" }));
@@ -600,7 +600,7 @@ describe("New rule", () => {
     );
     renderApp(<App />, "/administration/changes");
     await screen.findByRole("heading", { name: "Changes" });
-    await screen.findByRole("combobox", { name: /firewall/i });
+    await screen.findByRole("button", { name: /firewall/i });
     expect(screen.queryByRole("button", { name: /new rule/i })).not.toBeInTheDocument();
   });
 });

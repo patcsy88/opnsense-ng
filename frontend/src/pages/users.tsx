@@ -179,6 +179,7 @@ export function UsersPage() {
             <label className="space-y-1 text-sm">
               Role
               <SelectField
+                aria-label="Role"
                 value={newRole}
                 onValueChange={(v) => setNewRole(v as Role)}
                 options={ROLES.map((r) => ({ value: r, label: r }))}
