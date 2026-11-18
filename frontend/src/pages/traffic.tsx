@@ -154,7 +154,21 @@ export function TrafficPage() {
                               <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
                               <XAxis dataKey="t" tickFormatter={(v: number) => `${v}s`} fontSize={11} />
                               <YAxis tickFormatter={(v: number) => formatRate(v)} width={78} fontSize={11} />
-                              <Tooltip formatter={(v) => formatRate(Number(v))} labelFormatter={(v) => `${v}s`} />
+                              <Tooltip
+                                formatter={(v) => formatRate(Number(v))}
+                                labelFormatter={(v) => `${v}s`}
+                                contentStyle={{
+                                  background: "var(--overlay)",
+                                  color: "var(--overlay-foreground)",
+                                  border: "1px solid var(--border)",
+                                  borderRadius: "var(--radius)",
+                                  fontSize: 12,
+                                  boxShadow: "var(--overlay-shadow, 0 4px 16px rgb(0 0 0 / 0.15))",
+                                }}
+                                labelStyle={{ color: "var(--muted)", marginBottom: 4 }}
+                                itemStyle={{ color: "var(--overlay-foreground)" }}
+                                cursor={{ stroke: "var(--muted)", strokeOpacity: 0.4 }}
+                              />
                               <Legend />
                               <Line type="monotone" dataKey="inBps" name="In" stroke="#3b82f6" dot={false} isAnimationActive={false} />
                               <Line type="monotone" dataKey="outBps" name="Out" stroke="#f59e0b" dot={false} isAnimationActive={false} />
