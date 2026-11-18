@@ -12,6 +12,7 @@ class RO {
 globalThis.ResizeObserver ??= RO;
 Element.prototype.hasPointerCapture ??= () => false;
 Element.prototype.scrollIntoView ??= () => {};
+Element.prototype.getAnimations ??= () => [];
 
 beforeAll(() => server.listen({ onUnhandledFrame: "error" }));
 afterEach(() => {
