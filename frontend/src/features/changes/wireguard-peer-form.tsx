@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -171,18 +172,17 @@ export function WireguardPeerForm({
             tunnels
               .filter((t) => t.uuid)
               .map((t) => (
-                <label key={t.uuid} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="servers"
-                    value={t.uuid as string}
-                    defaultChecked={initial?.servers.includes(t.uuid as string)}
-                  />
+                <Checkbox
+                  key={t.uuid}
+                  name="servers"
+                  value={t.uuid as string}
+                  defaultChecked={initial?.servers.includes(t.uuid as string)}
+                >
                   {t.name ?? t.uuid}{" "}
                   <span className="font-mono text-xs text-muted-foreground">
                     {t.tunneladdress.join(", ")}
                   </span>
-                </label>
+                </Checkbox>
               ))
           )}
         </fieldset>

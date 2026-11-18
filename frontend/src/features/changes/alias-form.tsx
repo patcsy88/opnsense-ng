@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { SelectField } from "@/components/ui/select-field";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
@@ -96,10 +97,9 @@ export function AliasForm({ initial, pending, error, onSubmit, onCancel }: Props
       </div>
       <div className="space-y-1">
         {editing && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={enabled} onChange={(e) => setEnabled(e.target.checked)} />
+          <Checkbox checked={enabled} onCheckedChange={setEnabled}>
             Enabled
-          </label>
+          </Checkbox>
         )}
       </div>
       <p className="text-xs text-muted-foreground">

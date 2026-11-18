@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -159,14 +160,13 @@ export function WireguardTunnelForm({
             defaultValue={initial?.mtu ?? ""}
           />
         </div>
-        <label className="col-span-2 flex items-center gap-2 text-sm">
-          <input
-            type="checkbox"
-            name="disableroutes"
-            defaultChecked={initial?.disableroutes}
-          />
+        <Checkbox
+          className="col-span-2"
+          name="disableroutes"
+          defaultChecked={initial?.disableroutes}
+        >
           Do not add routes for the peers&apos; addresses
-        </label>
+        </Checkbox>
         <fieldset className="col-span-2 space-y-1">
           <legend className="text-sm font-medium">Peers</legend>
           {peers.filter((p) => p.uuid).length === 0 ? (
@@ -177,15 +177,14 @@ export function WireguardTunnelForm({
             peers
               .filter((p) => p.uuid)
               .map((p) => (
-                <label key={p.uuid} className="flex items-center gap-2 text-sm">
-                  <input
-                    type="checkbox"
-                    name="peers"
-                    value={p.uuid as string}
-                    defaultChecked={initial?.peers.includes(p.uuid as string)}
-                  />
+                <Checkbox
+                  key={p.uuid}
+                  name="peers"
+                  value={p.uuid as string}
+                  defaultChecked={initial?.peers.includes(p.uuid as string)}
+                >
                   {p.name ?? p.uuid}
-                </label>
+                </Checkbox>
               ))
           )}
         </fieldset>

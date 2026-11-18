@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -90,16 +91,14 @@ export function FirewallForm({ firewall, pending, error, onSubmit, onCancel }: P
         </Label>
         <Textarea id="fw-ca" name="ca_bundle_pem" placeholder="-----BEGIN CERTIFICATE-----" />
         {editing && firewall.has_ca_bundle && (
-          <label className="flex items-center gap-2 text-sm">
-            <input type="checkbox" checked={removeCa} onChange={(e) => setRemoveCa(e.target.checked)} />
+          <Checkbox checked={removeCa} onCheckedChange={setRemoveCa}>
             Remove stored CA bundle
-          </label>
+          </Checkbox>
         )}
       </div>
-      <label className="flex items-center gap-2 text-sm">
-        <input type="checkbox" checked={verifyTls} onChange={(e) => setVerifyTls(e.target.checked)} />
+      <Checkbox checked={verifyTls} onCheckedChange={setVerifyTls}>
         Verify TLS certificate
-      </label>
+      </Checkbox>
       {!verifyTls && (
         <p role="alert" className="rounded-md border border-warning/50 bg-warning/10 p-2 text-sm text-warning">
           Warning: with certificate verification off, the connection to this firewall can be intercepted

@@ -151,9 +151,21 @@ export function TrafficPage() {
                         <div role="img" aria-label={`Traffic graph for ${s.label}`} className="h-48">
                           <ResponsiveContainer width="100%" height="100%">
                             <LineChart data={s.points}>
-                              <CartesianGrid strokeDasharray="3 3" strokeOpacity={0.3} />
-                              <XAxis dataKey="t" tickFormatter={(v: number) => `${v}s`} fontSize={11} />
-                              <YAxis tickFormatter={(v: number) => formatRate(v)} width={78} fontSize={11} />
+                              <CartesianGrid strokeDasharray="3 3" stroke="var(--border)" />
+                              <XAxis
+                                dataKey="t"
+                                tickFormatter={(v: number) => `${v}s`}
+                                fontSize={11}
+                                stroke="var(--border)"
+                                tick={{ fill: "var(--muted)" }}
+                              />
+                              <YAxis
+                                tickFormatter={(v: number) => formatRate(v)}
+                                width={78}
+                                fontSize={11}
+                                stroke="var(--border)"
+                                tick={{ fill: "var(--muted)" }}
+                              />
                               <Tooltip
                                 formatter={(v) => formatRate(Number(v))}
                                 labelFormatter={(v) => `${v}s`}
@@ -169,9 +181,9 @@ export function TrafficPage() {
                                 itemStyle={{ color: "var(--overlay-foreground)" }}
                                 cursor={{ stroke: "var(--muted)", strokeOpacity: 0.4 }}
                               />
-                              <Legend />
-                              <Line type="monotone" dataKey="inBps" name="In" stroke="#3b82f6" dot={false} isAnimationActive={false} />
-                              <Line type="monotone" dataKey="outBps" name="Out" stroke="#f59e0b" dot={false} isAnimationActive={false} />
+                              <Legend wrapperStyle={{ fontSize: 12, color: "var(--muted)" }} />
+                              <Line type="monotone" dataKey="inBps" name="In" stroke="var(--accent)" strokeWidth={2} dot={false} isAnimationActive={false} />
+                              <Line type="monotone" dataKey="outBps" name="Out" stroke="var(--warning)" strokeWidth={2} dot={false} isAnimationActive={false} />
                             </LineChart>
                           </ResponsiveContainer>
                         </div>

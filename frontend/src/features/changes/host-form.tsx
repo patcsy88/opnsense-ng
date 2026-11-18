@@ -1,3 +1,4 @@
+import { Checkbox } from "@/components/ui/checkbox";
 import { useState, type FormEvent } from "react";
 import { Button } from "@/components/ui/button";
 import { DialogFooter } from "@/components/ui/dialog";
@@ -170,14 +171,9 @@ export function HostForm({
         give that device this address. No wildcards. The description is also the
         text you type to apply a high-risk entry.
       </p>
-      <label className="flex items-center gap-2 text-sm">
-        <input
-          type="checkbox"
-          name="ignore"
-          defaultChecked={initial?.ignore ?? false}
-        />{" "}
+      <Checkbox name="ignore" defaultChecked={initial?.ignore ?? false}>
         Ignore: refuse DHCP to these MAC addresses (high risk)
-      </label>
+      </Checkbox>
       {editing && (
         <div
           aria-label="Changes"
